@@ -1,0 +1,9 @@
+idf_component_register(
+    SRCS
+        ./my_lcd.c
+        ./my_ui_behavior.c
+    INCLUDE_DIRS
+        .
+    REQUIRES
+        main
+)
