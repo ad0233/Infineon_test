@@ -9,12 +9,18 @@ static const char *TAG = "fsm_main";
 
 enum fsm_main_event_enum {
     F_MAIN_E_INIT,
+    F_MAIN_E_LIDAR_FIND,
+    F_MAIN_E_LIDAR_UPDATE,
+    F_MAIN_E_LIDAR_NOT_FOUND,
+    F_MAIN_E_DEV_MOVE,
     F_MAIN_E_BTN_CLICKED,
-    F_MAIN_E_TIMEOUT = 255,
+    F_MAIN_E_BTN_L_CLICKED,
+    F_MAIN_E_TIMEOUT = 255, // 特殊事件，不能改值，库内部要求，fsm_timeout_trig函数触发该事件
 };
 
 enum fsm_main_state_enum {
     F_MAIN_S_UNINIT,
+    F_MAIN_S_CLOCK,
     // 找人
     F_MAIN_S_FINDPERSON,
     F_MAIN_S_FINDSUC,
@@ -22,23 +28,33 @@ enum fsm_main_state_enum {
     // Wifi连接
     F_MAIN_S_WIFI_GUIDE,
     F_MAIN_S_WIFI_CONN,
+    F_MAIN_S_WIFI_OFFLINE,
+    F_MAIN_S_WIFI_CONN_SUC,
+    F_MAIN_S_WIFI_CONN_FAIL,
 };
 
 static struct StateTable fsm_user_table[] = {
-    //区分事件组变量       编号     到来的事件                 当前的状态          下一个状态         超时  立即执行  将要要执行的函数
-    { nullptr            ,0   ,F_MAIN_E_INIT        , F_MAIN_S_UNINIT     , F_MAIN_S_FINDPERSON  ,15  ,false , fsm_main_do_init    },
+    //区分事件组变量       编号     到来的事件           当前的状态            下一个状态         超时  立即执行  将要要执行的函数
+    { nullptr            ,0   ,F_MAIN_E_INIT         , F_MAIN_S_UNINIT     , F_MAIN_S_FINDPERSON  ,15   ,false   ,fsm_main_lidar_find },
+    { nullptr            ,0   ,F_MAIN_E_LIDAR_UPDATE , F_MAIN_S_CLOCK      , F_MAIN_S_CLOCK       ,0    ,false   ,fsm_main_lidar_clock_update },
     // 找人
-    { nullptr            ,0   ,F_MAIN_E_INIT        , F_MAIN_S_FINDPERSON , F_MAIN_S_FINDSUC     ,60  ,false , fsm_main_do_init    },
-    { nullptr            ,0   ,F_MAIN_E_INIT        , F_MAIN_S_FINDPERSON , F_MAIN_S_FINDSUC     ,60  ,false , fsm_main_do_init    },
-    { nullptr            ,0   ,F_MAIN_E_TIMEOUT     , F_MAIN_S_FINDPERSON , F_MAIN_S_FINDFAIL    ,60  ,false , fsm_main_do_init    },
+    { nullptr            ,0   ,F_MAIN_E_DEV_MOVE     , F_MAIN_S_FINDFAIL   , F_MAIN_S_FINDPERSON  ,15   ,false   ,fsm_main_lidar_find_fail },
+    { nullptr            ,0   ,F_MAIN_E_LIDAR_FIND   , F_MAIN_S_FINDPERSON , F_MAIN_S_FINDSUC     ,5    ,false   ,fsm_main_lidar_find_suc  },
+    { nullptr            ,0   ,F_MAIN_E_TIMEOUT      , F_MAIN_S_FINDPERSON , F_MAIN_S_FINDFAIL    ,0    ,false   ,fsm_main_lidar_find },
+    // 网络相关
+    { fm_has_w_c_state ,FM_W_N_CFG ,F_MAIN_E_TIMEOUT  , F_MAIN_S_FINDSUC    , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,nullptr },
+    { fm_has_w_c_state ,FM_W_CONN  ,F_MAIN_E_TIMEOUT  , F_MAIN_S_FINDSUC    , F_MAIN_S_WIFI_CONN      ,0    ,false   ,fsm_main_wifi_connecting },
+    { fm_has_w_c_state ,FM_W_SUC   ,F_MAIN_E_TIMEOUT  , F_MAIN_S_FINDSUC    , F_MAIN_S_CLOCK          ,10   ,false   ,fsm_main_wifi_conn_suc },
+    { fm_has_w_c_state ,FM_W_FAI   ,F_MAIN_E_TIMEOUT  , F_MAIN_S_FINDSUC    , F_MAIN_S_WIFI_CONN_FAIL ,10   ,false   ,fsm_main_wifi_conn_fail },//ConnectingFailed
     // 指引连接wifi
-    { fm_has_wifi_config ,0   ,F_MAIN_E_BTN_CLICKED , F_MAIN_S_FINDPERSON , F_MAIN_S_WIFI_GUIDE  ,60  ,false , nullptr    },
-    { fm_has_wifi_config ,0   ,F_MAIN_E_BTN_CLICKED , F_MAIN_S_FINDSUC    , F_MAIN_S_WIFI_GUIDE  ,60  ,false , nullptr    },
-    { fm_has_wifi_config ,0   ,F_MAIN_E_BTN_CLICKED , F_MAIN_S_FINDFAIL   , F_MAIN_S_WIFI_GUIDE  ,60  ,false , nullptr    },
-    // 连接wifi
-    { fm_has_wifi_config ,1   ,F_MAIN_E_BTN_CLICKED , F_MAIN_S_FINDPERSON , F_MAIN_S_WIFI_CONN   ,60  ,false , nullptr    },
-    { fm_has_wifi_config ,1   ,F_MAIN_E_BTN_CLICKED , F_MAIN_S_FINDSUC    , F_MAIN_S_WIFI_CONN   ,60  ,false , nullptr    },
-    { fm_has_wifi_config ,1   ,F_MAIN_E_BTN_CLICKED , F_MAIN_S_FINDFAIL   , F_MAIN_S_WIFI_CONN   ,60  ,false , nullptr    },
+    { fm_has_wifi_config ,0   ,F_MAIN_E_BTN_L_CLICKED, F_MAIN_S_FINDPERSON , F_MAIN_S_WIFI_GUIDE  ,0    ,false   ,fsm_main_wifi_guide },
+    { fm_has_wifi_config ,0   ,F_MAIN_E_BTN_L_CLICKED, F_MAIN_S_FINDSUC    , F_MAIN_S_WIFI_GUIDE  ,0    ,false   ,fsm_main_wifi_guide },
+    { fm_has_wifi_config ,0   ,F_MAIN_E_BTN_L_CLICKED, F_MAIN_S_FINDFAIL   , F_MAIN_S_WIFI_GUIDE  ,0    ,false   ,fsm_main_wifi_guide },
+    { fm_has_wifi_config ,1   ,F_MAIN_E_BTN_L_CLICKED, F_MAIN_S_FINDPERSON , F_MAIN_S_WIFI_CONN   ,10   ,false   ,fsm_main_wifi_connecting },
+    { fm_has_wifi_config ,1   ,F_MAIN_E_BTN_L_CLICKED, F_MAIN_S_FINDSUC    , F_MAIN_S_WIFI_CONN   ,10   ,false   ,fsm_main_wifi_connecting },
+    { fm_has_wifi_config ,1   ,F_MAIN_E_BTN_L_CLICKED, F_MAIN_S_FINDFAIL   , F_MAIN_S_WIFI_CONN   ,10   ,false   ,fsm_main_wifi_connecting },
+    // wifi 连接失败
+    { nullptr            ,0   ,F_MAIN_E_TIMEOUT      , F_MAIN_S_WIFI_CONN  , F_MAIN_S_WIFI_GUIDE  ,0    ,false   ,fsm_main_wifi_guide },
 };
 
 static uint32_t timeout_ms_tick = 0;
