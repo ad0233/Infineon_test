@@ -33,8 +33,13 @@ typedef union {
 } device_config_t;
 
 // 验证结构体大小
+#ifdef __cplusplus
+static_assert(sizeof(device_config_t) == DEVICE_CONFIG_SIZE, "device_config_t size must be exactly 1024 bytes");
+static_assert(sizeof(struct device_config) <= DEVICE_CONFIG_SIZE, "device_config struct size must not exceed 1024 bytes");
+#else
 _Static_assert(sizeof(device_config_t) == DEVICE_CONFIG_SIZE, "device_config_t size must be exactly 1024 bytes");
 _Static_assert(sizeof(struct device_config) <= DEVICE_CONFIG_SIZE, "device_config struct size must not exceed 1024 bytes");
+#endif
 
 // 对外接口函数声明
 #ifdef __cplusplus
