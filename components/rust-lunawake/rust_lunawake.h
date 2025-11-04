@@ -18,13 +18,13 @@ typedef struct single_parse_t* single_parse_handle_t;
  * @param max_size Maximum frame size for parsing
  * @return Parser handle, NULL on failure
  */
-single_parse_handle_t single_parse_new(size_t max_size);
+single_parse_handle_t rust_single_parse_new(size_t max_size);
 
 /**
  * @brief Free a single parse instance
  * @param parser Parser handle returned from single_parse_new
  */
-void single_parse_free(single_parse_handle_t parser);
+void rust_single_parse_free(single_parse_handle_t parser);
 
 /**
  * @brief Unpack a single byte (incremental parsing)
@@ -34,7 +34,7 @@ void single_parse_free(single_parse_handle_t parser);
  * @return Pointer to decoded data if frame complete, NULL otherwise
  * @note The returned pointer is valid until the next call to single_parse_unpack
  */
-const uint8_t* single_parse_unpack(single_parse_handle_t parser, uint8_t byte, size_t* out_len);
+const uint8_t* rust_single_parse_unpack(single_parse_handle_t parser, uint8_t byte, size_t* out_len);
 
 /**
  * @brief Pack data into a frame
@@ -44,7 +44,7 @@ const uint8_t* single_parse_unpack(single_parse_handle_t parser, uint8_t byte, s
  * @param out_buf_len Size of output buffer
  * @return Actual encoded length on success, -1 on failure
  */
-int single_parse_pack(const uint8_t* data, size_t data_len, uint8_t* out_buf, size_t out_buf_len);
+int rust_single_parse_pack(const uint8_t* data, size_t data_len, uint8_t* out_buf, size_t out_buf_len);
 
 #ifdef __cplusplus
 }

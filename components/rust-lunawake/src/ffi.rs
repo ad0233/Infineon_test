@@ -12,7 +12,7 @@ pub struct SingleParseWrapper {
 /// max_size: maximum frame size for parsing
 /// Returns: opaque pointer to the parser, or NULL on failure
 #[no_mangle]
-pub extern "C" fn single_parse_new(max_size: usize) -> *mut SingleParseWrapper {
+pub extern "C" fn rust_single_parse_new(max_size: usize) -> *mut SingleParseWrapper {
     if max_size == 0 {
         return ptr::null_mut();
     }
@@ -28,7 +28,7 @@ pub extern "C" fn single_parse_new(max_size: usize) -> *mut SingleParseWrapper {
 /// Free a SingleParse instance
 /// parser: pointer returned from single_parse_new
 #[no_mangle]
-pub extern "C" fn single_parse_free(parser: *mut SingleParseWrapper) {
+pub extern "C" fn rust_single_parse_free(parser: *mut SingleParseWrapper) {
     if !parser.is_null() {
         unsafe {
             let _ = Box::from_raw(parser);
@@ -42,7 +42,7 @@ pub extern "C" fn single_parse_free(parser: *mut SingleParseWrapper) {
 /// out_len: pointer to store the output length (set to 0 if no complete frame)
 /// Returns: pointer to decoded data if frame complete, NULL otherwise
 #[no_mangle]
-pub extern "C" fn single_parse_unpack(
+pub extern "C" fn rust_single_parse_unpack(
     parser: *mut SingleParseWrapper,
     byte: u8,
     out_len: *mut usize,
@@ -73,7 +73,7 @@ pub extern "C" fn single_parse_unpack(
 /// out_buf_len: size of output buffer
 /// Returns: actual encoded length on success, -1 on failure
 #[no_mangle]
-pub extern "C" fn single_parse_pack(
+pub extern "C" fn rust_single_parse_pack(
     data: *const u8,
     data_len: usize,
     out_buf: *mut u8,
