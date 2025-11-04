@@ -172,8 +172,69 @@ extern "C" void app_main()
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
 
+    rust_lib_init();
+
     my_ble_init();
 
+    StreamBufferHandle_t ble_recv_stream = my_stream_buffer_create(1024 * 10, 1);
+    if (ble_recv_stream == NULL) {
+        ESP_LOGE("BLE_RX", "Failed to create BLE receive stream buffer");
+        return;
+    }
+    my_ble_register_recv_callback([](const uint8_t *data, uint16_t len, void *context) {
+        StreamBufferHandle_t stream = (StreamBufferHandle_t)context;
+        // ESP_LOG_BUFFER_HEXDUMP("BLE_RX", data, len, ESP_LOG_INFO);
+        size_t sent = xStreamBufferSend(stream, data, len, 0);
+        if (sent != len) {
+            ESP_LOGE("BLE_RX", "Stream buffer full, lost %d bytes", len - sent);
+        }
+    }, ble_recv_stream);
+    my_thread_create([](void *arg) {
+        StreamBufferHandle_t ble_recv_stream = (StreamBufferHandle_t)arg;
+        // decode task
+        single_parse_handle_t single_parser = rust_single_parse_new(100 * 1024);
+        if (single_parser == nullptr) {
+            ESP_LOGE("RUST", "Failed to init single parser");
+            vTaskDelete(nullptr);
+        }
+        auto one_packet_len = 10 * 1024;
+        auto one_packet_buf = (uint8_t *)heap_caps_malloc(one_packet_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        while(1) {
+            auto len = xStreamBufferReceive(
+                ble_recv_stream,
+                one_packet_buf, one_packet_len, portMAX_DELAY);
+            if (len > 0) {
+                size_t out_len;
+                for(auto i = 0; i < len; i++ ) {
+                    const uint8_t *out_buf = rust_single_parse_unpack(
+                        single_parser,
+                        one_packet_buf[i],
+                        &out_len);
+                        if (out_len > 0) {
+                            ESP_LOGI(TAG, "Parsed packet, len %d", out_len);
+                            ESP_LOG_BUFFER_HEXDUMP(TAG, out_buf, out_len, ESP_LOG_INFO);
+                        }
+                }
+            }
+        }
+    }, "rust_task", 1024 * 16, ble_recv_stream, 5, NULL);
+    xTaskCreate([](void *arg) {
+        static uint8_t send_buf[128];
+        while (1)
+        {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            int len = rust_single_parse_pack(
+                (const uint8_t*)"Hello from ESP32 BLE!", 
+                strlen("Hello from ESP32 BLE!"), 
+                send_buf, 
+                sizeof(send_buf));
+            if (len > 0) {
+                my_ble_send_data(send_buf, len, 1000);
+            } else {
+                ESP_LOGE("BLE_TX", "Pack failed");
+            }
+        }
+    }, "rust_task", 8192, NULL, 5, NULL);
     my_rtc_init();
     my_lcd_init();
     my_radar_init();
@@ -194,7 +255,7 @@ extern "C" void app_main()
         mac_str.erase(std::remove(mac_str.begin(), mac_str.end(), ':'), mac_str.end());
     }
     
-    my_ui_generate_qr_code("https://lunawake.com/wx", "lunawake", "test", mac_str.c_str());
+    my_ui_generate_qr_code("https://lunawake.ai", "lunawake", "test", mac_str.c_str());
 
     if (fsm_main_init() != 0) {
         ESP_LOGE(TAG, "fsm_main_init failed");

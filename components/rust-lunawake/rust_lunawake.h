@@ -1,6 +1,15 @@
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
+#include <assert.h>
+
+// ESP32 是 32 位架构，约定类型大小为 4 字节
+#define RUST_FFI_PTR_SIZE 4
+
+// 静态检查：确保 C 的类型大小符合约定
+_Static_assert(sizeof(size_t) == RUST_FFI_PTR_SIZE, "size_t must be 4 bytes");
+_Static_assert(sizeof(intptr_t) == RUST_FFI_PTR_SIZE, "intptr_t must be 4 bytes");
+_Static_assert(sizeof(void*) == RUST_FFI_PTR_SIZE, "pointer must be 4 bytes");
 
 #ifdef __cplusplus
 extern "C" {

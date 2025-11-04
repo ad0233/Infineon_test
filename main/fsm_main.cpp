@@ -69,7 +69,7 @@ static struct StateTable fsm_user_table[] = {
     { nullptr            ,0          ,F_MAIN_E_TIMEOUT       , F_MAIN_S_FINDPERSON     , F_MAIN_S_FINDFAIL       ,0    ,false   ,fsm_main_lidar_find_fail },
     // 网络相关
     { fm_has_w_c_state   ,FM_W_N_CFG ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDPERSON     , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_guide },
-    { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDPERSON     , F_MAIN_S_WIFI_CONN      ,10    ,false   ,fsm_main_wifi_connecting },
+    { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDPERSON     , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
     { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDPERSON     , F_MAIN_S_CLOCK          ,10   ,false   ,fsm_main_wifi_conn_suc },
     { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDPERSON     , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
 
@@ -77,6 +77,11 @@ static struct StateTable fsm_user_table[] = {
     { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
     { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDSUC        , F_MAIN_S_CLOCK          ,10   ,false   ,fsm_main_wifi_conn_suc },
     { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
+
+    { fm_has_w_c_state   ,FM_W_N_CFG ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_guide },
+    { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
+    { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_CLOCK          ,10   ,false   ,fsm_main_wifi_conn_suc },
+    { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
 
     { fm_has_w_c_state   ,FM_W_N_CFG ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_guide },
     { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
@@ -118,6 +123,7 @@ static void fsm_main_timeout_task(void* arg) {
         ESP_LOGE(TAG, "fsm_handle is nullptr");
         vTaskDelete(nullptr);
     }
+    ESP_LOGI(TAG, "fsm_main_timeout_task started");
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(100));
         /**

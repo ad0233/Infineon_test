@@ -2,6 +2,15 @@ use crate::single_parse::SingleParse;
 use std::ptr;
 use std::slice;
 
+// ESP32 是 32 位架构，约定指针和 size_t 类型大小为 4 字节
+const RUST_FFI_PTR_SIZE: usize = 4;
+
+// 编译时检查：确保 Rust 的类型大小符合约定
+const _: () = assert!(core::mem::size_of::<usize>() == RUST_FFI_PTR_SIZE);
+const _: () = assert!(core::mem::size_of::<isize>() == RUST_FFI_PTR_SIZE);
+const _: () = assert!(core::mem::size_of::<*const u8>() == RUST_FFI_PTR_SIZE);
+const _: () = assert!(core::mem::size_of::<*mut u8>() == RUST_FFI_PTR_SIZE);
+
 /// Opaque struct that wraps SingleParse with output buffer
 pub struct SingleParseWrapper {
     parser: SingleParse,
