@@ -8,6 +8,7 @@
 #include "esp_log.h"
 #include "my_lcd.h"
 #include <string.h>
+#include <stdio.h>
 
 #define TAG "UI_BEHAVIOR"
 
@@ -43,7 +44,18 @@ void my_ui_in_start() {
 }
 
 // 动态生成二维码的函数
-void my_ui_generate_qr_code(const char* data) {
+void my_ui_generate_qr_code(const char* url, const char* id, const char* name, const char* mac) {
+    static char qr_url[256];
+    
+    // 拼接完整URL
+    snprintf(qr_url, sizeof(qr_url), "%s?d=%s&name=%s&mac=%s", 
+             url ? url : "https://lunawake.com/wx",
+             id ? id : "",
+             name ? name : "",
+             mac ? mac : "");
+    
+    ESP_LOGI(TAG, "生成二维码URL: %s", qr_url);
+    
     lvgl_port_lock(0);
     
     static lv_obj_t *qr_code_obj = NULL;
@@ -62,15 +74,13 @@ void my_ui_generate_qr_code(const char* data) {
         qr_code_obj = lv_qrcode_create(ui_NetworkBootContainer);
         
         if (qr_code_obj != NULL) {
-            // 设置二维码大小和样式，与原图片保持一致
-            lv_qrcode_set_size(qr_code_obj, 200);
+            // 设置二维码大小和样式，与原图片保持一致 (200 * 159/256 ≈ 124)
+            lv_qrcode_set_size(qr_code_obj, 124);
             lv_qrcode_set_dark_color(qr_code_obj, lv_color_hex(0xFFFFFF)); // 白色二维码
             lv_qrcode_set_light_color(qr_code_obj, lv_color_hex(0x000000)); // 黑色背景
             
             // 生成二维码内容
-            if (data != NULL && strlen(data) > 0) {
-                lv_qrcode_update(qr_code_obj, data, strlen(data));
-            }
+            lv_qrcode_update(qr_code_obj, qr_url, strlen(qr_url));
             
             // 设置位置与原图片相同
             lv_obj_set_x(qr_code_obj, 0);

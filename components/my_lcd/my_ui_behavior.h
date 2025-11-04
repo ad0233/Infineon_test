@@ -100,7 +100,7 @@ void my_ui_clock_set_emoji(uint8_t emoji);
 void my_ui_clock_show_alarm(uint8_t hour, uint8_t min);
 
 // 二维码相关函数
-void my_ui_generate_qr_code(const char* data);
+void my_ui_generate_qr_code(const char* url, const char* id, const char* name, const char* mac);
 void my_ui_clock_show_no_alarm(void);
 void my_ui_in_funtion();
 void my_ui_function_menu_up();

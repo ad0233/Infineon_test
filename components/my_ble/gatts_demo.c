@@ -614,6 +614,15 @@ void my_ble_init(void)
         return;
     }
 
+    // 根据MAC地址生成5位十六进制随机数作为设备名称后缀
+    const uint8_t *mac = esp_bt_dev_get_address();
+    if (mac != NULL) {
+        // 使用MAC后3字节计算5位十六进制数 (最大值0xFFFFF)
+        uint32_t suffix = ((mac[3] << 16) | (mac[4] << 8) | mac[5]) & 0xFFFFF;
+        snprintf(test_device_name, ESP_BLE_ADV_NAME_LEN_MAX, "Lunawake-%05lX", suffix);
+        ESP_LOGI(GATTS_TAG, "BLE device name: %s", test_device_name);
+    }
+
     ret = esp_ble_gatts_register_callback(gatts_event_handler);
     if (ret){
         ESP_LOGE(GATTS_TAG, "gatts register error, error code = %x", ret);
@@ -666,4 +675,21 @@ int my_ble_send_data(const uint8_t *data, uint16_t len, uint32_t timeout_ms)
     size_t sent = xStreamBufferSend(s_send_stream_buffer, data, len, timeout_ticks);
     
     return (sent == len) ? 0 : -1;
+}
+
+int my_ble_get_mac(char *mac_str)
+{
+    if (mac_str == NULL) {
+        return -1;
+    }
+
+    const uint8_t *mac = esp_bt_dev_get_address();
+    if (mac == NULL) {
+        return -1;
+    }
+
+    snprintf(mac_str, 18, "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    
+    return 0;
 }
