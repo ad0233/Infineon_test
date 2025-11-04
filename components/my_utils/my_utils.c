@@ -10,6 +10,77 @@
 
 static const char *TAG = "MY_UTILS";
 
+// Task cleanup manager
+typedef struct {
+    StackType_t *stack;
+    StaticTask_t *tcb;
+} task_cleanup_t;
+
+static QueueHandle_t cleanup_queue = NULL;
+static SemaphoreHandle_t cleanup_mutex = NULL;
+
+// Cleanup manager task
+static void task_cleanup_manager(void *arg) {
+    task_cleanup_t cleanup;
+    while (1) {
+        if (xQueueReceive(cleanup_queue, &cleanup, portMAX_DELAY)) {
+            if (cleanup.stack != NULL) {
+                heap_caps_free(cleanup.stack);
+            }
+            if (cleanup.tcb != NULL) {
+                heap_caps_free(cleanup.tcb);
+            }
+            ESP_LOGD(TAG, "Cleaned up task resources");
+        }
+    }
+}
+
+// Ensure cleanup manager is initialized (singleton pattern)
+static esp_err_t ensure_cleanup_manager(void) {
+    if (cleanup_queue != NULL) {
+        return ESP_OK;  // Already initialized
+    }
+
+    // Create mutex for thread-safe initialization
+    if (cleanup_mutex == NULL) {
+        cleanup_mutex = xSemaphoreCreateMutex();
+        if (cleanup_mutex == NULL) {
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    xSemaphoreTake(cleanup_mutex, portMAX_DELAY);
+
+    // Double-check after acquiring lock
+    if (cleanup_queue == NULL) {
+        cleanup_queue = xQueueCreate(10, sizeof(task_cleanup_t));
+        if (cleanup_queue == NULL) {
+            xSemaphoreGive(cleanup_mutex);
+            return ESP_ERR_NO_MEM;
+        }
+
+        BaseType_t ret = xTaskCreate(
+            task_cleanup_manager,
+            "task_cleanup",
+            1024 * 4,
+            NULL,
+            2,
+            NULL);
+
+        if (ret != pdPASS) {
+            vQueueDelete(cleanup_queue);
+            cleanup_queue = NULL;
+            xSemaphoreGive(cleanup_mutex);
+            return ESP_ERR_NO_MEM;
+        }
+
+        ESP_LOGI(TAG, "Task cleanup manager initialized");
+    }
+
+    xSemaphoreGive(cleanup_mutex);
+    return ESP_OK;
+}
+
 esp_err_t my_thread_create(
     TaskFunction_t pvTaskCode,
     const char *pcName,
@@ -53,6 +124,10 @@ esp_err_t my_thread_create(
         heap_caps_free(pxTaskBuffer);
         return ESP_FAIL;
     }
+
+    // Save pointers to thread local storage for later cleanup
+    vTaskSetThreadLocalStoragePointer(handle, 0, pxTaskBuffer);
+    vTaskSetThreadLocalStoragePointer(handle, 1, pxStackBuffer);
 
     if (pvCreatedTask != NULL) {
         *pvCreatedTask = handle;
@@ -107,6 +182,10 @@ esp_err_t my_thread_create_pinned(
         heap_caps_free(pxTaskBuffer);
         return ESP_FAIL;
     }
+
+    // Save pointers to thread local storage for later cleanup
+    vTaskSetThreadLocalStoragePointer(handle, 0, pxTaskBuffer);
+    vTaskSetThreadLocalStoragePointer(handle, 1, pxStackBuffer);
 
     if (pvCreatedTask != NULL) {
         *pvCreatedTask = handle;
@@ -236,5 +315,41 @@ MessageBufferHandle_t my_message_buffer_create(size_t xBufferSizeBytes)
 
     ESP_LOGI(TAG, "Created message buffer with %u bytes in PSRAM", xBufferSizeBytes);
     return handle;
+}
+
+esp_err_t my_thread_delete(TaskHandle_t xTaskToDelete)
+{
+    if (xTaskToDelete == NULL) {
+        ESP_LOGE(TAG, "Invalid task handle for deletion");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Ensure cleanup manager is running
+    esp_err_t ret = ensure_cleanup_manager();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize cleanup manager");
+        return ret;
+    }
+
+    // Get stored pointers from thread local storage
+    StaticTask_t *pxTaskBuffer = (StaticTask_t *)pvTaskGetThreadLocalStoragePointer(xTaskToDelete, 0);
+    StackType_t *pxStackBuffer = (StackType_t *)pvTaskGetThreadLocalStoragePointer(xTaskToDelete, 1);
+
+    // Delete the task first
+    vTaskDelete(xTaskToDelete);
+
+    // Queue cleanup resources
+    task_cleanup_t cleanup = {
+        .stack = pxStackBuffer,
+        .tcb = pxTaskBuffer
+    };
+
+    if (xQueueSend(cleanup_queue, &cleanup, pdMS_TO_TICKS(100)) != pdPASS) {
+        ESP_LOGW(TAG, "Failed to queue task cleanup, resources may leak");
+        return ESP_ERR_TIMEOUT;
+    }
+
+    ESP_LOGI(TAG, "Task deleted and queued for cleanup");
+    return ESP_OK;
 }
 

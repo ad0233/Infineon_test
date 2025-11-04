@@ -58,6 +58,17 @@ esp_err_t my_thread_create_pinned(
     BaseType_t xCoreID);
 
 /**
+ * @brief Delete a task created with my_thread_create or my_thread_create_pinned
+ * 
+ * Safely deletes the task and frees associated PSRAM and internal memory.
+ * Uses a background cleanup manager to ensure resources are properly freed.
+ *
+ * @param xTaskToDelete Handle of the task to delete
+ * @return ESP_OK on success, error code on failure
+ */
+esp_err_t my_thread_delete(TaskHandle_t xTaskToDelete);
+
+/**
  * @brief Create a queue with storage allocated in PSRAM
  *
  * @param uxQueueLength Maximum number of items in the queue
