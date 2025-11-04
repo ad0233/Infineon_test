@@ -11,7 +11,8 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
-
+#include <algorithm>
+#include <string>
 
 #include "freertos/idf_additions.h"
 #include "nvs_flash.h"
@@ -42,6 +43,8 @@
 #include "my_lidar.h"
 #include "my_nvs.h"
 #include "my_ble.h"
+
+#include "rust_lunawake.h"
 
 #include "fsm_main.h"
 
@@ -115,6 +118,7 @@ void heart_rate_data_callback(const radar_heart_rate_data_t *data)
 
 #include "audio_recorder.h"
 #include "audio_processor.h"
+#include <my_utils.h>
 
 // #define ENABLE_TASK_MONITOR
 
@@ -169,12 +173,6 @@ extern "C" void app_main()
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
 
     my_ble_init();
-    my_ui_generate_qr_code("https://www.volcengine.com/");
-
-    if (fsm_main_init() != 0) {
-        ESP_LOGE(TAG, "fsm_main_init failed");
-        vTaskDelete(nullptr);
-    }
 
     my_rtc_init();
     my_lcd_init();
@@ -187,6 +185,29 @@ extern "C" void app_main()
     
     // 启动雷达监测（包含所有开关设置）
     my_radar_start();
+    
+    // 获取蓝牙MAC地址并去掉冒号
+    char mac_with_colon[18];
+    std::string mac_str;
+    if (my_ble_get_mac(mac_with_colon) == 0) {
+        mac_str = mac_with_colon;
+        mac_str.erase(std::remove(mac_str.begin(), mac_str.end(), ':'), mac_str.end());
+    }
+    
+    my_ui_generate_qr_code("https://lunawake.com/wx", "lunawake", "test", mac_str.c_str());
+
+    if (fsm_main_init() != 0) {
+        ESP_LOGE(TAG, "fsm_main_init failed");
+        vTaskDelete(nullptr);
+    }
+    xTaskCreate([](void *arg) {
+        // while(esp_log_timestamp() < 3000) {
+        //     vTaskDelay(10 / portTICK_PERIOD_MS);
+        // }
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
+        fsm_main_event_trig(F_MAIN_E_INIT, nullptr);
+        vTaskDelete(nullptr);
+    }, "init_task", 1024 * 4, NULL, 5, NULL);
     
 #ifndef USE_AIRTOUCH_RADAR
     // R60ABD1 雷达特有的查询功能
@@ -359,311 +380,23 @@ void encoder_test(void *arg)
     int32_t val = 0;
 
     ESP_LOGI(TAG, "Initial value: %" PRIi32, val);
-
-    
-    my_ui_in_start();
-    for (;;) {
-        if(esp_log_timestamp() > 3000) break;
-        vTaskDelay(1);
-    }
-
-    my_ui_network_guide();
-
     //clear
     while(xQueueReceive(event_queue, &e, 1) == pdTRUE) {}
 
-    uint32_t last_1s_flush_time = esp_log_timestamp();
     while (1)
     {
-        // update clock
-        if(esp_log_timestamp() - last_1s_flush_time > 1000) {
-            last_1s_flush_time = esp_log_timestamp();
-            struct tm time;
-            memset(&time, 0, sizeof(time));
-            bool valid = false;
-            my_rtc_get_time(&time, &valid);
-            if(valid) {
-                my_ui_clock_set_now_time(time.tm_hour, time.tm_min);
-                const struct device_config *cfg = my_nvs_get_config();
-                if(cfg->alarm_enable) {
-                    // show alarm time exp: 08:00 AM
-                    char alarm_time_str[24] = {0};
-                    // 转换为12小时制
-                    uint8_t display_hour;
-                    const char* am_pm;
-                    if(cfg->alarm_hour == 0) {
-                        display_hour = 12;
-                        am_pm = "AM";
-                    } else if(cfg->alarm_hour < 12) {
-                        display_hour = cfg->alarm_hour;
-                        am_pm = "AM";
-                    } else if(cfg->alarm_hour == 12) {
-                        display_hour = 12;
-                        am_pm = "PM";
-                    } else {
-                        display_hour = cfg->alarm_hour - 12;
-                        am_pm = "PM";
-                    }
-                    snprintf(alarm_time_str, sizeof(alarm_time_str), "%02d:%02d %s", display_hour, cfg->alarm_minute, am_pm);
-                    my_ui_clock_set_tips(alarm_time_str);
-                } else {
-                    my_ui_clock_set_tips("No Alarm");
-                }
-            }
-        }
-
         if(xQueueReceive(event_queue, &e, 10) == pdFALSE) {
             continue;
         }
-
-        // 获取当前在哪个页面
-        page_t current_page = (page_t)my_ui_get_current_page();
-
         switch (e.type)
         {
             case RE_ET_BTN_CLICKED:
-                pwm_control_set(0, 150);  // 短按50%占空比
-                // ESP_LOGI(TAG, "Current page: %d", current_page);
-                if(current_page == PAGE_FUNCTION) {
-                    // 获取当前功能菜单位置
-                    menu_item_t current_menu_item = (menu_item_t)my_ui_function_get_index();
-                    ESP_LOGI(TAG, "Current menu item: %d", current_menu_item);
-                    switch(current_menu_item) {
-                        case MENU_ALARM:{
-                            my_ui_alarm_set_time(8, 0);
-                            alarm_set_tips();
-                            my_ui_in_alarm();
-                        }
-                            break;
-                        case MENU_WAKE_MODE:{
-                            // 从NVS加载唤醒模式配置
-                            const struct device_config *cfg = my_nvs_get_config();
-                            if(cfg->wake_mode < WAKE_MODE_MAX) {
-                                my_ui_wake_mode_set((wake_mode_t)cfg->wake_mode);
-                                // 同时设置为已保存的模式
-                                my_ui_wake_mode_save_current();
-                            }
-                            my_ui_in_wake_mode();
-                        }
-                            break;
-                        case MENU_WIFI:
-                            my_ui_network_guide();
-                            break;
-                        case MENU_UNWIND:
-                            my_ui_in_unwind_on();
-                            break;
-                        case MENU_VOLUME:
-                            my_ui_in_volume();
-                            break;
-                        case MENU_SET_TIME:
-                            my_ui_in_time_set();
-                            break;
-                        case MENU_BODY_DATA:{
-                            // 从NVS加载亮度设置
-                            const struct device_config *cfg = my_nvs_get_config();
-                            if(cfg->light_duty >= 20 && cfg->light_duty <= 100 && (cfg->light_duty - 20) % 10 == 0) {
-                                my_ui_light_set(cfg->light_duty);
-                            }
-                            my_ui_in_light();
-                        }
-                            break;
-                        default:
-                            break;
-                    }
-                } else if(current_page == PAGE_NETWORK_GUIDE ||
-                          current_page == PAGE_NETWORK_CONN_FAIL) {
-                    my_ui_network_offline();
-                } else if(current_page == PAGE_NETWORK_OFFLINE) {
-                    bool valid = false;
-                    struct tm time;
-                    memset(&time, 0, sizeof(time));
-                    my_rtc_get_time(&time, &valid);
-                    if(valid) {
-                        my_ui_clock_set_now_time(time.tm_hour, time.tm_min);
-                        my_ui_in_clock();
-                    } else {
-                        my_ui_in_time_set();
-                    }
-                } else if(current_page == PAGE_TIME_SET) {
-                    uint8_t hour = 0, min = 0;
-                    my_ui_time_get(&hour, &min);
-                    struct tm time;
-                    memset(&time, 0, sizeof(time));
-                    time.tm_hour = hour;
-                    time.tm_min = min;
-                    my_rtc_set_time(&time);
-                    my_ui_in_clock();
-                } else if(current_page == PAGE_ALARM) {
-                    uint8_t hour = 0, min = 0;
-                    my_ui_alarm_get_time(&hour, &min);
-                    const struct device_config *cfg = my_nvs_get_config();
-                    bool last_alarm_enable = cfg->alarm_enable;
-                    struct device_config new_cfg = *cfg;
-                    new_cfg.alarm_hour = hour;
-                    new_cfg.alarm_minute = min;
-                    new_cfg.alarm_enable = true;
-                    my_nvs_update_config(&new_cfg);
-                    my_ui_in_clock();
-                    if(last_alarm_enable != new_cfg.alarm_enable) {
-                        // audio_tone_play("spiffs://spiffs/on.wav");
-                    } else {
-                        // audio_tone_play("spiffs://spiffs/updated.wav");
-                    }
-                } else if(current_page == PAGE_CLOCK) {
-                    // 主界面单击进入雷达显示界面
-                    my_ui_in_radar_display();
-                } else if(current_page == PAGE_RADAR_DISPLAY) {
-                    // 雷达显示界面单击进入睡眠数据界面
-                    my_ui_in_sleep_data();
-                } else if(current_page == PAGE_SLEEP_DATA) {
-                    // 睡眠数据界面单击进入早安动画界面
-                    my_ui_in_good_morning();
-                    // audio_tone_play("spiffs://spiffs/demo-mira.wav");
-                } else if(current_page == PAGE_GOOD_MORNING) {
-                    // 早安动画界面单击返回主界面
-                    my_ui_in_clock();
-                } else if(current_page == PAGE_VOLUME) {
-                    const struct device_config *cfg = my_nvs_get_config();
-                    struct device_config new_cfg = *cfg;
-                    new_cfg.volume = my_ui_volume_get();
-                    my_nvs_update_config(&new_cfg);
-                    my_ui_in_clock();
-                    audio_hal_set_volume(board_handle->audio_hal, new_cfg.volume);
-                } else if(current_page == PAGE_WAKE_MODE) {
-                    // 保存当前浏览的模式为设置的模式
-                    my_ui_wake_mode_save_current();
-                    // 保存唤醒模式到NVS
-                    const struct device_config *cfg = my_nvs_get_config();
-                    struct device_config new_cfg = *cfg;
-                    new_cfg.wake_mode = (uint8_t)my_ui_wake_mode_get();
-                    my_nvs_update_config(&new_cfg);
-                    my_ui_in_clock();
-                } else if(current_page == PAGE_LIGHT) {
-                    // 保存亮度设置到NVS
-                    const struct device_config *cfg = my_nvs_get_config();
-                    struct device_config new_cfg = *cfg;
-                    new_cfg.light_duty = my_ui_light_get();
-                    my_nvs_update_config(&new_cfg);
-                    my_ui_in_clock();
-                } else if(current_page == PAGE_UNWIND_ON) {
-                    // UnwindOn页面单击进入确认页面
-                    my_ui_in_unwind_select();
-                } else if(current_page == PAGE_UNWIND_SELECT) {
-                    // UnwindSelet页面单击进入时间设置页面并播放音频
-                    my_ui_in_noise_time();
-                    audio_tone_play("spiffs://spiffs/water-fountain.mp3");
-                } else if(current_page == PAGE_NOISE_TIME) {
-                    // NoiseTime页面单击返回主界面
-                    my_ui_in_clock();
-                } else if(current_page == PAGE_MIAN_YES_PERSON) {
-                    // MianYesPerson页面单击返回主页面
-                    my_ui_in_clock();
-                } else {
-                    my_ui_in_clock();
-                }
+                fsm_main_event_trig(F_MAIN_E_BTN_CLICKED, nullptr);
                 break;
             case RE_ET_BTN_LONG_PRESSED:
-                pwm_control_set(0, 150);  // 长按100%占空比
-                if(current_page == PAGE_ALARM) {
-                    const struct device_config *cfg = my_nvs_get_config();
-                    struct device_config new_cfg = *cfg;
-                    new_cfg.alarm_enable = false;
-                    my_nvs_update_config(&new_cfg);
-                    my_ui_in_no_alarm();
-                    // audio_tone_play("spiffs://spiffs/off.wav");
-                    xTaskCreate([](void *arg){
-                        vTaskDelay(3000 / portTICK_PERIOD_MS);
-                        my_ui_in_clock();
-                        vTaskDelete(NULL);
-                    }, "no_alarm_task", 4096, NULL, 5, NULL);
-                } else if(current_page == PAGE_SLEEP_DATA || 
-                          current_page == PAGE_DETECTION ||
-                          current_page == PAGE_DETECTION_N ||
-                          current_page == PAGE_DETECTION_Y ||
-                          current_page == PAGE_DETECTION_N1 ||
-                          current_page == PAGE_MIAN_YES_PERSON) {
-                    // 长按返回主页面
-                    my_ui_in_clock();
-                }
+                fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, nullptr);
                 break;
             case RE_ET_CHANGED:
-                // ESP_LOGI(TAG, "Value = %" PRIi32, e.diff);
-                // ESP_LOGI(TAG, "Current page: %d", current_page);
-                if(current_page == PAGE_TIME_SET) {
-                    uint8_t hour = 8, min = 0;
-                    my_ui_time_get(&hour, &min);
-                    
-                    // 使用封装的时间调整函数
-                    adjust_time_by_encoder(e.diff, &hour, &min);
-                    
-                    my_ui_time_set(hour, min);
-                    // my_rtc_set_time(&time);
-                    // my_ui_in_clock();
-                } else if(current_page == PAGE_FUNCTION) {
-                    if(e.diff < 0) {
-                        my_ui_function_menu_up();
-                    } else {
-                        my_ui_function_menu_down();
-                    }
-                } else if(current_page == PAGE_CLOCK) {
-                    my_ui_in_funtion();
-                } else if(current_page == PAGE_ALARM) {
-                    uint8_t hour = 0, min = 0;
-                    my_ui_alarm_get_time(&hour, &min);
-                    
-                    // 使用封装的时间调整函数
-                    adjust_time_by_encoder(e.diff * 5, &hour, &min);
-
-                    my_ui_alarm_set_time(hour, min);
-                    alarm_set_tips();
-                } else if(current_page == PAGE_VOLUME) {
-                    uint8_t volume = my_ui_volume_get();
-                    my_ui_volume_set(volume + e.diff);
-                    audio_hal_set_volume(board_handle->audio_hal, volume + e.diff);
-                } else if(current_page == PAGE_WAKE_MODE) {
-                    // 旋转编码器切换唤醒模式
-                    if(e.diff > 0) {
-                        my_ui_wake_mode_next();
-                    } else {
-                        my_ui_wake_mode_prev();
-                    }
-                } else if(current_page == PAGE_LIGHT) {
-                    // 旋转编码器切换亮度档位（步进10%）
-                    uint8_t light = my_ui_light_get();
-                    int new_light = light + (e.diff * 10);
-                    
-                    // 处理循环逻辑
-                    if(new_light > 100) {
-                        new_light = 20;  // 超过100%回到20%
-                    } else if(new_light < 20) {
-                        new_light = 100;  // 低于20%回到100%
-                    }
-                    
-                    my_ui_light_set((uint8_t)new_light);
-                } else if(current_page == PAGE_UNWIND_ON) {
-                    // UnwindOn页面旋转编码器切换动物
-                    if(e.diff > 0) {
-                        my_ui_unwind_next_animal();
-                    } else {
-                        my_ui_unwind_prev_animal();
-                    }
-                } else if(current_page == PAGE_NOISE_TIME) {
-                    // NoiseTime页面旋转编码器调整时间选择
-                    lvgl_port_lock(0);
-                    uint16_t current_selected = lv_roller_get_selected(ui_NoiseTimeRoller);
-                    uint16_t option_cnt = lv_roller_get_option_cnt(ui_NoiseTimeRoller);
-                    
-                    if(e.diff > 0) {
-                        // 向下滚动
-                        current_selected = (current_selected + 1) % option_cnt;
-                    } else {
-                        // 向上滚动
-                        current_selected = (current_selected + option_cnt - 1) % option_cnt;
-                    }
-                    
-                    lv_roller_set_selected(ui_NoiseTimeRoller, current_selected, LV_ANIM_ON);
-                    lvgl_port_unlock();
-                }
                 break;
             default:
                 break;

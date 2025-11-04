@@ -9,6 +9,10 @@
 
 #define TAG "fsm_main"
 
+// ⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠
+// ⚠不能在这里的函数使用fsm_event_handle ⚠
+// ⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠
+
 uint8_t fm_has_w_c_state(void) {
     // 有连接，就返回1
     if (false) {
@@ -33,7 +37,7 @@ void fsm_main_lidar_clock_update(void *arg) {
 }
 
 void fsm_main_lidar_find(void *arg) {
-    ESP_LOGI(TAG, "init");
+    ESP_LOGI(TAG, "find person...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_Detection);
     lvgl_port_unlock();
@@ -76,5 +80,19 @@ void fsm_main_wifi_conn_suc(void *arg) {
 void fsm_main_wifi_conn_fail(void *arg) {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_ConnectingFailed);
+    lvgl_port_unlock();
+}
+
+void fsm_main_wifi_reconn(void *arg) {
+    ESP_LOGI(TAG, "wifi reconnecting...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_Connecting);
+    lvgl_port_unlock();
+}
+
+void fsm_main_wifi_forget(void *arg) {
+    ESP_LOGI(TAG, "wifi forget and guide...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_NetworkBoot);
     lvgl_port_unlock();
 }
