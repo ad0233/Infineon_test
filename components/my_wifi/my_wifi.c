@@ -21,13 +21,14 @@ static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_num = 0;
 static wifi_state_t s_wifi_state = WIFI_STATE_IDLE;
 static wifi_event_callback_t s_event_callback = NULL;
+static void *s_event_callback_context = NULL;
 static esp_netif_t *s_sta_netif = NULL;
 
 static void set_wifi_state(wifi_state_t state)
 {
     s_wifi_state = state;
     if (s_event_callback) {
-        s_event_callback(state);
+        s_event_callback(state, s_event_callback_context);
     }
 }
 
@@ -96,9 +97,9 @@ esp_err_t my_wifi_connect(const char *ssid, const char *password)
     }
     
     wifi_config_t wifi_config = {0};
-    strncpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid) - 1);
+    snprintf((char *)wifi_config.sta.ssid, sizeof(wifi_config.sta.ssid), "%s", ssid);
     if (password) {
-        strncpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password) - 1);
+        snprintf((char *)wifi_config.sta.password, sizeof(wifi_config.sta.password), "%s", password);
     }
     wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     
@@ -141,9 +142,10 @@ bool my_wifi_is_connected(void)
     return s_wifi_state == WIFI_STATE_CONNECTED;
 }
 
-void my_wifi_set_event_callback(wifi_event_callback_t callback)
+void my_wifi_set_event_callback(wifi_event_callback_t callback, void *context)
 {
     s_event_callback = callback;
+    s_event_callback_context = context;
 }
 
 esp_err_t my_wifi_get_ip(char *ip_str, size_t len)
@@ -185,9 +187,9 @@ esp_err_t my_wifi_save_credentials(const char *ssid, const char *password)
     // 保存WiFi凭据
     memset(new_cfg.wifi_ssid, 0, sizeof(new_cfg.wifi_ssid));
     memset(new_cfg.wifi_password, 0, sizeof(new_cfg.wifi_password));
-    strncpy(new_cfg.wifi_ssid, ssid, sizeof(new_cfg.wifi_ssid) - 1);
+    snprintf(new_cfg.wifi_ssid, sizeof(new_cfg.wifi_ssid), "%s", ssid);
     if (password) {
-        strncpy(new_cfg.wifi_password, password, sizeof(new_cfg.wifi_password) - 1);
+        snprintf(new_cfg.wifi_password, sizeof(new_cfg.wifi_password), "%s", password);
     }
     new_cfg.wifi_enable = 1;  // 默认启用WiFi
     

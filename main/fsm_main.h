@@ -13,10 +13,11 @@ int fsm_main_init(void);
 enum fm_wifi_conn_state {
     FM_W_N_CFG,
     FM_W_CONN,
+    FM_W_SUC,
     FM_W_FAI,
-    FM_W_SUC
 };
 uint8_t fm_has_w_c_state(void);
+uint8_t fsm_has_wifi_config(void);
 
 void fsm_main_lidar_clock_update(void *arg);
 void fsm_main_lidar_find(void *arg);
@@ -29,6 +30,8 @@ void fsm_main_wifi_conn_suc(void *arg);
 void fsm_main_wifi_conn_fail(void *arg);
 void fsm_main_wifi_reconn(void *arg);
 void fsm_main_wifi_forget(void *arg);
+
+void fsm_main_to_clock(void *arg);
 
 enum fsm_main_event_enum {
     F_MAIN_E_INIT,

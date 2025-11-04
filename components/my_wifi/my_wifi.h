@@ -17,7 +17,7 @@ typedef enum {
     WIFI_STATE_FAILED
 } wifi_state_t;
 
-typedef void (*wifi_event_callback_t)(wifi_state_t state);
+typedef void (*wifi_event_callback_t)(wifi_state_t state, void *context);
 
 /**
  * @brief 初始化 WiFi
@@ -61,8 +61,9 @@ bool my_wifi_is_connected(void);
  * @brief 设置 WiFi 事件回调
  * 
  * @param callback 回调函数
+ * @param context 用户上下文，会传递给回调函数
  */
-void my_wifi_set_event_callback(wifi_event_callback_t callback);
+void my_wifi_set_event_callback(wifi_event_callback_t callback, void *context);
 
 /**
  * @brief 获取 IP 地址

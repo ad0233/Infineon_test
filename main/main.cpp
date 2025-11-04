@@ -43,8 +43,10 @@
 #include "my_lidar.h"
 #include "my_nvs.h"
 #include "my_ble.h"
+#include "my_wifi.h"
 
 #include "rust_lunawake.h"
+#include "cmd_parse.h"
 
 #include "fsm_main.h"
 
@@ -174,7 +176,48 @@ extern "C" void app_main()
 
     rust_lib_init();
 
+
+    if (fsm_main_init() != 0) {
+        ESP_LOGE(TAG, "fsm_main_init failed");
+        vTaskDelete(nullptr);
+    }
     my_ble_init();
+    my_wifi_init();
+    
+    // 自动连接已保存的WiFi
+    xTaskCreate([](void *arg) {
+        esp_err_t ret = my_wifi_auto_connect();
+        if (ret == ESP_ERR_INVALID_STATE) {
+            ESP_LOGI(TAG, "未配置WiFi，等待通过蓝牙配置");
+        } else if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "WiFi自动连接失败");
+        }
+        vTaskDelete(nullptr);
+    }, "wifi_conn", 1024 * 8, NULL, 5, NULL);
+
+    my_wifi_set_event_callback([](wifi_state_t event, void *arg){
+        switch(event) {
+            case WIFI_STATE_IDLE:
+                ESP_LOGI("WIFI_EVT", "WIFI_STATE_IDLE");
+                break;
+            case WIFI_STATE_CONNECTING:
+                ESP_LOGI("WIFI_EVT", "WIFI_STATE_CONNECTING");
+                break;
+            case WIFI_STATE_CONNECTED:
+                fsm_main_event_trig(F_MAIN_E_WIFI_C_SUC, NULL);
+                ESP_LOGI("WIFI_EVT", "WIFI_STATE_CONNECTED");
+                break;
+            case WIFI_STATE_DISCONNECTED:
+                ESP_LOGI("WIFI_EVT", "WIFI_STATE_DISCONNECTED");
+                break;
+            case WIFI_STATE_FAILED:
+                fsm_main_event_trig(F_MAIN_E_WIFI_C_FAIL, NULL);
+                ESP_LOGI("WIFI_EVT", "WIFI_STATE_FAILED");
+                break;
+            default:
+                break;
+        }
+    }, NULL);
 
     StreamBufferHandle_t ble_recv_stream = my_stream_buffer_create(1024 * 10, 1);
     if (ble_recv_stream == NULL) {
@@ -213,6 +256,9 @@ extern "C" void app_main()
                         if (out_len > 0) {
                             ESP_LOGI(TAG, "Parsed packet, len %d", out_len);
                             ESP_LOG_BUFFER_HEXDUMP(TAG, out_buf, out_len, ESP_LOG_INFO);
+                            
+                            // 解析命令
+                            cmd_parse(out_buf, out_len);
                         }
                 }
             }
@@ -257,10 +303,6 @@ extern "C" void app_main()
     
     my_ui_generate_qr_code("https://lunawake.ai", "lunawake", "test", mac_str.c_str());
 
-    if (fsm_main_init() != 0) {
-        ESP_LOGE(TAG, "fsm_main_init failed");
-        vTaskDelete(nullptr);
-    }
     xTaskCreate([](void *arg) {
         // while(esp_log_timestamp() < 3000) {
         //     vTaskDelay(10 / portTICK_PERIOD_MS);

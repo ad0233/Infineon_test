@@ -6,6 +6,7 @@
 
 #include "my_ui_behavior.h"
 #include "my_nvs.h"
+#include <my_wifi.h>
 
 #define TAG "fsm_main"
 
@@ -14,21 +15,37 @@
 // ⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠
 
 uint8_t fm_has_w_c_state(void) {
-    // 有连接，就返回1
-    if (false) {
-        return 1;
+    // 没有配置
+    const struct device_config *cfg = my_nvs_get_config();
+    if(cfg->wifi_enable == false) {
+        ESP_LOGI(TAG, "wifi not configured");
+        return FM_W_N_CFG;
     }
+    switch (my_wifi_get_state())
+    {
+    case WIFI_STATE_CONNECTED:
+        ESP_LOGI(TAG, "wifi is connected");
+        return FM_W_SUC;
+        break;
+    case WIFI_STATE_CONNECTING:
+        ESP_LOGI(TAG, "wifi is connecting");
+        return FM_W_CONN;
+        break;
+    case WIFI_STATE_FAILED:
+        ESP_LOGI(TAG, "wifi connection failed");
+        return FM_W_FAI;
+        break;
+    default:
+        ESP_LOGI(TAG, "wifi connection failed");
+        return FM_W_FAI;
+        break;
+    }
+    return FM_W_FAI;
+}
 
-    // 正在连接
-    if(false) {
-        return 2;
-    }
-
-    // 已知连接失败
-    if(false) {
-        return 3;
-    }
-    return 0;
+uint8_t fsm_has_wifi_config(void) {
+    const struct device_config *cfg = my_nvs_get_config();
+    return cfg->wifi_enable;
 }
 
 void fsm_main_lidar_clock_update(void *arg) {
@@ -88,11 +105,19 @@ void fsm_main_wifi_reconn(void *arg) {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_Connecting);
     lvgl_port_unlock();
+    my_wifi_auto_connect();
 }
 
 void fsm_main_wifi_forget(void *arg) {
     ESP_LOGI(TAG, "wifi forget and guide...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_NetworkBoot);
+    lvgl_port_unlock();
+}
+
+void fsm_main_to_clock(void *arg) {
+    ESP_LOGI(TAG, "to clock...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_MianNoPerson);
     lvgl_port_unlock();
 }
