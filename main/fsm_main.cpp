@@ -9,18 +9,18 @@ static const char *TAG = "fsm_main";
 
 
 enum fsm_main_state_enum {
-    F_MAIN_S_UNINIT,
-    F_MAIN_S_CLOCK,
+    F_MAIN_S_UNINIT,            // 未初始化
+    F_MAIN_S_CLOCK,             // 时钟页面
     // 找人
-    F_MAIN_S_FINDPERSON,
-    F_MAIN_S_FINDSUC,
-    F_MAIN_S_FINDFAIL,
+    F_MAIN_S_FINDPERSON,        // 找人中
+    F_MAIN_S_FINDSUC,           // 找人成功
+    F_MAIN_S_FINDFAIL,          // 找人失败
     // Wifi连接
-    F_MAIN_S_WIFI_GUIDE,
-    F_MAIN_S_WIFI_CONN,
-    F_MAIN_S_WIFI_OFFLINE,
-    F_MAIN_S_WIFI_CONN_SUC,
-    F_MAIN_S_WIFI_CONN_FAIL,
+    F_MAIN_S_WIFI_GUIDE,        // 指引连接wifi
+    F_MAIN_S_WIFI_CONN,         // wifi连接中
+    F_MAIN_S_WIFI_OFFLINE,      // wifi离线
+    F_MAIN_S_WIFI_CONN_SUC,     // wifi连接成功
+    F_MAIN_S_WIFI_CONN_FAIL,    // wifi连接失败
 };
 
 // 事件名称获取
@@ -73,25 +73,16 @@ static struct StateTable fsm_user_table[] = {
     { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDPERSON     , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_to_clock },
     { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDPERSON     , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
 
-    { fm_has_w_c_state   ,FM_W_N_CFG ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_guide },
-    { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
-    { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDSUC        , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_to_clock },
-    { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
+    { fm_has_w_c_state   ,FM_W_N_CFG ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_guide },
+    { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
+    { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDSUC        , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_to_clock },
+    { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
 
     { fm_has_w_c_state   ,FM_W_N_CFG ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_guide },
     { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
     { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_to_clock },
     { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
-
-    { fm_has_w_c_state   ,FM_W_N_CFG ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_guide },
-    { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
-    { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDFAIL       , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_to_clock },
-    { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
     //区分事件组变量       编号         到来的事件               当前的状态            下一个状态         超时  立即执行  将要要执行的函数
-    { fm_has_w_c_state   ,FM_W_N_CFG ,F_MAIN_E_TIMEOUT       , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_guide },
-    { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_TIMEOUT       , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
-    { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_TIMEOUT       , F_MAIN_S_FINDSUC        , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_to_clock },
-    { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_TIMEOUT       , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_CONN_FAIL ,10   ,false   ,fsm_main_wifi_conn_fail },
     // 指引连接wifi
     // wifi 连接 （时间判定）
     // { nullptr            ,0          ,F_MAIN_E_TIMEOUT       , F_MAIN_S_WIFI_CONN      , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
