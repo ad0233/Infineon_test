@@ -95,6 +95,9 @@ static struct StateTable fsm_user_table[] = {
     { nullptr            ,0          ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_WIFI_CONN_FAIL , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_forget },
     
     { nullptr            ,0          ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_WIFI_CONN_SUC  , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_to_clock },
+    // 离线模式
+    { fsm_clock_need_cfg ,0          ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_WIFI_GUIDE     , F_MAIN_S_WIFI_OFFLINE   ,0    ,false   ,fsm_main_in_offline },
+    { fsm_clock_need_cfg ,1          ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_WIFI_GUIDE     , F_MAIN_S_WIFI_OFFLINE   ,0    ,false   ,fsm_main_in_offline },
 };
 
 static uint32_t timeout_ms_tick = 0;

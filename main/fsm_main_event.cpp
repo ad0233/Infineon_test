@@ -7,6 +7,7 @@
 #include "my_ui_behavior.h"
 #include "my_nvs.h"
 #include <my_wifi.h>
+#include "my_rtc.h"
 
 #define TAG "fsm_main"
 
@@ -43,9 +44,8 @@ uint8_t fm_has_w_c_state(void) {
     return FM_W_FAI;
 }
 
-uint8_t fsm_has_wifi_config(void) {
-    const struct device_config *cfg = my_nvs_get_config();
-    return cfg->wifi_enable;
+uint8_t fsm_clock_need_cfg(void) {
+    return my_rtc_is_time_valid();
 }
 
 void fsm_main_lidar_clock_update(void *arg) {
@@ -112,6 +112,13 @@ void fsm_main_wifi_forget(void *arg) {
     ESP_LOGI(TAG, "wifi forget and guide...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_NetworkBoot);
+    lvgl_port_unlock();
+}
+
+void fsm_main_in_offline(void *arg) {
+    ESP_LOGI(TAG, "in offline mode...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_OfflineMode);
     lvgl_port_unlock();
 }
 
