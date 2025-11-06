@@ -2,6 +2,7 @@
 
 本文档描述 LunaWake 使用 AWS IoT Core 的完整 API 调用流程。
 
+https://ibza2n2iii.us-east-1.awsapprunner.com
 测试接口:https://ibza2n2iii.us-east-1.awsapprunner.com/docs 
 
 ## 核心特性

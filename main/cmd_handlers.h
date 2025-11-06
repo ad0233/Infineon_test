@@ -22,6 +22,30 @@ int cmd_handle_wifi_connect(cJSON *params);
  */
 int cmd_handle_forget_wifi(cJSON *params);
 
+/**
+ * @brief 处理 WiFi 配置命令（新格式）
+ * 
+ * @param data JSON data 对象
+ * @return int 0成功，-1失败
+ */
+int cmd_handle_wifi_config(cJSON *data);
+
+/**
+ * @brief 处理 IoT 配置命令
+ * 
+ * @param data JSON data 对象
+ * @return int 0成功，-1失败
+ */
+int cmd_handle_iot_config(cJSON *data);
+
+/**
+ * @brief 处理私钥配置命令
+ * 
+ * @param data JSON data 对象
+ * @return int 0成功，-1失败
+ */
+int cmd_handle_private_key_config(cJSON *data);
+
 #ifdef __cplusplus
 }
 #endif

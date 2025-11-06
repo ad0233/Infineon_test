@@ -293,12 +293,11 @@ extern "C" void app_main()
     // 启动雷达监测（包含所有开关设置）
     my_radar_start();
     
-    // 获取蓝牙MAC地址并去掉冒号
-    char mac_with_colon[18];
+    // 获取蓝牙MAC地址（无冒号）
     std::string mac_str;
-    if (my_ble_get_mac(mac_with_colon) == 0) {
-        mac_str = mac_with_colon;
-        mac_str.erase(std::remove(mac_str.begin(), mac_str.end(), ':'), mac_str.end());
+    const char *mac_no_colon = my_ble_get_mac(false);
+    if (mac_no_colon) {
+        mac_str = mac_no_colon;
     }
     
     my_ui_generate_qr_code("https://lunawake.ai", "lunawake", "test", mac_str.c_str());

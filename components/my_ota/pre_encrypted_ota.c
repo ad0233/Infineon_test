@@ -12,6 +12,8 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
+#include "my_ota.h"
+
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -24,28 +26,18 @@
 #include "esp_https_ota.h"
 #include "nvs.h"
 #include "nvs_flash.h"
-#include "protocol_examples_common.h"
 #include "esp_encrypted_img.h"
-#ifdef CONFIG_EXAMPLE_USE_CERT_BUNDLE
+#include "esp_https_ota.h"
 #include "esp_crt_bundle.h"
-#endif
-#if CONFIG_EXAMPLE_ENABLE_CI_TEST
-#include "test_local_server_ota.h"
-#endif
-#if CONFIG_EXAMPLE_CONNECT_WIFI
-#include "esp_wifi.h"
-#endif
-#if defined(CONFIG_PRE_ENCRYPTED_OTA_USE_RSA) && defined(CONFIG_PRE_ENCRYPTED_RSA_USE_DS)
-#include "esp_secure_cert_read.h"
-#endif
 
 static const char *TAG = "pre_encrypted_ota_example";
-extern const char server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
-extern const char server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
+
+// OTA 任务句柄（确保同时只有一个 OTA 任务）
+static TaskHandle_t s_ota_task_handle = NULL;
 
 #if defined(CONFIG_PRE_ENCRYPTED_OTA_USE_RSA)
-extern const char rsa_private_pem_start[] asm("_binary_private_pem_start");
-extern const char rsa_private_pem_end[]   asm("_binary_private_pem_end");
+extern const char rsa_private_pem_start[] asm("_binary_rsa_priv_key_pem_start");
+extern const char rsa_private_pem_end[]   asm("_binary_rsa_priv_key_pem_end");
 #elif defined(CONFIG_PRE_ENCRYPTED_OTA_USE_ECIES)
 #define HMAC_UP_KEY_ID 2
 #else
@@ -115,20 +107,30 @@ static esp_err_t _decrypt_cb(decrypt_cb_arg_t *args, void *user_ctx)
 
 void pre_encrypted_ota_task(void *pvParameter)
 {
+    char *url = (char *)pvParameter;
     ESP_LOGI(TAG, "Starting Pre Encrypted OTA example");
+    ESP_LOGI(TAG, "OTA URL: %s", url ? url : "NULL");
+    
+    if (url == NULL) {
+        ESP_LOGE(TAG, "OTA URL is NULL");
+        s_ota_task_handle = NULL;
+        vTaskDelete(NULL);
+        return;
+    }
+    
+    // 清理退出前清除任务句柄和释放 URL 内存
+    #define OTA_TASK_EXIT() do { \
+        free(url); \
+        s_ota_task_handle = NULL; \
+        vTaskDelete(NULL); \
+    } while(0)
 
     esp_http_client_config_t config = {
-        .url = CONFIG_EXAMPLE_FIRMWARE_UPGRADE_URL,
-        .timeout_ms = CONFIG_EXAMPLE_OTA_RECV_TIMEOUT,
-#ifdef CONFIG_EXAMPLE_USE_CERT_BUNDLE
+        .url = url,
+        .timeout_ms = 60,
         .crt_bundle_attach = esp_crt_bundle_attach,
-#else
-        .cert_pem = (char *)server_cert_pem_start,
-#endif /* CONFIG_EXAMPLE_USE_CERT_BUNDLE */
         .keep_alive_enable = true,
-#ifdef CONFIG_EXAMPLE_ENABLE_PARTIAL_HTTP_DOWNLOAD
         .save_client_session = true,
-#endif
     };
     esp_decrypt_cfg_t cfg = {0};
 #if defined(CONFIG_PRE_ENCRYPTED_OTA_USE_RSA)
@@ -136,7 +138,7 @@ void pre_encrypted_ota_task(void *pvParameter)
     esp_ds_data_ctx_t *ds_data = esp_secure_cert_get_ds_ctx();
     if (ds_data == NULL) {
         ESP_LOGE(TAG, "Failed to get DS context");
-        vTaskDelete(NULL);
+        OTA_TASK_EXIT();
     }
     cfg.ds_data = ds_data;
 #else
@@ -149,23 +151,11 @@ void pre_encrypted_ota_task(void *pvParameter)
     esp_decrypt_handle_t decrypt_handle = esp_encrypted_img_decrypt_start(&cfg);
     if (!decrypt_handle) {
         ESP_LOGE(TAG, "OTA upgrade failed");
-        vTaskDelete(NULL);
+        OTA_TASK_EXIT();
     }
-
-#if CONFIG_EXAMPLE_ENABLE_CI_TEST
-    example_test_firmware_data_from_stdin(&config.url);
-#endif
-
-#ifdef CONFIG_EXAMPLE_SKIP_COMMON_NAME_CHECK
-    config.skip_cert_common_name_check = true;
-#endif
 
     esp_https_ota_config_t ota_config = {
         .http_config = &config,
-#ifdef CONFIG_EXAMPLE_ENABLE_PARTIAL_HTTP_DOWNLOAD
-        .partial_http_download = true,
-        .max_http_request_size = CONFIG_EXAMPLE_HTTP_REQUEST_SIZE,
-#endif
         .decrypt_cb = _decrypt_cb,
         .decrypt_user_ctx = (void *)decrypt_handle,
         .enc_img_header_size = esp_encrypted_img_get_header_size(),
@@ -175,7 +165,7 @@ void pre_encrypted_ota_task(void *pvParameter)
     esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
-        vTaskDelete(NULL);
+        OTA_TASK_EXIT();
     }
 
     while (1) {
@@ -207,7 +197,7 @@ void pre_encrypted_ota_task(void *pvParameter)
                 ESP_LOGE(TAG, "Image validation failed, image is corrupted");
             }
             ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
-            vTaskDelete(NULL);
+            OTA_TASK_EXIT();
         }
     }
 
@@ -215,43 +205,43 @@ ota_end:
     esp_https_ota_abort(https_ota_handle);
     esp_encrypted_img_decrypt_abort(decrypt_handle);
     ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed");
-    vTaskDelete(NULL);
+    OTA_TASK_EXIT();
 }
 
-void app_main(void)
+int my_ota_start(const char *url_ota_file)
 {
-    // Initialize NVS.
-    esp_err_t err = nvs_flash_init();
-    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        // 1.OTA app partition table has a smaller NVS partition size than the non-OTA
-        // partition table. This size mismatch may cause NVS initialization to fail.
-        // 2.NVS partition contains data in new format and cannot be recognized by this version of code.
-        // If this happens, we erase NVS partition and initialize NVS again.
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        err = nvs_flash_init();
+    if (url_ota_file == NULL) {
+        ESP_LOGE(TAG, "OTA URL is NULL");
+        return -1;
     }
-    ESP_ERROR_CHECK( err );
-
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
-    /* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
-     * Read "Establishing Wi-Fi or Ethernet Connection" section in
-     * examples/protocols/README.md for more information about this function.
-    */
-    ESP_ERROR_CHECK(example_connect());
-
-#if CONFIG_EXAMPLE_CONNECT_WIFI
-    /* Ensure to disable any WiFi power save mode, this allows best throughput
-     * and hence timings for overall OTA operation.
-     */
-    esp_wifi_set_ps(WIFI_PS_NONE);
-#endif // CONFIG_EXAMPLE_CONNECT_WIFI
-
-#if CONFIG_EXAMPLE_ENABLE_CI_TEST
-    if (example_test_start_webserver() != ESP_OK) {
-        ESP_LOGE(TAG, "Unable to start server");
+    
+    // 检查是否已有 OTA 任务在运行
+    if (s_ota_task_handle != NULL) {
+        // 验证任务是否仍然存在
+        eTaskState task_state = eTaskGetState(s_ota_task_handle);
+        if (task_state != eDeleted && task_state != eInvalid) {
+            ESP_LOGW(TAG, "OTA task is already running");
+            return -1;
+        }
+        // 任务已结束但句柄未清除，清除它
+        s_ota_task_handle = NULL;
     }
-#endif
-    xTaskCreate(&pre_encrypted_ota_task, "pre_encrypted_ota_task", 1024 * 8, NULL, 5, NULL);
+    
+    // 复制 URL 字符串，避免调用者释放后导致悬空指针
+    char *url_copy = strdup(url_ota_file);
+    if (url_copy == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for URL");
+        return -1;
+    }
+    
+    BaseType_t ret = xTaskCreate(&pre_encrypted_ota_task, "pre_encrypted_ota_task", 
+                                  1024 * 8, (void *)url_copy, 5, &s_ota_task_handle);
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create OTA task");
+        free(url_copy);
+        s_ota_task_handle = NULL;
+        return -1;
+    }
+    
+    return 0;
 }

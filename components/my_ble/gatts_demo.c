@@ -673,19 +673,31 @@ int my_ble_send_data(const uint8_t *data, uint16_t len, uint32_t timeout_ms)
     return (sent == len) ? 0 : -1;
 }
 
-int my_ble_get_mac(char *mac_str)
+const char *my_ble_get_mac(bool with_colon)
 {
-    if (mac_str == NULL) {
-        return -1;
+    static char s_mac_with_colon[18] = {0};     // "AA:BB:CC:DD:EE:FF"
+    static char s_mac_without_colon[13] = {0};  // "AABBCCDDEEFF"
+    static bool s_mac_initialized = false;
+
+    // 首次调用时初始化
+    if (!s_mac_initialized) {
+        const uint8_t *mac = esp_bt_dev_get_address();
+        if (mac == NULL) {
+            return NULL;
+        }
+
+        // 生成带冒号格式
+        snprintf(s_mac_with_colon, sizeof(s_mac_with_colon), 
+                 "%02X:%02X:%02X:%02X:%02X:%02X",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+        // 生成不带冒号格式
+        snprintf(s_mac_without_colon, sizeof(s_mac_without_colon),
+                 "%02X%02X%02X%02X%02X%02X",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+        s_mac_initialized = true;
     }
 
-    const uint8_t *mac = esp_bt_dev_get_address();
-    if (mac == NULL) {
-        return -1;
-    }
-
-    snprintf(mac_str, 18, "%02X:%02X:%02X:%02X:%02X:%02X",
-             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    
-    return 0;
+    return with_colon ? s_mac_with_colon : s_mac_without_colon;
 }

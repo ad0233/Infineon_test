@@ -8,9 +8,8 @@ static const char *TAG = "cmd_parse";
 
 // JSON 命令解析
 static int parse_json_cmd(const char *json_str) {
-    cJSON *cmd_item;
-    const char *cmd;
-    cJSON *params;
+    cJSON *cmd_item = NULL;
+    cJSON *type_item = NULL;
     cJSON *root = cJSON_Parse(json_str);
     if (!root) {
         ESP_LOGE(TAG, "JSON parse failed");
@@ -19,26 +18,47 @@ static int parse_json_cmd(const char *json_str) {
     
     int ret = -1;
     
-    cmd_item = cJSON_GetObjectItem(root, "cmd");
-    if (!cJSON_IsString(cmd_item)) {
-        ESP_LOGE(TAG, "cmd not found or invalid");
+    // 尝试新格式: {"type": "xxx", "data": {...}}
+    type_item = cJSON_GetObjectItem(root, "type");
+    if (cJSON_IsString(type_item)) {
+        const char *type = type_item->valuestring;
+        cJSON *data = cJSON_GetObjectItem(root, "data");
+        
+        ESP_LOGI(TAG, "Type: %s", type);
+        
+        if (strcmp(type, "wifi_config") == 0) {
+            ret = cmd_handle_wifi_config(data);
+        } else if (strcmp(type, "iot_config") == 0) {
+            ret = cmd_handle_iot_config(data);
+        } else if (strcmp(type, "private_key_config") == 0) {
+            ret = cmd_handle_private_key_config(data);
+        } else {
+            ESP_LOGW(TAG, "Unknown type: %s", type);
+            ret = -1;
+        }
         goto cleanup;
     }
     
-    cmd = cmd_item->valuestring;
-    params = cJSON_GetObjectItem(root, "params");
-    
-    ESP_LOGI(TAG, "Command: %s", cmd);
-    
-    // 分发命令
-    if (strcmp(cmd, "wifi_connect") == 0) {
-        ret = cmd_handle_wifi_connect(params);
-    } else if (strcmp(cmd, "test_forget_wifi") == 0) {
-        ret = cmd_handle_forget_wifi(params);
-    } else {
-        ESP_LOGW(TAG, "Unknown command: %s", cmd);
-        ret = -1;
+    // 旧格式: {"cmd": "xxx", "params": {...}}
+    cmd_item = cJSON_GetObjectItem(root, "cmd");
+    if (cJSON_IsString(cmd_item)) {
+        const char *cmd = cmd_item->valuestring;
+        cJSON *params = cJSON_GetObjectItem(root, "params");
+        
+        ESP_LOGI(TAG, "Command: %s", cmd);
+        
+        if (strcmp(cmd, "wifi_connect") == 0) {
+            ret = cmd_handle_wifi_connect(params);
+        } else if (strcmp(cmd, "test_forget_wifi") == 0) {
+            ret = cmd_handle_forget_wifi(params);
+        } else {
+            ESP_LOGW(TAG, "Unknown command: %s", cmd);
+            ret = -1;
+        }
+        goto cleanup;
     }
+    
+    ESP_LOGE(TAG, "Invalid JSON format (no 'type' or 'cmd' field)");
     
 cleanup:
     cJSON_Delete(root);
