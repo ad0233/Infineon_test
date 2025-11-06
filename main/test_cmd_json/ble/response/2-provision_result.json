@@ -1,0 +1,8 @@
+{
+  "type": "provision_result",
+  "data": {
+    "status": "success",
+    "wifi_connected": true,
+    "ip_address": "192.168.1.100"
+  }
+}

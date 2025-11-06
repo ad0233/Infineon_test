@@ -1,7 +1,0 @@
-{
-    "cmd": "wifi_connect",
-    "params": {
-        "ssid": "C301",
-        "password": "1124861985"
-    }
-}

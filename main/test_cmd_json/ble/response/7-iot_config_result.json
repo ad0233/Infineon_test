@@ -1,0 +1,6 @@
+{
+  "type": "iot_config_result",
+  "data": {
+    "status": "success"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "type": "private_key_config",
+  "data": {
+    "private_key_pem": "-----BEGIN PRIVATE KEY-----\n..."
+  }
+}
