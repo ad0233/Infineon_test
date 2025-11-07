@@ -26,7 +26,7 @@ static int i2c_init()
     my_rtc_i2c = i2c_bus_create(I2C_NUM_0, &es_i2c_cfg);
     return ret;
 }
-
+static bool s_valid;
 int my_rtc_init() {
     // 初始化I2C总线
     int ret = i2c_init();
@@ -59,11 +59,10 @@ int my_rtc_init() {
     // ESP_ERROR_CHECK(pcf8563_set_time(my_rtc_i2c, &time));
 
     vTaskDelay(pdMS_TO_TICKS(500));
-    bool valid;
-    esp_err_t r = pcf8563_get_time(my_rtc_i2c, &time, &valid);
+    esp_err_t r = pcf8563_get_time(my_rtc_i2c, &time, &s_valid);
     if (r == ESP_OK)
         printf("%04d-%02d-%02d %02d:%02d:%02d, %s\n", time.tm_year + 1900, time.tm_mon + 1,
-                time.tm_mday, time.tm_hour, time.tm_min, time.tm_sec, valid ? "VALID" : "NOT VALID");
+                time.tm_mday, time.tm_hour, time.tm_min, time.tm_sec, s_valid ? "VALID" : "NOT VALID");
     else
         printf("Error %d: %s\n", r, esp_err_to_name(r));
     
@@ -77,4 +76,8 @@ int my_rtc_get_time(struct tm *time, bool *valid) {
 
 int my_rtc_set_time(struct tm *time) {
     return pcf8563_set_time(my_rtc_i2c, time);
+}
+
+bool my_rtc_is_time_valid() {
+    return s_valid;
 }
