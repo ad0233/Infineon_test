@@ -2942,7 +2942,8 @@ CONFIG_LV_USE_QRCODE=y
 # CONFIG_LV_USE_RLOTTIE is not set
 # CONFIG_LV_USE_THORVG is not set
 # CONFIG_LV_USE_LZ4 is not set
-# CONFIG_LV_USE_FFMPEG is not set
+CONFIG_LV_USE_FFMPEG=y
+CONFIG_LV_FFMPEG_DUMP_FORMAT=y
 # end of 3rd Party Libraries
 
 #
