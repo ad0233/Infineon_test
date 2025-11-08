@@ -1,0 +1,9 @@
+idf_component_register(
+    SRCS
+        ./h264_io.c
+        ./esp_h264_sw_dec_test.c
+    INCLUDE_DIRS
+        .
+    REQUIRES
+        esp_h264
+)

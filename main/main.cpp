@@ -50,6 +50,7 @@
 #include "cmd_parse.h"
 
 #include "fsm_main.h"
+#include "my_h264.h"
 
 // 时间调整函数 - 根据编码器变化调整时间
 static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
