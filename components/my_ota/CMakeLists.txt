@@ -5,4 +5,6 @@ idf_component_register(
         .
     REQUIRES
         main
+    EMBED_TXTFILES
+        ./rsa_priv_key.pem
 )

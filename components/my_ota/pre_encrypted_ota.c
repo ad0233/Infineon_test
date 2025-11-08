@@ -35,14 +35,8 @@ static const char *TAG = "pre_encrypted_ota_example";
 // OTA 任务句柄（确保同时只有一个 OTA 任务）
 static TaskHandle_t s_ota_task_handle = NULL;
 
-#if defined(CONFIG_PRE_ENCRYPTED_OTA_USE_RSA)
 extern const char rsa_private_pem_start[] asm("_binary_rsa_priv_key_pem_start");
 extern const char rsa_private_pem_end[]   asm("_binary_rsa_priv_key_pem_end");
-#elif defined(CONFIG_PRE_ENCRYPTED_OTA_USE_ECIES)
-#define HMAC_UP_KEY_ID 2
-#else
-#error "Please select a valid encryption algorithm in menuconfig"
-#endif
 
 static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
 {
@@ -127,27 +121,14 @@ void pre_encrypted_ota_task(void *pvParameter)
 
     esp_http_client_config_t config = {
         .url = url,
-        .timeout_ms = 60,
+        .timeout_ms = 60 * 1000,
         .crt_bundle_attach = esp_crt_bundle_attach,
         .keep_alive_enable = true,
         .save_client_session = true,
     };
     esp_decrypt_cfg_t cfg = {0};
-#if defined(CONFIG_PRE_ENCRYPTED_OTA_USE_RSA)
-#if defined(CONFIG_PRE_ENCRYPTED_RSA_USE_DS)
-    esp_ds_data_ctx_t *ds_data = esp_secure_cert_get_ds_ctx();
-    if (ds_data == NULL) {
-        ESP_LOGE(TAG, "Failed to get DS context");
-        OTA_TASK_EXIT();
-    }
-    cfg.ds_data = ds_data;
-#else
     cfg.rsa_priv_key = rsa_private_pem_start;
     cfg.rsa_priv_key_len = rsa_private_pem_end - rsa_private_pem_start;
-#endif /* CONFIG_PRE_ENCRYPTED_RSA_USE_DS */
-#elif defined(CONFIG_PRE_ENCRYPTED_OTA_USE_ECIES)
-    cfg.hmac_key_id = HMAC_UP_KEY_ID;
-#endif /* CONFIG_PRE_ENCRYPTED_OTA_USE_RSA */
     esp_decrypt_handle_t decrypt_handle = esp_encrypted_img_decrypt_start(&cfg);
     if (!decrypt_handle) {
         ESP_LOGE(TAG, "OTA upgrade failed");

@@ -44,6 +44,7 @@
 #include "my_nvs.h"
 #include "my_ble.h"
 #include "my_wifi.h"
+#include "my_ota.h"
 
 #include "rust_lunawake.h"
 #include "cmd_parse.h"
@@ -183,6 +184,11 @@ extern "C" void app_main()
     }
     my_ble_init();
     my_wifi_init();
+    my_wifi_connect("303", "Qq13543826488.");
+    
+    my_ota_start("https://lunawake.oss-cn-shenzhen.aliyuncs.com/Lunawake_main_00ec7c3_c6633aa2_20251108_123533.bin?x-oss-credential=LTAI5tKXsxzVgvKJaTE4Dgaa%2F20251108%2Fcn-shenzhen%2Foss%2Faliyun_v4_request&x-oss-date=20251108T062527Z&x-oss-expires=3600&x-oss-signature-version=OSS4-HMAC-SHA256&x-oss-signature=69550e223abdb7c46640aa396d6583cfc3f2803815fbdf0029dc299c13be0ed0");
+
+    return;
     
     // 自动连接已保存的WiFi
     xTaskCreate([](void *arg) {
