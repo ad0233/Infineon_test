@@ -47,15 +47,15 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_app_desc_t running_app_info;
     if (esp_ota_get_partition_description(running, &running_app_info) == ESP_OK) {
-        ESP_LOGI(TAG, "Running firmware version: %s", running_app_info.version);
+        ESP_LOGI(TAG, "Running firmware version: %s %ld", running_app_info.version, running->size);
     }
 
-#ifndef CONFIG_EXAMPLE_SKIP_VERSION_CHECK
-    if (memcmp(new_app_info->version, running_app_info.version, sizeof(new_app_info->version)) == 0) {
-        ESP_LOGW(TAG, "Current running version is the same as a new. We will not continue the update.");
-        return ESP_FAIL;
-    }
-#endif
+// #ifndef CONFIG_EXAMPLE_SKIP_VERSION_CHECK
+//     if (memcmp(new_app_info->version, running_app_info.version, sizeof(new_app_info->version)) == 0) {
+//         ESP_LOGW(TAG, "Current running version is the same as a new. We will not continue the update.");
+//         return ESP_FAIL;
+//     }
+// #endif
     return ESP_OK;
 }
 
@@ -121,10 +121,10 @@ void pre_encrypted_ota_task(void *pvParameter)
 
     esp_http_client_config_t config = {
         .url = url,
-        .timeout_ms = 60 * 1000,
+        .timeout_ms = 90 * 1000,
         .crt_bundle_attach = esp_crt_bundle_attach,
         .keep_alive_enable = true,
-        .save_client_session = true,
+        .buffer_size = 1024 * 64,
     };
     esp_decrypt_cfg_t cfg = {0};
     cfg.rsa_priv_key = rsa_private_pem_start;
@@ -159,6 +159,8 @@ void pre_encrypted_ota_task(void *pvParameter)
         // data read so far.
         ESP_LOGD(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
     }
+    ESP_LOGI(TAG, "esp_https_ota_get_image_len_read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
+    ESP_LOGI(TAG, "esp_https_ota_is_complete_data_received: %d", esp_https_ota_is_complete_data_received(https_ota_handle));
 
     if (!esp_https_ota_is_complete_data_received(https_ota_handle)) {
         // the OTA image was not completely received and user can customise the response to this situation.
