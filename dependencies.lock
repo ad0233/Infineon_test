@@ -2,43 +2,43 @@ dependencies:
   espressif/cmake_utilities:
     dependencies: []
     source:
-      path: /home/henry/ai_agent/volc_rtc/dependencies/espressif__cmake_utilities
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__cmake_utilities
       type: local
     version: 0.5.3
   espressif/esp-dsp:
     dependencies: []
     source:
-      path: /home/henry/ai_agent/volc_rtc/dependencies/espressif__esp-dsp
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__esp-dsp
       type: local
     version: 1.6.0
   espressif/esp_secure_cert_mgr:
     dependencies: []
     source:
-      path: /home/henry/ai_agent/volc_rtc/dependencies/espressif__esp_secure_cert_mgr
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__esp_secure_cert_mgr
       type: local
     version: 2.6.1
   espressif/esp_websocket_client:
     dependencies: []
     source:
-      path: /home/henry/ai_agent/volc_rtc/dependencies/espressif__esp_websocket_client
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__esp_websocket_client
       type: local
     version: 1.5.0
   espressif/jsmn:
     dependencies: []
     source:
-      path: /home/henry/ai_agent/volc_rtc/dependencies/espressif__jsmn
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__jsmn
       type: local
     version: 1.1.0
   espressif/nghttp:
     dependencies: []
     source:
-      path: /home/henry/ai_agent/volc_rtc/dependencies/espressif__nghttp
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__nghttp
       type: local
     version: 1.65.0
   espressif/zlib:
     dependencies: []
     source:
-      path: /home/henry/ai_agent/volc_rtc/dependencies/espressif__zlib
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__zlib
       type: local
     version: 1.3.1
   idf:
@@ -48,7 +48,7 @@ dependencies:
   lvgl/lvgl:
     dependencies: []
     source:
-      path: /home/henry/ai_agent/volc_rtc/dependencies/lvgl__lvgl
+      path: /home/henry/BY001-ESP32-main/dependencies/lvgl__lvgl
       type: local
     version: 9.2.2
 direct_dependencies:
@@ -61,6 +61,6 @@ direct_dependencies:
 - espressif/zlib
 - idf
 - lvgl/lvgl
-manifest_hash: ff760c983496c2ee364a85ba8bfe2db6b5161f177c13e5b158d8eeb4bf66b17c
+manifest_hash: d1447bda1d7604df5eefb05228c4a6b58387481b2bf74c2d4ee2d14c300c2f33
 target: esp32s3
 version: 2.0.0
