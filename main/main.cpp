@@ -177,11 +177,13 @@ extern "C" void app_main()
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
 
     rust_lib_init();
-
+    my_lcd_init();
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
         ESP_LOGI("H264", "rgb565_buf_len: %ld", rgb565_buf_len);
+        my_lcd_draw_rgb565(reinterpret_cast<const uint16_t *>(rgb565_buf), rgb565_buf_len / 2);
     }, NULL);
 
+    lvgl_port_stop();
     my_h264_start(100);
 
     if (fsm_main_init() != 0) {
@@ -293,7 +295,6 @@ extern "C" void app_main()
         }
     }, "rust_task", 8192, NULL, 5, NULL);
     my_rtc_init();
-    my_lcd_init();
     my_radar_init();
     // 设置雷达监测数据回调
     my_radar_set_human_presence_callback(human_presence_callback);

@@ -19,6 +19,8 @@
 
 #include "ui.h"
 
+#include "freertos/semphr.h"
+
 #define TAG __FILE__
 
 #define LCD_BL_PWM GPIO_NUM_8
@@ -41,6 +43,36 @@ static esp_lcd_panel_io_handle_t io_handle = NULL;
 static esp_lcd_panel_handle_t panel_handle = NULL;
 
 static lv_disp_t *lvgl_disp = NULL;
+
+esp_err_t my_lcd_draw_rgb565(const uint16_t *frame, size_t pixel_count)
+{
+    if (panel_handle == NULL || frame == NULL) {
+        ESP_LOGE(TAG, "panel_handle or frame is NULL");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (pixel_count != (EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES)) {
+        ESP_LOGE(TAG, "pixel_count is not equal to EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES");
+        return ESP_ERR_INVALID_ARG;
+    }
+    const int chunk_rows = 72;
+    esp_err_t err = ESP_OK;
+    lvgl_port_lock(0);
+    for (int y = 2 * chunk_rows; y < EXAMPLE_LCD_V_RES; y += chunk_rows) {
+        int rows = chunk_rows;
+        if (y + rows > EXAMPLE_LCD_V_RES) {
+            rows = EXAMPLE_LCD_V_RES - y;
+        }
+        const uint16_t *chunk_ptr = frame + (size_t)y * EXAMPLE_LCD_H_RES;
+        err = esp_lcd_panel_draw_bitmap(panel_handle, 0, y, EXAMPLE_LCD_H_RES, y + rows, chunk_ptr);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "esp_lcd_panel_draw_bitmap failed: %d (y=%d rows=%d)", err, y, rows);
+            break;
+        }
+        break;
+    }
+    lvgl_port_unlock();
+    return err;
+}
 
 void bsp_lcd_init(void);
 void bsp_lcd_bl_init(void);
