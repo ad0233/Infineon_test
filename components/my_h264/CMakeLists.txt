@@ -1,9 +1,10 @@
 idf_component_register(
     SRCS
-        ./h264_io.c
-        ./esp_h264_sw_dec_test.c
+        ./my_h264.c
     INCLUDE_DIRS
         .
     REQUIRES
         esp_h264
+    EMBED_FILES
+        h264/brand-motion2.h264
 )

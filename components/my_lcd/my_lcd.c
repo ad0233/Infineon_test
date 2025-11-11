@@ -56,8 +56,8 @@ int my_lcd_init() {
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io_handle,
         .panel_handle = panel_handle,
-        .buffer_size = EXAMPLE_LCD_H_RES * 36,
-        .double_buffer = 0,
+        .buffer_size = EXAMPLE_LCD_H_RES * 72,
+        .double_buffer = 1,
         .hres = EXAMPLE_LCD_H_RES,
         .vres = EXAMPLE_LCD_V_RES,
         .color_format = LV_COLOR_FORMAT_RGB565,

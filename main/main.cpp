@@ -178,6 +178,11 @@ extern "C" void app_main()
 
     rust_lib_init();
 
+    my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
+        ESP_LOGI("H264", "rgb565_buf_len: %ld", rgb565_buf_len);
+    }, NULL);
+
+    my_h264_start(100);
 
     if (fsm_main_init() != 0) {
         ESP_LOGE(TAG, "fsm_main_init failed");
@@ -185,9 +190,9 @@ extern "C" void app_main()
     }
     my_ble_init();
     my_wifi_init();
-    my_wifi_connect("303", "Qq13543826488.");
+    // my_wifi_connect("303", "Qq13543826488.");
     
-    my_ota_start("https://lunawake.oss-cn-shenzhen.aliyuncs.com/Lunawake_main_1706a52_a8f0dcb6_20251108_164040.bin?x-oss-credential=LTAI5tKXsxzVgvKJaTE4Dgaa%2F20251108%2Fcn-shenzhen%2Foss%2Faliyun_v4_request&x-oss-date=20251108T084717Z&x-oss-expires=32400&x-oss-signature-version=OSS4-HMAC-SHA256&x-oss-signature=977c006b564eb20045ab5e3ae0c9337a2c50834c0de7cb6d9c24a80651c05ef6");
+    // my_ota_start("https://lunawake.oss-cn-shenzhen.aliyuncs.com/Lunawake_main_1706a52_a8f0dcb6_20251108_164040.bin?x-oss-credential=LTAI5tKXsxzVgvKJaTE4Dgaa%2F20251108%2Fcn-shenzhen%2Foss%2Faliyun_v4_request&x-oss-date=20251108T084717Z&x-oss-expires=32400&x-oss-signature-version=OSS4-HMAC-SHA256&x-oss-signature=977c006b564eb20045ab5e3ae0c9337a2c50834c0de7cb6d9c24a80651c05ef6");
     return;
     
     // 自动连接已保存的WiFi

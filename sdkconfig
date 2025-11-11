@@ -3012,6 +3012,70 @@ CONFIG_LV_BUILD_EXAMPLES=y
 # CONFIG_LV_USE_DEMO_MULTILANG is not set
 # end of Demos
 # end of LVGL configuration
+
+#
+# Espressif Camera Sensors Configurations
+#
+
+#
+# Camera Sensor Configuration
+#
+
+#
+# Select and Set Camera Sensor
+#
+# CONFIG_CAMERA_BF3901 is not set
+# end of Select and Set Camera Sensor
+# end of Camera Sensor Configuration
+
+#
+# Camera XCLK Generator Configuration
+#
+CONFIG_CAMERA_XCLK_USE_LEDC=y
+# end of Camera XCLK Generator Configuration
+
+#
+# Camera Motor Control Configuration
+#
+# CONFIG_CAM_MOTOR_DW9714 is not set
+# end of Camera Motor Control Configuration
+
+#
+# Camera SPI Controller Configuration
+#
+CONFIG_CAM_CTLR_SPI_ISR_CACHE_SAFE=y
+# CONFIG_CAM_CTLR_SPI_DISABLE_BACKUP_BUFFER is not set
+# CONFIG_CAM_CTLR_SPI_DISABLE_AUTO_DECODE is not set
+CONFIG_CAM_CTLR_SPI_DECODE_TASK_STACK_SIZE=4096
+CONFIG_CAM_CTLR_SPI_DECODE_TASK_PRIORITY=10
+# end of Camera SPI Controller Configuration
+# end of Espressif Camera Sensors Configurations
+
+#
+# Espressif SCCB Configurations
+#
+CONFIG_ESP_SCCB_TRANS_TIMEOUT_DEFAULT=500
+# end of Espressif SCCB Configurations
+
+#
+# Espressif Video Configuration
+#
+CONFIG_ESP_VIDEO_CHECK_PARAMETERS=y
+# CONFIG_ESP_VIDEO_ENABLE_SPI_VIDEO_DEVICE is not set
+# CONFIG_ESP_VIDEO_ENABLE_USB_UVC_VIDEO_DEVICE is not set
+
+#
+# Video Data Preprocessing
+#
+# end of Video Data Preprocessing
+# end of Espressif Video Configuration
+
+#
+# USB HOST UVC
+#
+# CONFIG_UVC_PRINTF_CONFIGURATION_DESCRIPTOR is not set
+CONFIG_UVC_INTERVAL_ARRAY_SIZE=3
+# end of USB HOST UVC
 # end of Component config
 
 CONFIG_IDF_EXPERIMENTAL_FEATURES=y
