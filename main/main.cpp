@@ -179,12 +179,14 @@ extern "C" void app_main()
     rust_lib_init();
     my_lcd_init();
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
-        ESP_LOGI("H264", "rgb565_buf_len: %ld", rgb565_buf_len);
         my_lcd_draw_rgb565(reinterpret_cast<const uint16_t *>(rgb565_buf), rgb565_buf_len / 2);
     }, NULL);
 
     lvgl_port_stop();
     my_h264_start(100);
+    vTaskDelay(6000 / portTICK_PERIOD_MS);
+    lvgl_port_resume();
+    return;
 
     if (fsm_main_init() != 0) {
         ESP_LOGE(TAG, "fsm_main_init failed");
