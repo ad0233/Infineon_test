@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include "my_h264.h"
 
@@ -8,6 +9,7 @@
 #include "freertos/queue.h"
 
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 
 #include "esp_h264_dec.h"
 #include "esp_h264_dec_sw.h"
@@ -17,18 +19,68 @@ extern const uint8_t brand_motion2_h264_start[] asm("_binary_brand_motion2_h264_
 extern const uint8_t brand_motion2_h264_end[]   asm("_binary_brand_motion2_h264_end");
 
 static QueueHandle_t h264_queue = NULL;
+static QueueHandle_t s_rgb_ready_queue = NULL;
+static QueueHandle_t s_rgb_free_queue = NULL;
 static my_h264_callback_t s_callback = NULL;
 static void *s_context = NULL;
 
-static void ConvertYUV420SPToRGB565(unsigned char* src,unsigned char* Dst,int ImageWidth,int ImageHeight);
+typedef struct {
+    uint8_t *buf;
+    size_t len;
+} rgb565_frame_t;
+
+#define RGB565_BUFFER_COUNT (2)
+#define CLIP_TABLE_SIZE     (2048)
+#define CLIP_TABLE_OFFSET   (512)
+
+static void ensure_lut_ready(void);
+static void ConvertYUV420SPToRGB565_LUT(const unsigned char *src,
+                                        unsigned char *dst,
+                                        int src_width,
+                                        int src_height,
+                                        int dst_width,
+                                        int dst_height);
 static void i420_decode_thread(void *arg);
+static void playback_thread(void *arg);
+
+static bool s_lut_ready = false;
+static int32_t s_y_table[256];
+static int32_t s_u_b_table[256];
+static int32_t s_u_g_table[256];
+static int32_t s_v_r_table[256];
+static int32_t s_v_g_table[256];
+static uint8_t s_clip_table[CLIP_TABLE_SIZE];
+
+static uint16_t s_src_width = 0;
+static uint16_t s_src_height = 0;
+static uint16_t s_dst_width = 0;
+static uint16_t s_dst_height = 0;
+static size_t s_rgb_frame_bytes = 0;
+static bool s_buffers_initialized = false;
+
+static inline uint16_t align16(uint16_t value)
+{
+    return (value + 15) & ~0x0F;
+}
 
 void my_h264_init(my_h264_callback_t callback, void *context)
 {
     s_callback = callback;
     s_context = context;
     h264_queue = xQueueCreate(1, sizeof(esp_h264_dec_in_frame_t));
-    xTaskCreate(i420_decode_thread, "i420_decode_thread", 1024 * 10, NULL, 5, NULL);
+    s_rgb_ready_queue = xQueueCreate(RGB565_BUFFER_COUNT, sizeof(rgb565_frame_t));
+    s_rgb_free_queue = xQueueCreate(RGB565_BUFFER_COUNT, sizeof(uint8_t *));
+    if (h264_queue == NULL || s_rgb_ready_queue == NULL || s_rgb_free_queue == NULL) {
+        ESP_LOGE("h264", "Failed to create queues");
+        return;
+    }
+    if (xTaskCreatePinnedToCore(playback_thread, "h264_play_thread", 1024 * 6, NULL, 5, NULL, 1) != pdPASS) {
+        ESP_LOGE("h264", "Failed to create playback task");
+        return;
+    }
+    if (xTaskCreatePinnedToCore(i420_decode_thread, "i420_decode_thread", 1024 * 10, NULL, 5, NULL, 0) != pdPASS) {
+        ESP_LOGE("h264", "Failed to create decode task");
+    }
 }
 
 int my_h264_start(uint32_t timeout_ms)
@@ -61,8 +113,53 @@ static void i420_decode_thread(void *arg) {
         vTaskDelete(NULL);
         return;
     }
-    uint8_t *rgb565_360_buf = malloc(360 * 360 * 2);
-    uint8_t *rgb565_368_buf = malloc(368 * 368 * 2);
+    ensure_lut_ready();
+
+    esp_h264_dec_param_sw_handle_t param_handle = NULL;
+    esp_h264_resolution_t res = {0};
+    ret = esp_h264_dec_sw_get_param_hd(dec, &param_handle);
+    if (ret == ESP_H264_ERR_OK) {
+        ret = esp_h264_dec_get_resolution(param_handle, &res);
+    }
+    if (ret != ESP_H264_ERR_OK || res.width == 0 || res.height == 0) {
+        // ESP_LOGW("h264", "Failed to get resolution, fallback to 360x360");
+        res.width = 360;
+        res.height = 360;
+    }
+
+    s_dst_width = res.width;
+    s_dst_height = res.height;
+    s_src_width = align16(res.width);
+    s_src_height = align16(res.height);
+    s_rgb_frame_bytes = (size_t)s_dst_width * s_dst_height * 2;
+
+    if (s_rgb_free_queue == NULL || s_rgb_ready_queue == NULL) {
+        ESP_LOGE("h264", "RGB queues are not ready");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    if (!s_buffers_initialized) {
+        for (int i = 0; i < RGB565_BUFFER_COUNT; ++i) {
+            uint8_t *buf = (uint8_t *)heap_caps_malloc(s_rgb_frame_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+            if (buf == NULL) {
+                buf = (uint8_t *)heap_caps_malloc(s_rgb_frame_bytes, MALLOC_CAP_8BIT);
+            }
+            if (buf == NULL) {
+                ESP_LOGE("h264", "Failed to allocate RGB buffer");
+                vTaskDelete(NULL);
+                return;
+            }
+            if (xQueueSend(s_rgb_free_queue, &buf, 0) != pdPASS) {
+                ESP_LOGE("h264", "Failed to enqueue RGB buffer");
+                heap_caps_free(buf);
+                vTaskDelete(NULL);
+                return;
+            }
+        }
+        s_buffers_initialized = true;
+    }
+
     esp_h264_dec_out_frame_t out_frame;
     esp_h264_dec_in_frame_t in_frame;
     while (1) {
@@ -75,15 +172,26 @@ static void i420_decode_thread(void *arg) {
                 in_frame.raw_data.buffer += in_frame.consume;
                 in_frame.raw_data.len -= in_frame.consume;
                 if (ret == ESP_H264_ERR_OK) {
-                    ConvertYUV420SPToRGB565(out_frame.outbuf, rgb565_368_buf, 368, 368);
-                    // 368 转 360
-                    uint16_t *src_line = (uint16_t *)rgb565_368_buf;
-                    uint16_t *dst_line = (uint16_t *)rgb565_360_buf;
-                    for (int row = 0; row < 360; ++row) {
-                        memcpy(dst_line + row * 360, src_line + row * 368, 360 * sizeof(uint16_t));
+                    uint8_t *rgb565_buf = NULL;
+                    if (xQueueReceive(s_rgb_free_queue, &rgb565_buf, portMAX_DELAY) != pdPASS) {
+                        ESP_LOGE("h264", "Failed to get free RGB buffer");
+                        break;
                     }
-
-                    s_callback(rgb565_360_buf, 360 * 360 * 2, s_context);
+                    ConvertYUV420SPToRGB565_LUT(out_frame.outbuf,
+                                                rgb565_buf,
+                                                s_src_width,
+                                                s_src_height,
+                                                s_dst_width,
+                                                s_dst_height);
+                    rgb565_frame_t frame = {
+                        .buf = rgb565_buf,
+                        .len = s_rgb_frame_bytes,
+                    };
+                    if (xQueueSend(s_rgb_ready_queue, &frame, portMAX_DELAY) != pdPASS) {
+                        ESP_LOGE("h264", "Failed to enqueue RGB frame");
+                        xQueueSend(s_rgb_free_queue, &rgb565_buf, portMAX_DELAY);
+                        break;
+                    }
                 } else {
                     ESP_LOGE("h264", "decode failed. line %d \n", __LINE__);
                     break;
@@ -93,53 +201,98 @@ static void i420_decode_thread(void *arg) {
     }
 }
 
-static void ConvertYUV420SPToRGB565(unsigned char* src,unsigned char* Dst,int ImageWidth,int ImageHeight)
+static void ensure_lut_ready(void)
 {
-    if (ImageWidth < 1 || ImageHeight < 1 || src == NULL || Dst == NULL)
+    if (s_lut_ready) {
         return;
-    const long len = ImageWidth * ImageHeight;
-    unsigned char* yData = src;
-    unsigned char* uData = &yData[len];
-    unsigned char* vData = &uData[len >> 2];
-    int yIdx,uIdx,vIdx;
-    for (int i = 0; i < ImageHeight; i++){
-        for (int j = 0; j < ImageWidth; j++){
-            yIdx = i * ImageWidth + j;
-            vIdx = (i/2) * (ImageWidth/2) + (j/2);
-            uIdx = vIdx;
+    }
+    for (int i = 0; i < 256; ++i) {
+        int y = i - 16;
+        if (y < 0) {
+            y = 0;
+        }
+        s_y_table[i] = 298 * y;
+        int u = i - 128;
+        s_u_b_table[i] = 516 * u;
+        s_u_g_table[i] = -100 * u;
+        int v = i - 128;
+        s_v_r_table[i] = 409 * v;
+        s_v_g_table[i] = -208 * v;
+    }
+    for (int i = 0; i < CLIP_TABLE_SIZE; ++i) {
+        int value = i - CLIP_TABLE_OFFSET;
+        if (value < 0) {
+            value = 0;
+        } else if (value > 255) {
+            value = 255;
+        }
+        s_clip_table[i] = (uint8_t)value;
+    }
+    s_lut_ready = true;
+}
 
-            int y = yData[yIdx] - 16;
-            int u = uData[uIdx] - 128;
-            int v = vData[vIdx] - 128;
+static void ConvertYUV420SPToRGB565_LUT(const unsigned char *src,
+                                        unsigned char *dst,
+                                        int src_width,
+                                        int src_height,
+                                        int dst_width,
+                                        int dst_height)
+{
+    if (src == NULL || dst == NULL || src_width <= 0 || src_height <= 0 ||
+        dst_width <= 0 || dst_height <= 0 || dst_width > src_width || dst_height > src_height) {
+        return;
+    }
 
-            if (y < 0) {
-                y = 0;
+    ensure_lut_ready();
+
+    const size_t y_plane_size = (size_t)src_width * src_height;
+    const unsigned char *yData = src;
+    const unsigned char *uData = yData + y_plane_size;
+    const unsigned char *vData = uData + (y_plane_size >> 2);
+
+    const int half_src_width = src_width >> 1;
+
+    for (int i = 0; i < dst_height; ++i) {
+        const int y_row_offset = i * src_width;
+        const int uv_row_offset = (i >> 1) * half_src_width;
+        const int dst_row_offset = i * dst_width;
+        for (int j = 0; j < dst_width; ++j) {
+            const int yIdx = y_row_offset + j;
+            const int uvIdx = uv_row_offset + (j >> 1);
+
+            const int y_component = s_y_table[yData[yIdx]];
+            const int u_value = uData[uvIdx];
+            const int v_value = vData[uvIdx];
+
+            const int r_val = (y_component + s_v_r_table[v_value] + 128) >> 8;
+            const int g_val = (y_component + s_u_g_table[u_value] + s_v_g_table[v_value] + 128) >> 8;
+            const int b_val = (y_component + s_u_b_table[u_value] + 128) >> 8;
+
+            const uint8_t r = s_clip_table[r_val + CLIP_TABLE_OFFSET];
+            const uint8_t g = s_clip_table[g_val + CLIP_TABLE_OFFSET];
+            const uint8_t b = s_clip_table[b_val + CLIP_TABLE_OFFSET];
+
+            const uint16_t color = (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
+            const size_t dst_pos = ((size_t)dst_row_offset + j) << 1;
+            dst[dst_pos] = (uint8_t)(color >> 8);
+            dst[dst_pos + 1] = (uint8_t)(color & 0xFF);
+        }
+    }
+}
+
+static void playback_thread(void *arg)
+{
+    rgb565_frame_t frame;
+    while (1) {
+        if (s_rgb_ready_queue == NULL || s_rgb_free_queue == NULL) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+            continue;
+        }
+        if (xQueueReceive(s_rgb_ready_queue, &frame, portMAX_DELAY) == pdPASS) {
+            if (s_callback != NULL) {
+                s_callback(frame.buf, frame.len, s_context);
             }
-
-            int r = (298 * y + 409 * v + 128) >> 8;
-            int g = (298 * y - 100 * u - 208 * v + 128) >> 8;
-            int b = (298 * y + 516 * u + 128) >> 8;
-
-            if (r < 0) {
-                r = 0;
-            } else if (r > 255) {
-                r = 255;
-            }
-            if (g < 0) {
-                g = 0;
-            } else if (g > 255) {
-                g = 255;
-            }
-            if (b < 0) {
-                b = 0;
-            } else if (b > 255) {
-                b = 255;
-            }
-
-            uint16_t color = (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
-            size_t byte_pos = (size_t)yIdx << 1;
-            Dst[byte_pos] = (uint8_t)(color >> 8);
-            Dst[byte_pos + 1] = (uint8_t)(color & 0xFF);
+            xQueueSend(s_rgb_free_queue, &frame.buf, portMAX_DELAY);
         }
     }
 }
