@@ -2,8 +2,10 @@ idf_component_register(
     SRCS
         ./my_lcd.c
         ./my_ui_behavior.c
+        ./my_ui_assets.c
     INCLUDE_DIRS
         .
     REQUIRES
         main
+        Lunawake
 )

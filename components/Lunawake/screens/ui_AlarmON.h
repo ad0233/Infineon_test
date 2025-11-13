@@ -11,9 +11,9 @@ extern "C" {
 #endif
 
 // SCREEN: ui_AlarmON
-
 extern void ui_AlarmON_screen_init(void);
 extern void ui_AlarmON_screen_destroy(void);
+extern void ui_AlarmON_screen_relocalize(void);
 extern lv_obj_t * ui_AlarmON;
 extern lv_obj_t * ui_AlarmONContainer;
 extern lv_obj_t * ui_AlarmONLabel1;

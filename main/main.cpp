@@ -182,10 +182,13 @@ extern "C" void app_main()
         my_lcd_draw_rgb565(reinterpret_cast<const uint16_t *>(rgb565_buf), rgb565_buf_len / 2);
     }, NULL);
 
+    my_ui_network_guide();
     lvgl_port_stop();
-    my_h264_start(100);
+    my_h264_start(MY_H264_ANIM_FAIL2, 100);
     vTaskDelay(6000 / portTICK_PERIOD_MS);
     lvgl_port_resume();
+    my_lvgl_force_refresh();
+    print_mem_info();
     return;
 
     if (fsm_main_init() != 0) {

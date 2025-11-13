@@ -26,13 +26,9 @@ void ui_NetworkBoot_screen_init(void)
     lv_obj_set_height(ui_NetworkBootContainer, 290);
     lv_obj_set_align(ui_NetworkBootContainer, LV_ALIGN_CENTER);
     lv_obj_remove_flag(ui_NetworkBootContainer, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_obj_set_style_radius(ui_NetworkBootContainer, 145, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(ui_NetworkBootContainer, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_opa(ui_NetworkBootContainer, 50, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(ui_NetworkBootContainer, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_NetworkBootImage = lv_image_create(ui_NetworkBootContainer);
-    lv_image_set_src(ui_NetworkBootImage, &ui_img_qr_code_png);
+    lv_image_set_src(ui_NetworkBootImage, &ui_img_qrcode_png);
     lv_obj_set_width(ui_NetworkBootImage, LV_SIZE_CONTENT);   /// 200
     lv_obj_set_height(ui_NetworkBootImage, LV_SIZE_CONTENT);    /// 204
     lv_obj_set_x(ui_NetworkBootImage, 0);
@@ -40,7 +36,6 @@ void ui_NetworkBoot_screen_init(void)
     lv_obj_set_align(ui_NetworkBootImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_NetworkBootImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_NetworkBootImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_NetworkBootImage, 159);
 
     ui_NetworkBootLabel = lv_label_create(ui_NetworkBootContainer);
     lv_obj_set_width(ui_NetworkBootLabel, LV_SIZE_CONTENT);   /// 1
@@ -50,7 +45,7 @@ void ui_NetworkBoot_screen_init(void)
     lv_obj_set_align(ui_NetworkBootLabel, LV_ALIGN_CENTER);
     lv_label_set_text(ui_NetworkBootLabel, " Scan to unlock more \n personalized content");
     lv_obj_set_style_text_color(ui_NetworkBootLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_NetworkBootLabel, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_NetworkBootLabel, 180, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_NetworkBootLabel, &ui_font_sfprodisplay18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 }
@@ -64,5 +59,11 @@ void ui_NetworkBoot_screen_destroy(void)
     ui_NetworkBootContainer = NULL;
     ui_NetworkBootImage = NULL;
     ui_NetworkBootLabel = NULL;
+
+}
+
+void ui_NetworkBoot_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

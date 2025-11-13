@@ -45,7 +45,7 @@ void ui_ConnectingFailed_screen_init(void)
     lv_obj_set_style_text_font(ui_ConnectingFailedLabel1, &ui_font_sfprodisplay20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_ConnectingFailedImage = lv_image_create(ui_ConnectingFailedContainer);
-    lv_image_set_src(ui_ConnectingFailedImage, &ui_img_376556310);
+    lv_image_set_src(ui_ConnectingFailedImage, &ui_img_wifino_png);
     lv_obj_set_width(ui_ConnectingFailedImage, LV_SIZE_CONTENT);   /// 128
     lv_obj_set_height(ui_ConnectingFailedImage, LV_SIZE_CONTENT);    /// 128
     lv_obj_set_x(ui_ConnectingFailedImage, 0);
@@ -53,7 +53,6 @@ void ui_ConnectingFailed_screen_init(void)
     lv_obj_set_align(ui_ConnectingFailedImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_ConnectingFailedImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_ConnectingFailedImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_ConnectingFailedImage, 159);
 
     ui_ConnectingFailedLabel2 = lv_label_create(ui_ConnectingFailedContainer);
     lv_obj_set_width(ui_ConnectingFailedLabel2, LV_SIZE_CONTENT);   /// 1
@@ -79,5 +78,11 @@ void ui_ConnectingFailed_screen_destroy(void)
     ui_ConnectingFailedLabel1 = NULL;
     ui_ConnectingFailedImage = NULL;
     ui_ConnectingFailedLabel2 = NULL;
+
+}
+
+void ui_ConnectingFailed_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

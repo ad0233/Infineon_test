@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_ConnectingSuccess
 extern void ui_ConnectingSuccess_screen_init(void);
 extern void ui_ConnectingSuccess_screen_destroy(void);
+extern void ui_ConnectingSuccess_screen_relocalize(void);
 extern lv_obj_t * ui_ConnectingSuccess;
 extern lv_obj_t * ui_ConnectingSuccessContainer;
 extern lv_obj_t * ui_ConnectingSuccessLabel;

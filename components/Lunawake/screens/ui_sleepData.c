@@ -192,8 +192,8 @@ void ui_sleepData_screen_init(void)
     lv_image_set_src(ui_sleepValueImage, &ui_img_up_png);
     lv_obj_set_width(ui_sleepValueImage, LV_SIZE_CONTENT);   /// 16
     lv_obj_set_height(ui_sleepValueImage, LV_SIZE_CONTENT);    /// 16
-    lv_obj_set_x(ui_sleepValueImage, 50);
-    lv_obj_set_y(ui_sleepValueImage, 1);
+    lv_obj_set_x(ui_sleepValueImage, 27);
+    lv_obj_set_y(ui_sleepValueImage, 31);
     lv_obj_set_align(ui_sleepValueImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_sleepValueImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_sleepValueImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
@@ -223,5 +223,11 @@ void ui_sleepData_screen_destroy(void)
     ui_HeartRateData = NULL;
     ui_TimeToSleepData = NULL;
     ui_sleepValueImage = NULL;
+
+}
+
+void ui_sleepData_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

@@ -9,7 +9,7 @@ static const char *TAG = "fsm_main";
 
 
 enum fsm_main_state_enum {
-    F_MAIN_S_UNINIT,            // 未初始化
+    F_MAIN_S_UNINIT = 0,            // 未初始化
     F_MAIN_S_CLOCK,             // 时钟页面
     // 找人
     F_MAIN_S_FINDPERSON,        // 找人中

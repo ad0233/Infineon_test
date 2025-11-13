@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_Detection
 extern void ui_Detection_screen_init(void);
 extern void ui_Detection_screen_destroy(void);
+extern void ui_Detection_screen_relocalize(void);
 extern lv_obj_t * ui_Detection;
 extern lv_obj_t * ui_DetectionContainer;
 extern lv_obj_t * ui_DetectionLabel;

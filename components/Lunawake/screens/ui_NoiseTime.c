@@ -8,18 +8,7 @@
 lv_obj_t * ui_NoiseTime = NULL;
 lv_obj_t * ui_NoiseTimeContainer = NULL;
 lv_obj_t * ui_NoiseTimeRoller = NULL;
-lv_obj_t * ui_NoiseTimeImage1 = NULL;
-lv_obj_t * ui_NoiseTimeImage = NULL;
 // event funtions
-void ui_event_NoiseTimeRoller(lv_event_t * e)
-{
-    lv_event_code_t event_code = lv_event_get_code(e);
-
-    if(event_code == LV_EVENT_PRESSED) {
-        Imagezoom_Animation(ui_NoiseTimeImage, 0);
-        Imagezoom_Animation(ui_NoiseTimeImage1, 0);
-    }
-}
 
 // build funtions
 
@@ -66,30 +55,6 @@ void ui_NoiseTime_screen_init(void)
     lv_obj_set_style_bg_color(ui_NoiseTimeRoller, lv_color_hex(0x000000), LV_PART_SELECTED | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_NoiseTimeRoller, 255, LV_PART_SELECTED | LV_STATE_DEFAULT);
 
-    ui_NoiseTimeImage1 = lv_image_create(ui_NoiseTimeRoller);
-    lv_image_set_src(ui_NoiseTimeImage1, &ui_img_vector_141_png);
-    lv_obj_set_width(ui_NoiseTimeImage1, LV_SIZE_CONTENT);   /// 49
-    lv_obj_set_height(ui_NoiseTimeImage1, LV_SIZE_CONTENT);    /// 2
-    lv_obj_set_x(ui_NoiseTimeImage1, 130);
-    lv_obj_set_y(ui_NoiseTimeImage1, 0);
-    lv_obj_set_align(ui_NoiseTimeImage1, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_NoiseTimeImage1, LV_OBJ_FLAG_CLICKABLE);     /// Flags
-    lv_obj_remove_flag(ui_NoiseTimeImage1, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_obj_set_style_image_recolor(ui_NoiseTimeImage1, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_image_recolor_opa(ui_NoiseTimeImage1, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    ui_NoiseTimeImage = lv_image_create(ui_NoiseTimeRoller);
-    lv_image_set_src(ui_NoiseTimeImage, &ui_img_vector_141_png);
-    lv_obj_set_width(ui_NoiseTimeImage, LV_SIZE_CONTENT);   /// 49
-    lv_obj_set_height(ui_NoiseTimeImage, LV_SIZE_CONTENT);    /// 2
-    lv_obj_set_x(ui_NoiseTimeImage, -130);
-    lv_obj_set_y(ui_NoiseTimeImage, 0);
-    lv_obj_set_align(ui_NoiseTimeImage, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_NoiseTimeImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
-    lv_obj_remove_flag(ui_NoiseTimeImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-
-    lv_obj_add_event_cb(ui_NoiseTimeRoller, ui_event_NoiseTimeRoller, LV_EVENT_ALL, NULL);
-
 }
 
 void ui_NoiseTime_screen_destroy(void)
@@ -100,7 +65,11 @@ void ui_NoiseTime_screen_destroy(void)
     ui_NoiseTime = NULL;
     ui_NoiseTimeContainer = NULL;
     ui_NoiseTimeRoller = NULL;
-    ui_NoiseTimeImage1 = NULL;
-    ui_NoiseTimeImage = NULL;
+
+}
+
+void ui_NoiseTime_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

@@ -27,7 +27,7 @@ static const lv_img_dsc_t* unwind_animal_images[UNWIND_ANIMAL_MAX] = {
     &ui_img_fox_png,
     &ui_img_hummingbird_png,
     &ui_img_koi_png,
-    &ui_img_swan_1_png
+    // &ui_img_swan_1_png
 };
 
 void my_ui_set_light(uint8_t val) {
@@ -187,7 +187,7 @@ void my_ui_clock_set_now_time(uint8_t hour, uint8_t min) {
 
 void my_ui_clock_set_tips(const char* tips) {
     lvgl_port_lock(0);
-    lv_label_set_text(ui_MianNoPersonLabel2, tips);
+    // lv_label_set_text(ui_MianNoPersonLabel2, tips);
     lvgl_port_unlock();
 }
 
@@ -215,14 +215,14 @@ void my_ui_clock_show_alarm(uint8_t hour, uint8_t min) {
     }
     
     snprintf(alarm_display_str, sizeof(alarm_display_str), "Alarm: %d:%02d %s", display_hour, min, am_pm);
-    lv_label_set_text(ui_MianNoPersonLabel2, alarm_display_str);
+    // lv_label_set_text(ui_MianNoPersonLabel2, alarm_display_str);
     lvgl_port_unlock();
 }
 
 // 在主页面显示无闹钟
 void my_ui_clock_show_no_alarm(void) {
     lvgl_port_lock(0);
-    lv_label_set_text(ui_MianNoPersonLabel2, "No Alarm");
+    // lv_label_set_text(ui_MianNoPersonLabel2, "No Alarm");
     lvgl_port_unlock();
 }
 
@@ -231,18 +231,18 @@ void my_ui_clock_set_emoji(uint8_t emoji) {
     switch (emoji)
     {
     case 0:
-        lv_image_set_src(ui_MianNoPersonImage, &ui_img_1271368945);  // 太阳 🌞
+        // lv_image_set_src(ui_MianNoPersonImage, &ui_img_1271368945);  // 太阳 🌞
         break;
     case 1:
         // TODO: 需要确认月亮图标资源，ui_img_1271505029 可能不存在
-        lv_image_set_src(ui_MianNoPersonImage, &ui_img_component_8_png);  // 默认图标
+        // lv_image_set_src(ui_MianNoPersonImage, &ui_img_component_8_png);  // 默认图标
         break;
     case 2:
         // TODO: 需要确认离线图标资源，ui_img_806445133 可能不存在
-        lv_image_set_src(ui_MianNoPersonImage, &ui_img_component_8_png);  // 默认图标
+        // lv_image_set_src(ui_MianNoPersonImage, &ui_img_component_8_png);  // 默认图标
         break;
     default:
-        lv_image_set_src(ui_MianNoPersonImage, &ui_img_component_8_png);
+        // lv_image_set_src(ui_MianNoPersonImage, &ui_img_component_8_png);
         break;
     }
     lvgl_port_unlock();
@@ -368,9 +368,9 @@ void my_ui_volume_set(int val) {
     
     // 当音量为0时，更换 ui_VolumeImage 为静音图标
     if(val == 0) {
-        lv_image_set_src(ui_VolumeImage, &ui_img_muted_png);
+        // lv_image_set_src(ui_VolumeImage, &ui_img_muted_png);
     } else {
-        lv_image_set_src(ui_VolumeImage, &ui_img_1416476185);
+        // lv_image_set_src(ui_VolumeImage, &ui_img_1416476185);
     }
     
     lvgl_port_unlock();
@@ -418,7 +418,7 @@ void my_ui_unwind_select_mode(uint8_t mode) {
         break;
     case 1:
     case 2:
-        lv_disp_load_scr(ui_UnwindOn);  // 运行屏幕
+        // lv_disp_load_scr(ui_UnwindOn);  // 运行屏幕
         break;
     default:
         lv_disp_load_scr(ui_UnwindSelet);
@@ -430,7 +430,7 @@ void my_ui_unwind_select_mode(uint8_t mode) {
 // 进入UnwindOn页面（动物选择）
 void my_ui_in_unwind_on(void) {
     lvgl_port_lock(0);
-    lv_disp_load_scr(ui_UnwindOn);
+    // lv_disp_load_scr(ui_UnwindOn);
     current_page = PAGE_UNWIND_ON;
     // 设置当前动物图片
     my_ui_unwind_set_animal(current_unwind_animal);
@@ -465,7 +465,7 @@ void my_ui_unwind_set_animal(unwind_animal_t animal) {
     current_unwind_animal = animal;
     
     lvgl_port_lock(0);
-    lv_image_set_src(ui_UnwindOnImage, unwind_animal_images[animal]);
+    // lv_image_set_src(ui_UnwindOnImage, unwind_animal_images[animal]);
     lvgl_port_unlock();
 }
 
@@ -671,34 +671,13 @@ void my_ui_in_body_data() {
 static wake_mode_t current_wake_mode = WAKE_MODE_SMART;
 static wake_mode_t saved_wake_mode = WAKE_MODE_SMART;  // 已保存的模式
 
-// 唤醒模式配置表
-typedef struct {
-    const char *name;         // 模式名称
-    const char *description;  // 模式描述
-    uint32_t color;          // 模式颜色
-} wake_mode_config_t;
-
-static const wake_mode_config_t wake_mode_configs[WAKE_MODE_MAX] = {
-    [WAKE_MODE_SMART] = {
-        .name = "Smart",
-        .description = "Wakes you gently, based\non your sleep cycle.",
-        .color = 0x17C3D6  // 青色
-    },
-    [WAKE_MODE_CLASSIC] = {
-        .name = "Classic",
-        .description = "Traditional alarm, same\ntime every day.",
-        .color = 0x17C3D6  // 青色
-    }
-};
-
 void my_ui_in_wake_mode() {
     lvgl_port_lock(0);
-    lv_disp_load_scr(ui_WakeMode);
+    // lv_disp_load_scr(ui_WakeMode);
     current_page = PAGE_WAKE_MODE;
     lvgl_port_unlock();
     
     // 强制刷新当前模式显示（确保UI正确更新）
-    my_ui_wake_mode_set(current_wake_mode);
 }
 
 // 设置唤醒模式并更新UI显示
@@ -711,32 +690,7 @@ void my_ui_wake_mode_set(wake_mode_t mode) {
     current_wake_mode = mode;
     
     lvgl_port_lock(0);
-    
-    // 更新模式名称
-    lv_label_set_text(ui_WakeModeLabel, wake_mode_configs[mode].name);
-    
-    // 更新模式描述
-    lv_label_set_text(ui_WakeModeLabel2, wake_mode_configs[mode].description);
-    
-    // 更新弧形进度条颜色和进度
-    // 根据UI设计要求：选中时外圈高亮线圈从无到完整绘制一圈
-    lv_obj_set_style_arc_color(ui_WakeModeArc, lv_color_hex(wake_mode_configs[mode].color), 
-                                LV_PART_INDICATOR | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(ui_WakeModeArc, lv_color_hex(wake_mode_configs[mode].color), 
-                               LV_PART_KNOB | LV_STATE_DEFAULT);
-    
-    // 设置弧形进度条的值：
-    // 如果是当前设置的模式：显示100%圆圈（高亮）
-    // 如果不是当前设置的模式：显示0%圆圈（预览）
-    if(mode == saved_wake_mode) {
-        lv_arc_set_value(ui_WakeModeArc, 100);  // 当前设置的模式显示100%
-    } else {
-        lv_arc_set_value(ui_WakeModeArc, 0);   // 预览模式显示25%
-    }
-    
-    // 强制刷新弧形进度条显示
-    lv_obj_invalidate(ui_WakeModeArc);
-    
+
     lvgl_port_unlock();
 }
 
@@ -769,15 +723,15 @@ static uint8_t current_light_duty = 20;  // 默认20%
 
 // 亮度图片映射表（按顺序：20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%）
 static const lv_img_dsc_t* light_images[9] = {
-    &ui_img_b1_png,         // 20%
-    &ui_img_b2_png,         // 30%
-    &ui_img_b3_png,         // 40%
-    &ui_img_frame_23_png,   // 50%
-    &ui_img_frame_26_png,   // 60%
-    &ui_img_frame_25_png,   // 70%
-    &ui_img_frame_24_png,   // 80%
-    &ui_img_frame_28_png,   // 90%
-    &ui_img_frame_30_png    // 100%
+    &ui_img_light20_png,   // 20%
+    &ui_img_light30_png,   // 30%
+    &ui_img_light40_png,   // 40%
+    &ui_img_light50_png,   // 50%
+    &ui_img_light60_png,   // 60%
+    &ui_img_light70_png,   // 70%
+    &ui_img_light80_png,   // 80%
+    &ui_img_light90_png,   // 90%
+    &ui_img_light100_png   // 100%
 };
 
 void my_ui_in_light() {

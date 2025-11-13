@@ -8,8 +8,8 @@
 lv_obj_t * ui_DetectionN1 = NULL;
 lv_obj_t * ui_DetectionN1Container = NULL;
 lv_obj_t * ui_DetectionN1Image = NULL;
+lv_obj_t * ui_DetectionN1Label = NULL;
 // event funtions
-
 
 // build funtions
 
@@ -32,13 +32,25 @@ void ui_DetectionN1_screen_init(void)
     lv_obj_set_style_border_width(ui_DetectionN1Container, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_DetectionN1Image = lv_image_create(ui_DetectionN1Container);
-    lv_image_set_src(ui_DetectionN1Image, &ui_img_frame_45_png);
+    lv_image_set_src(ui_DetectionN1Image, &ui_img_detectionn1image_png);
     lv_obj_set_width(ui_DetectionN1Image, LV_SIZE_CONTENT);   /// 331
     lv_obj_set_height(ui_DetectionN1Image, LV_SIZE_CONTENT);    /// 297
+    lv_obj_set_x(ui_DetectionN1Image, 0);
+    lv_obj_set_y(ui_DetectionN1Image, -49);
     lv_obj_set_align(ui_DetectionN1Image, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_DetectionN1Image, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_DetectionN1Image, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_DetectionN1Image, 159);
+
+    ui_DetectionN1Label = lv_label_create(ui_DetectionN1Container);
+    lv_obj_set_width(ui_DetectionN1Label, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_DetectionN1Label, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_DetectionN1Label, 0);
+    lv_obj_set_y(ui_DetectionN1Label, 60);
+    lv_obj_set_align(ui_DetectionN1Label, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_DetectionN1Label, " Try adjusting the device \n position for best coverage");
+    lv_obj_set_style_text_color(ui_DetectionN1Label, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_DetectionN1Label, 180, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_DetectionN1Label, &ui_font_sfprodisplay18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 }
 
@@ -50,5 +62,12 @@ void ui_DetectionN1_screen_destroy(void)
     ui_DetectionN1 = NULL;
     ui_DetectionN1Container = NULL;
     ui_DetectionN1Image = NULL;
+    ui_DetectionN1Label = NULL;
+
+}
+
+void ui_DetectionN1_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

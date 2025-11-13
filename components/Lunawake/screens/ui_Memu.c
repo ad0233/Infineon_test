@@ -68,6 +68,7 @@ void ui_Memu_screen_init(void)
     lv_obj_set_style_bg_color(ui_MueuRoller, lv_color_hex(0x000000), LV_PART_SELECTED | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_MueuRoller, 255, LV_PART_SELECTED | LV_STATE_DEFAULT);
 
+
     ui_MemuImage1 = lv_image_create(ui_MueuRoller);
     lv_image_set_src(ui_MemuImage1, &ui_img_vector_136_png);
     lv_obj_set_width(ui_MemuImage1, LV_SIZE_CONTENT);   /// 49
@@ -92,7 +93,9 @@ void ui_Memu_screen_init(void)
     lv_obj_add_flag(ui_MemuImage2, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_MemuImage2, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
-    lv_obj_add_event_cb(ui_MueuRoller, ui_event_MueuRoller, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(ui_MueuRoller, ui_event_MueuRoller, LV_EVENT_ALL, NULL);  
+      
+    
     uic_memu1 = ui_MemuContainer;
 
 }
@@ -108,5 +111,11 @@ void ui_Memu_screen_destroy(void)
     ui_MueuRoller = NULL;
     ui_MemuImage1 = NULL;
     ui_MemuImage2 = NULL;
+
+}
+
+void ui_Memu_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

@@ -8,7 +8,8 @@
 
 ///////////////////// VARIABLES ////////////////////
 lv_anim_t * Imagezoom_Animation(lv_obj_t * TargetObject, int delay);
-
+lv_anim_t * memuUp_Animation(lv_obj_t * TargetObject, int delay);
+lv_anim_t * memuDown_Animation(lv_obj_t * TargetObject, int delay);
 
 // EVENTS
 lv_obj_t * ui____initial_actions0;
@@ -46,6 +47,56 @@ lv_anim_t * Imagezoom_Animation(lv_obj_t * TargetObject, int delay)
 
     return out_anim;
 }
+lv_anim_t * memuUp_Animation(lv_obj_t * TargetObject, int delay)
+{
+    lv_anim_t * out_anim;
+    ui_anim_user_data_t * PropertyAnimation_0_user_data = lv_malloc(sizeof(ui_anim_user_data_t));
+    PropertyAnimation_0_user_data->target = TargetObject;
+    PropertyAnimation_0_user_data->val = -1;
+    lv_anim_t PropertyAnimation_0;
+    lv_anim_init(&PropertyAnimation_0);
+    lv_anim_set_time(&PropertyAnimation_0, 300);
+    lv_anim_set_user_data(&PropertyAnimation_0, PropertyAnimation_0_user_data);
+    lv_anim_set_custom_exec_cb(&PropertyAnimation_0, _ui_anim_callback_set_y);
+    lv_anim_set_values(&PropertyAnimation_0, 0, -80);
+    lv_anim_set_path_cb(&PropertyAnimation_0, lv_anim_path_linear);
+    lv_anim_set_delay(&PropertyAnimation_0, delay + 0);
+    lv_anim_set_deleted_cb(&PropertyAnimation_0, _ui_anim_callback_free_user_data);
+    lv_anim_set_playback_time(&PropertyAnimation_0, 0);
+    lv_anim_set_playback_delay(&PropertyAnimation_0, 0);
+    lv_anim_set_repeat_count(&PropertyAnimation_0, 0);
+    lv_anim_set_repeat_delay(&PropertyAnimation_0, 0);
+    lv_anim_set_early_apply(&PropertyAnimation_0, false);
+    lv_anim_set_get_value_cb(&PropertyAnimation_0, &_ui_anim_callback_get_y);
+    out_anim = lv_anim_start(&PropertyAnimation_0);
+
+    return out_anim;
+}
+lv_anim_t * memuDown_Animation(lv_obj_t * TargetObject, int delay)
+{
+    lv_anim_t * out_anim;
+    ui_anim_user_data_t * PropertyAnimation_0_user_data = lv_malloc(sizeof(ui_anim_user_data_t));
+    PropertyAnimation_0_user_data->target = TargetObject;
+    PropertyAnimation_0_user_data->val = -1;
+    lv_anim_t PropertyAnimation_0;
+    lv_anim_init(&PropertyAnimation_0);
+    lv_anim_set_time(&PropertyAnimation_0, 300);
+    lv_anim_set_user_data(&PropertyAnimation_0, PropertyAnimation_0_user_data);
+    lv_anim_set_custom_exec_cb(&PropertyAnimation_0, _ui_anim_callback_set_y);
+    lv_anim_set_values(&PropertyAnimation_0, 0, 80);
+    lv_anim_set_path_cb(&PropertyAnimation_0, lv_anim_path_linear);
+    lv_anim_set_delay(&PropertyAnimation_0, delay + 0);
+    lv_anim_set_deleted_cb(&PropertyAnimation_0, _ui_anim_callback_free_user_data);
+    lv_anim_set_playback_time(&PropertyAnimation_0, 0);
+    lv_anim_set_playback_delay(&PropertyAnimation_0, 0);
+    lv_anim_set_repeat_count(&PropertyAnimation_0, 0);
+    lv_anim_set_repeat_delay(&PropertyAnimation_0, 0);
+    lv_anim_set_early_apply(&PropertyAnimation_0, false);
+    lv_anim_set_get_value_cb(&PropertyAnimation_0, &_ui_anim_callback_get_y);
+    out_anim = lv_anim_start(&PropertyAnimation_0);
+
+    return out_anim;
+}
 
 ///////////////////// FUNCTIONS ////////////////////
 
@@ -53,32 +104,63 @@ lv_anim_t * Imagezoom_Animation(lv_obj_t * TargetObject, int delay)
 
 void ui_init(void)
 {
+    LV_EVENT_GET_COMP_CHILD = lv_event_register_id();
+
     lv_disp_t * dispp = lv_display_get_default();
     lv_theme_t * theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED),
                                                false, LV_FONT_DEFAULT);
     lv_disp_set_theme(dispp, theme);
-    ui_Memu_screen_init();
-    ui_WakeMode_screen_init();
+    ui_img_offalarm_png_load();
+    ui_img_800502611_load();
+    ui_img_volumeyes_png_load();
+    ui_img_swan_png_load();
+    ui_img_light20_png_load();
+    ui_img_vector_136_png_load();
+    ui_img_738525346_load();
+    ui_img_1757982151_load();
+    ui_img_220829844_load();
+    ui_img_bell_png_load();
+    ui_img_bootimage_png_load();
+    ui_img_cat_png_load();
+    ui_img_detectionimage_png_load();
+    ui_img_detectionn1image_png_load();
+    ui_img_detectionnimage_png_load();
+    ui_img_detectionylabel_png_load();
+    ui_img_fox_png_load();
+    ui_img_hummingbird_png_load();
+    ui_img_koi_png_load();
+    ui_img_light100_png_load();
+    ui_img_light30_png_load();
+    ui_img_light40_png_load();
+    ui_img_light50_png_load();
+    ui_img_light60_png_load();
+    ui_img_light70_png_load();
+    ui_img_light80_png_load();
+    ui_img_light90_png_load();
+    ui_img_moon_png_load();
+    ui_img_offinternet_png_load();
+    ui_img_qrcode_png_load();
+    ui_img_sun_png_load();
+    ui_img_up_png_load();
+    ui_img_volumeno_png_load();
+    ui_img_wifino_png_load();
+    ui_img_wifiyes_png_load();
     ui_AlarmOFF_screen_init();
     ui_AlarmON_screen_init();
     ui_Volume__screen_init();
     ui_UnwindSelet_screen_init();
-    ui_UnwindOn_screen_init();
     ui_NoiseTime_screen_init();
     ui_Light_screen_init();
     ui_SetTime_screen_init();
-    ui_MorningAnimation_screen_init();
-    ui_BluetoothMusic_screen_init();
-    ui_OTA_screen_init();
-    ui_sleepData_screen_init();
+    ui_Memu_screen_init();
+    ui_WakeModeTest_screen_init();
 
-    //其他文件的初始化代码
     ui_NetworkBoot_screen_init();
     ui_Connecting_screen_init();
     ui_ConnectingSuccess_screen_init();
     ui_ConnectingFailed_screen_init();
     ui_OfflineMode_screen_init();
-
+    
     ui_Boot_screen_init();
     ui_Detection_screen_init();
     ui_DetectionY_screen_init();
@@ -86,28 +168,28 @@ void ui_init(void)
     ui_DetectionN1_screen_init();
     ui_MianNoPerson_screen_init();
     ui_MianYesPerson_screen_init();
-
+    ui_MorningAnimation_screen_init();
+    ui_BluetoothMusic_screen_init();
+    ui_OTA_screen_init();
+    ui_sleepData_screen_init();
+    ui_ReminderTomorrow_screen_init();
     ui____initial_actions0 = lv_obj_create(NULL);
     lv_disp_load_scr(ui_Boot);
 }
 
 void ui_destroy(void)
 {
-    ui_Memu_screen_destroy();
-    ui_WakeMode_screen_destroy();
     ui_AlarmOFF_screen_destroy();
     ui_AlarmON_screen_destroy();
     ui_Volume__screen_destroy();
     ui_UnwindSelet_screen_destroy();
-    ui_UnwindOn_screen_destroy();
     ui_NoiseTime_screen_destroy();
     ui_Light_screen_destroy();
     ui_SetTime_screen_destroy();
-    ui_MorningAnimation_screen_destroy();
-    ui_BluetoothMusic_screen_destroy();
-    ui_OTA_screen_destroy();
-    ui_sleepData_screen_destroy();
-    //其他文件的销毁代码
+    ui_Memu_screen_destroy();
+
+    ui_WakeModeTest_screen_destroy();
+
     ui_NetworkBoot_screen_destroy();
     ui_Connecting_screen_destroy();
     ui_ConnectingSuccess_screen_destroy();
@@ -122,4 +204,43 @@ void ui_destroy(void)
     ui_MianNoPerson_screen_destroy();
     ui_MianYesPerson_screen_destroy();
 
+    ui_MorningAnimation_screen_destroy();
+    ui_BluetoothMusic_screen_destroy();
+    ui_OTA_screen_destroy();
+    ui_sleepData_screen_destroy();
+    ui_ReminderTomorrow_screen_destroy();
+}
+
+void ui_relocalize(void)
+{
+    ui_AlarmOFF_screen_relocalize();
+    ui_AlarmON_screen_relocalize();
+    ui_Volume__screen_relocalize();
+    ui_UnwindSelet_screen_relocalize();
+    ui_NoiseTime_screen_relocalize();
+    ui_Light_screen_relocalize();
+    ui_SetTime_screen_relocalize();
+    ui_Memu_screen_relocalize();
+
+    ui_WakeModeTest_screen_relocalize();
+
+        ui_NetworkBoot_screen_relocalize();
+    ui_Connecting_screen_relocalize();
+    ui_ConnectingSuccess_screen_relocalize();
+    ui_ConnectingFailed_screen_relocalize();
+    ui_OfflineMode_screen_relocalize();
+
+        ui_Boot_screen_relocalize();
+    ui_Detection_screen_relocalize();
+    ui_DetectionY_screen_relocalize();
+    ui_DetectionN_screen_relocalize();
+    ui_DetectionN1_screen_relocalize();
+    ui_MianNoPerson_screen_relocalize();
+    ui_MianYesPerson_screen_relocalize();
+
+        ui_MorningAnimation_screen_relocalize();
+    ui_BluetoothMusic_screen_relocalize();
+    ui_OTA_screen_relocalize();
+    ui_sleepData_screen_relocalize();
+    ui_ReminderTomorrow_screen_relocalize();
 }

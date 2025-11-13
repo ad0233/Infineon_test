@@ -14,8 +14,6 @@ lv_obj_t * ui_AlarmONminute = NULL;
 lv_obj_t * ui_AlarmONLabel2 = NULL;
 // event funtions
 
-
-
 // build funtions
 
 void ui_AlarmON_screen_init(void)
@@ -52,7 +50,6 @@ void ui_AlarmON_screen_init(void)
     lv_obj_set_align(ui_AlarmONImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_AlarmONImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_AlarmONImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_AlarmONImage, 179);
 
     ui_AlarmONhour = lv_label_create(ui_AlarmONContainer);
     lv_obj_set_width(ui_AlarmONhour, LV_SIZE_CONTENT);   /// 1
@@ -100,5 +97,11 @@ void ui_AlarmON_screen_destroy(void)
     ui_AlarmONhour = NULL;
     ui_AlarmONminute = NULL;
     ui_AlarmONLabel2 = NULL;
+
+}
+
+void ui_AlarmON_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

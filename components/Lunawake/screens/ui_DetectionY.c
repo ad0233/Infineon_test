@@ -10,8 +10,6 @@ lv_obj_t * ui_DetectionYImage = NULL;
 lv_obj_t * ui_DetectionYLabel = NULL;
 // event funtions
 
-
-
 // build funtions
 
 void ui_DetectionY_screen_init(void)
@@ -22,15 +20,14 @@ void ui_DetectionY_screen_init(void)
     lv_obj_set_style_bg_opa(ui_DetectionY, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_DetectionYImage = lv_image_create(ui_DetectionY);
-    lv_image_set_src(ui_DetectionYImage, &ui_img_component_8_png);
+    lv_image_set_src(ui_DetectionYImage, &ui_img_detectionylabel_png);
     lv_obj_set_width(ui_DetectionYImage, LV_SIZE_CONTENT);   /// 149
     lv_obj_set_height(ui_DetectionYImage, LV_SIZE_CONTENT);    /// 122
-    lv_obj_set_x(ui_DetectionYImage, -2);
+    lv_obj_set_x(ui_DetectionYImage, 0);
     lv_obj_set_y(ui_DetectionYImage, -49);
     lv_obj_set_align(ui_DetectionYImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_DetectionYImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_DetectionYImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_DetectionYImage, 250);
 
     ui_DetectionYLabel = lv_label_create(ui_DetectionY);
     lv_obj_set_width(ui_DetectionYLabel, LV_SIZE_CONTENT);   /// 1
@@ -40,7 +37,7 @@ void ui_DetectionY_screen_init(void)
     lv_obj_set_align(ui_DetectionYLabel, LV_ALIGN_CENTER);
     lv_label_set_text(ui_DetectionYLabel, " You are within my \nsensing range");
     lv_obj_set_style_text_color(ui_DetectionYLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_DetectionYLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_DetectionYLabel, 180, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(ui_DetectionYLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_DetectionYLabel, &ui_font_sfprodisplay18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -54,5 +51,11 @@ void ui_DetectionY_screen_destroy(void)
     ui_DetectionY = NULL;
     ui_DetectionYImage = NULL;
     ui_DetectionYLabel = NULL;
+
+}
+
+void ui_DetectionY_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

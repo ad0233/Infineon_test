@@ -13,12 +13,10 @@ extern "C" {
 // SCREEN: ui_NoiseTime
 extern void ui_NoiseTime_screen_init(void);
 extern void ui_NoiseTime_screen_destroy(void);
+extern void ui_NoiseTime_screen_relocalize(void);
 extern lv_obj_t * ui_NoiseTime;
 extern lv_obj_t * ui_NoiseTimeContainer;
-extern void ui_event_NoiseTimeRoller(lv_event_t * e);
 extern lv_obj_t * ui_NoiseTimeRoller;
-extern lv_obj_t * ui_NoiseTimeImage1;
-extern lv_obj_t * ui_NoiseTimeImage;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_sleepData
 extern void ui_sleepData_screen_init(void);
 extern void ui_sleepData_screen_destroy(void);
+extern void ui_sleepData_screen_relocalize(void);
 extern lv_obj_t * ui_sleepData;
 extern lv_obj_t * ui_sleepDataTitle;
 extern lv_obj_t * ui_WakeWindowTitle;

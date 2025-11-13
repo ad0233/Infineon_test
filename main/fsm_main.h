@@ -36,7 +36,7 @@ void fsm_main_in_offline(void *arg);
 void fsm_main_to_clock(void *arg);
 
 enum fsm_main_event_enum {
-    F_MAIN_E_INIT,              // 初始化事件
+    F_MAIN_E_INIT = 0,              // 初始化事件
     F_MAIN_E_LIDAR_FIND,        // 雷达找到人事件
     F_MAIN_E_LIDAR_UPDATE,      // 雷达数据更新事件
     F_MAIN_E_LIDAR_NOT_FOUND,   // 雷达未找到人事件

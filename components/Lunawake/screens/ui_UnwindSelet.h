@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_UnwindSelet
 extern void ui_UnwindSelet_screen_init(void);
 extern void ui_UnwindSelet_screen_destroy(void);
+extern void ui_UnwindSelet_screen_relocalize(void);
 extern lv_obj_t * ui_UnwindSelet;
 extern lv_obj_t * ui_UnwindSeletContainer;
 extern lv_obj_t * ui_UnwindSeletArc;

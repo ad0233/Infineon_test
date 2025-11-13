@@ -74,6 +74,19 @@ esp_err_t my_lcd_draw_rgb565(const uint16_t *frame, size_t pixel_count)
     return err;
 }
 
+esp_err_t my_lvgl_force_refresh(void)
+{
+    lvgl_port_lock(0);
+    lv_disp_t *disp = lv_disp_get_default();
+    if (disp == NULL) {
+        lvgl_port_unlock();
+        return ESP_ERR_INVALID_STATE;
+    }
+    lv_refr_now(disp);
+    lvgl_port_unlock();
+    return ESP_OK;
+}
+
 void bsp_lcd_init(void);
 void bsp_lcd_bl_init(void);
 

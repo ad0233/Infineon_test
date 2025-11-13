@@ -26,10 +26,6 @@ void ui_Connecting_screen_init(void)
     lv_obj_set_height(ui_ConnectingContainer, 290);
     lv_obj_set_align(ui_ConnectingContainer, LV_ALIGN_CENTER);
     lv_obj_remove_flag(ui_ConnectingContainer, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_obj_set_style_radius(ui_ConnectingContainer, 145, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(ui_ConnectingContainer, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_opa(ui_ConnectingContainer, 50, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(ui_ConnectingContainer, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_ConnectingLabel = lv_label_create(ui_ConnectingContainer);
     lv_obj_set_width(ui_ConnectingLabel, LV_SIZE_CONTENT);   /// 1
@@ -39,7 +35,7 @@ void ui_Connecting_screen_init(void)
     lv_obj_set_align(ui_ConnectingLabel, LV_ALIGN_CENTER);
     lv_label_set_text(ui_ConnectingLabel, " Connecting to \nNetwork");
     lv_obj_set_style_text_color(ui_ConnectingLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_ConnectingLabel, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_ConnectingLabel, 180, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(ui_ConnectingLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_ConnectingLabel, &ui_font_sfprodisplay18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -65,5 +61,11 @@ void ui_Connecting_screen_destroy(void)
     ui_ConnectingContainer = NULL;
     ui_ConnectingLabel = NULL;
     ui_ConnectingImage = NULL;
+
+}
+
+void ui_Connecting_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

@@ -19,12 +19,13 @@ void ui_MianYesPerson_screen_init(void)
     lv_obj_set_style_bg_opa(ui_MianYesPerson, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_MianYesPersonImage = lv_image_create(ui_MianYesPerson);
-    lv_image_set_src(ui_MianYesPersonImage, &ui_img_component_8_png);
+    lv_image_set_src(ui_MianYesPersonImage, &ui_img_bootimage_png);
     lv_obj_set_width(ui_MianYesPersonImage, LV_SIZE_CONTENT);   /// 149
     lv_obj_set_height(ui_MianYesPersonImage, LV_SIZE_CONTENT);    /// 122
     lv_obj_set_align(ui_MianYesPersonImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_MianYesPersonImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_MianYesPersonImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_image_set_scale(ui_MianYesPersonImage, 426);
 
 }
 
@@ -35,5 +36,11 @@ void ui_MianYesPerson_screen_destroy(void)
     // NULL screen variables
     ui_MianYesPerson = NULL;
     ui_MianYesPersonImage = NULL;
+
+}
+
+void ui_MianYesPerson_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

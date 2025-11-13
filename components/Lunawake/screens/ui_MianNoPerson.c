@@ -10,7 +10,11 @@ lv_obj_t * ui_MianNoPersonImage = NULL;
 lv_obj_t * ui_MainHour = NULL;
 lv_obj_t * ui_MianNoPersonLabel1 = NULL;
 lv_obj_t * ui_MainMinute = NULL;
-lv_obj_t * ui_MianNoPersonLabel2 = NULL;
+lv_obj_t * ui_MainNightAlarm = NULL;
+lv_obj_t * ui_MainMorningAlarm = NULL;
+lv_obj_t * ui_MainMorningAlarmImg = NULL;
+lv_obj_t * ui_MainNightAlarmImg = NULL;
+lv_obj_t * ui_MainNightAlarmImg1 = NULL;
 // event funtions
 
 // build funtions
@@ -23,7 +27,7 @@ void ui_MianNoPerson_screen_init(void)
     lv_obj_set_style_bg_opa(ui_MianNoPerson, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_MianNoPersonImage = lv_image_create(ui_MianNoPerson);
-    lv_image_set_src(ui_MianNoPersonImage, &ui_img_component_8_png);
+    lv_image_set_src(ui_MianNoPersonImage, &ui_img_detectionylabel_png);
     lv_obj_set_width(ui_MianNoPersonImage, LV_SIZE_CONTENT);   /// 72
     lv_obj_set_height(ui_MianNoPersonImage, LV_SIZE_CONTENT);    /// 20
     lv_obj_set_x(ui_MianNoPersonImage, 0);
@@ -66,16 +70,78 @@ void ui_MianNoPerson_screen_init(void)
     lv_obj_set_style_text_opa(ui_MainMinute, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_MainMinute, &ui_font_sfprodisplay60, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    ui_MianNoPersonLabel2 = lv_label_create(ui_MianNoPerson);
-    lv_obj_set_width(ui_MianNoPersonLabel2, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_MianNoPersonLabel2, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_MianNoPersonLabel2, 0);
-    lv_obj_set_y(ui_MianNoPersonLabel2, 84);
-    lv_obj_set_align(ui_MianNoPersonLabel2, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_MianNoPersonLabel2, "No Alarml");
-    lv_obj_set_style_text_color(ui_MianNoPersonLabel2, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_MianNoPersonLabel2, 200, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_MianNoPersonLabel2, &ui_font_sfprodisplay18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    ui_MainNightAlarm = lv_label_create(ui_MianNoPerson);
+    lv_obj_set_width(ui_MainNightAlarm, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_MainNightAlarm, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_MainNightAlarm, -50);
+    lv_obj_set_y(ui_MainNightAlarm, 90);
+    lv_obj_set_align(ui_MainNightAlarm, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_MainNightAlarm, "23:45");
+    lv_obj_set_style_text_color(ui_MainNightAlarm, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_MainNightAlarm, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_MainNightAlarm, &ui_font_sfprodisplay14, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_MainMorningAlarm = lv_label_create(ui_MianNoPerson);
+    lv_obj_set_width(ui_MainMorningAlarm, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_MainMorningAlarm, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_MainMorningAlarm, 70);
+    lv_obj_set_y(ui_MainMorningAlarm, 90);
+    lv_obj_set_align(ui_MainMorningAlarm, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_MainMorningAlarm, "08:00");
+    lv_obj_set_style_text_color(ui_MainMorningAlarm, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_MainMorningAlarm, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_MainMorningAlarm, &ui_font_sfprodisplay14, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_MainMorningAlarmImg = lv_arc_create(ui_MianNoPerson);
+    lv_obj_set_width(ui_MainMorningAlarmImg, 12);
+    lv_obj_set_height(ui_MainMorningAlarmImg, 12);
+    lv_obj_set_x(ui_MainMorningAlarmImg, 30);
+    lv_obj_set_y(ui_MainMorningAlarmImg, 90);
+    lv_obj_set_align(ui_MainMorningAlarmImg, LV_ALIGN_CENTER);
+    lv_arc_set_value(ui_MainMorningAlarmImg, 50);
+    lv_arc_set_bg_angles(ui_MainMorningAlarmImg, 270, 269);
+    lv_obj_set_style_arc_color(ui_MainMorningAlarmImg, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_opa(ui_MainMorningAlarmImg, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    lv_obj_set_style_arc_color(ui_MainMorningAlarmImg, lv_color_hex(0xFEFEFE), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_opa(ui_MainMorningAlarmImg, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+
+    lv_obj_set_style_bg_color(ui_MainMorningAlarmImg, lv_color_hex(0xFFFFFF), LV_PART_KNOB | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui_MainMorningAlarmImg, 0, LV_PART_KNOB | LV_STATE_DEFAULT);
+
+    ui_MainNightAlarmImg = lv_arc_create(ui_MianNoPerson);
+    lv_obj_set_width(ui_MainNightAlarmImg, 12);
+    lv_obj_set_height(ui_MainNightAlarmImg, 12);
+    lv_obj_set_x(ui_MainNightAlarmImg, -90);
+    lv_obj_set_y(ui_MainNightAlarmImg, 90);
+    lv_obj_set_align(ui_MainNightAlarmImg, LV_ALIGN_CENTER);
+    lv_arc_set_value(ui_MainNightAlarmImg, 50);
+    lv_arc_set_bg_angles(ui_MainNightAlarmImg, 270, 269);
+    lv_obj_set_style_arc_color(ui_MainNightAlarmImg, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_opa(ui_MainNightAlarmImg, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    lv_obj_set_style_arc_color(ui_MainNightAlarmImg, lv_color_hex(0xFEFEFE), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_opa(ui_MainNightAlarmImg, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+
+    lv_obj_set_style_bg_color(ui_MainNightAlarmImg, lv_color_hex(0xFFFFFF), LV_PART_KNOB | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui_MainNightAlarmImg, 0, LV_PART_KNOB | LV_STATE_DEFAULT);
+
+    ui_MainNightAlarmImg1 = lv_arc_create(ui_MainNightAlarmImg);
+    lv_obj_set_width(ui_MainNightAlarmImg1, 12);
+    lv_obj_set_height(ui_MainNightAlarmImg1, 12);
+    lv_obj_set_x(ui_MainNightAlarmImg1, -5);
+    lv_obj_set_y(ui_MainNightAlarmImg1, -3);
+    lv_obj_set_align(ui_MainNightAlarmImg1, LV_ALIGN_CENTER);
+    lv_arc_set_value(ui_MainNightAlarmImg1, 50);
+    lv_arc_set_bg_angles(ui_MainNightAlarmImg1, 270, 269);
+    lv_obj_set_style_arc_color(ui_MainNightAlarmImg1, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_opa(ui_MainNightAlarmImg1, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    lv_obj_set_style_arc_color(ui_MainNightAlarmImg1, lv_color_hex(0x000000), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_opa(ui_MainNightAlarmImg1, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+
+    lv_obj_set_style_bg_color(ui_MainNightAlarmImg1, lv_color_hex(0xFFFFFF), LV_PART_KNOB | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(ui_MainNightAlarmImg1, 0, LV_PART_KNOB | LV_STATE_DEFAULT);
 
 }
 
@@ -89,6 +155,16 @@ void ui_MianNoPerson_screen_destroy(void)
     ui_MainHour = NULL;
     ui_MianNoPersonLabel1 = NULL;
     ui_MainMinute = NULL;
-    ui_MianNoPersonLabel2 = NULL;
+    ui_MainNightAlarm = NULL;
+    ui_MainMorningAlarm = NULL;
+    ui_MainMorningAlarmImg = NULL;
+    ui_MainNightAlarmImg = NULL;
+    ui_MainNightAlarmImg1 = NULL;
+
+}
+
+void ui_MianNoPerson_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_Memu
 extern void ui_Memu_screen_init(void);
 extern void ui_Memu_screen_destroy(void);
+extern void ui_Memu_screen_relocalize(void);
 extern lv_obj_t * ui_Memu;
 extern lv_obj_t * ui_MemuContainer;
 extern void ui_event_MueuRoller(lv_event_t * e);
@@ -21,8 +22,6 @@ extern lv_obj_t * ui_MemuImage1;
 extern lv_obj_t * ui_MemuImage2;
 // CUSTOM VARIABLES
 extern lv_obj_t * uic_memu1;
-extern int get_current_menu_index(void);
-extern void menu_confirm_current_selection(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

@@ -11,8 +11,6 @@ lv_obj_t * ui_DetectionNLabel = NULL;
 lv_obj_t * ui_DetectionNImage = NULL;
 // event funtions
 
-
-
 // build funtions
 
 void ui_DetectionN_screen_init(void)
@@ -41,21 +39,20 @@ void ui_DetectionN_screen_init(void)
     lv_obj_set_align(ui_DetectionNLabel, LV_ALIGN_CENTER);
     lv_label_set_text(ui_DetectionNLabel, "I didn‘t sense anyone\n nearby");
     lv_obj_set_style_text_color(ui_DetectionNLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_DetectionNLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_DetectionNLabel, 180, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(ui_DetectionNLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_DetectionNLabel, &ui_font_sfprodisplay18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_DetectionNImage = lv_image_create(ui_DetectionNContainer);
-    lv_image_set_src(ui_DetectionNImage, &ui_img_component_29_png);
+    lv_image_set_src(ui_DetectionNImage, &ui_img_detectionnimage_png);
     lv_obj_set_width(ui_DetectionNImage, LV_SIZE_CONTENT);   /// 83
     lv_obj_set_height(ui_DetectionNImage, LV_SIZE_CONTENT);    /// 77
-    lv_obj_set_x(ui_DetectionNImage, 113);
-    lv_obj_set_y(ui_DetectionNImage, -44);
+    lv_obj_set_x(ui_DetectionNImage, 114);
+    lv_obj_set_y(ui_DetectionNImage, -46);
     lv_obj_set_align(ui_DetectionNImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_DetectionNImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_DetectionNImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
     lv_image_set_rotation(ui_DetectionNImage, 70);
-    lv_image_set_scale(ui_DetectionNImage, 169);
 
 }
 
@@ -68,5 +65,11 @@ void ui_DetectionN_screen_destroy(void)
     ui_DetectionNContainer = NULL;
     ui_DetectionNLabel = NULL;
     ui_DetectionNImage = NULL;
+
+}
+
+void ui_DetectionN_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

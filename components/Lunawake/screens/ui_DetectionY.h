@@ -11,9 +11,9 @@ extern "C" {
 #endif
 
 // SCREEN: ui_DetectionY
-
 extern void ui_DetectionY_screen_init(void);
 extern void ui_DetectionY_screen_destroy(void);
+extern void ui_DetectionY_screen_relocalize(void);
 extern lv_obj_t * ui_DetectionY;
 extern lv_obj_t * ui_DetectionYImage;
 extern lv_obj_t * ui_DetectionYLabel;

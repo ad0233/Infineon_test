@@ -92,3 +92,9 @@ void ui_SetTime_screen_destroy(void)
     ui_SetTimeMinute = NULL;
 
 }
+
+void ui_SetTime_screen_relocalize(void)
+{
+    // label widgets on screen
+
+}

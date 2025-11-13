@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_NetworkBoot
 extern void ui_NetworkBoot_screen_init(void);
 extern void ui_NetworkBoot_screen_destroy(void);
+extern void ui_NetworkBoot_screen_relocalize(void);
 extern lv_obj_t * ui_NetworkBoot;
 extern lv_obj_t * ui_NetworkBootContainer;
 extern lv_obj_t * ui_NetworkBootImage;

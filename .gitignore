@@ -3,3 +3,4 @@ sdkconfig.old
 .vscode/
 .DS_Store
 .cache/
+tools/__pycache__/

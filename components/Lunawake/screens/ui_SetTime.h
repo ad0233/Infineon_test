@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_SetTime
 extern void ui_SetTime_screen_init(void);
 extern void ui_SetTime_screen_destroy(void);
+extern void ui_SetTime_screen_relocalize(void);
 extern lv_obj_t * ui_SetTime;
 extern lv_obj_t * ui_SetTimeHour;
 extern lv_obj_t * ui_SetTimeLabel2;

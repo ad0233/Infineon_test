@@ -1,3 +1,5 @@
+file(GLOB H264_BIN_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "h264/*.h264")
+
 idf_component_register(
     SRCS
         ./my_h264.c
@@ -6,5 +8,5 @@ idf_component_register(
     REQUIRES
         esp_h264
     EMBED_FILES
-        h264/brand-motion2.h264
+        ${H264_BIN_FILES}
 )

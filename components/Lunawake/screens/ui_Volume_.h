@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_Volume_
 extern void ui_Volume__screen_init(void);
 extern void ui_Volume__screen_destroy(void);
+extern void ui_Volume__screen_relocalize(void);
 extern lv_obj_t * ui_Volume_;
 extern lv_obj_t * ui_VolumeContainer;
 extern lv_obj_t * ui_VolumeArc;

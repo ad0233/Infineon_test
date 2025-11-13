@@ -38,7 +38,7 @@ void ui_Detection_screen_init(void)
     lv_obj_set_style_text_font(ui_DetectionLabel, &ui_font_sfprodisplay24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_DetectionImage = lv_image_create(ui_DetectionContainer);
-    lv_image_set_src(ui_DetectionImage, &ui_img_component_28_png);
+    lv_image_set_src(ui_DetectionImage, &ui_img_detectionimage_png);
     lv_obj_set_width(ui_DetectionImage, LV_SIZE_CONTENT);   /// 83
     lv_obj_set_height(ui_DetectionImage, LV_SIZE_CONTENT);    /// 87
     lv_obj_set_x(ui_DetectionImage, 86);
@@ -46,7 +46,6 @@ void ui_Detection_screen_init(void)
     lv_obj_set_align(ui_DetectionImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_DetectionImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_DetectionImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_DetectionImage, 169);
 
 }
 
@@ -59,5 +58,11 @@ void ui_Detection_screen_destroy(void)
     ui_DetectionContainer = NULL;
     ui_DetectionLabel = NULL;
     ui_DetectionImage = NULL;
+
+}
+
+void ui_Detection_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

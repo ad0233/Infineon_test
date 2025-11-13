@@ -15,8 +15,18 @@
 #include "esp_h264_dec_sw.h"
 #include "esp_h264_dec_param.h"
 
-extern const uint8_t brand_motion2_h264_start[] asm("_binary_brand_motion2_h264_start");
-extern const uint8_t brand_motion2_h264_end[]   asm("_binary_brand_motion2_h264_end");
+extern const uint8_t _binary_brand_motion2_h264_start[];
+extern const uint8_t _binary_brand_motion2_h264_end[];
+extern const uint8_t _binary_fail2_h264_start[];
+extern const uint8_t _binary_fail2_h264_end[];
+extern const uint8_t _binary_go_up_h264_start[];
+extern const uint8_t _binary_go_up_h264_end[];
+extern const uint8_t _binary_human_recognized_h264_start[];
+extern const uint8_t _binary_human_recognized_h264_end[];
+extern const uint8_t _binary_processing_h264_start[];
+extern const uint8_t _binary_processing_h264_end[];
+extern const uint8_t _binary_success2_h264_start[];
+extern const uint8_t _binary_success2_h264_end[];
 
 static QueueHandle_t h264_queue = NULL;
 static QueueHandle_t s_rgb_ready_queue = NULL;
@@ -83,11 +93,47 @@ void my_h264_init(my_h264_callback_t callback, void *context)
     }
 }
 
-int my_h264_start(uint32_t timeout_ms)
+int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
 {
     esp_h264_dec_in_frame_t in_frame;
-    in_frame.raw_data.buffer = brand_motion2_h264_start;
-    in_frame.raw_data.len = brand_motion2_h264_end - brand_motion2_h264_start;
+    const uint8_t *start = NULL;
+    const uint8_t *end = NULL;
+
+    switch (animation) {
+        case MY_H264_ANIM_BRAND_MOTION2:
+            start = _binary_brand_motion2_h264_start;
+            end = _binary_brand_motion2_h264_end;
+            break;
+        case MY_H264_ANIM_FAIL2:
+            start = _binary_fail2_h264_start;
+            end = _binary_fail2_h264_end;
+            break;
+        case MY_H264_ANIM_GO_UP:
+            start = _binary_go_up_h264_start;
+            end = _binary_go_up_h264_end;
+            break;
+        case MY_H264_ANIM_HUMAN_RECOGNIZED:
+            start = _binary_human_recognized_h264_start;
+            end = _binary_human_recognized_h264_end;
+            break;
+        case MY_H264_ANIM_PROCESSING:
+            start = _binary_processing_h264_start;
+            end = _binary_processing_h264_end;
+            break;
+        case MY_H264_ANIM_SUCCESS2:
+            start = _binary_success2_h264_start;
+            end = _binary_success2_h264_end;
+            break;
+        default:
+            return -1;
+    }
+
+    if (start == NULL || end == NULL || end <= start) {
+        return -1;
+    }
+
+    in_frame.raw_data.buffer = start;
+    in_frame.raw_data.len = end - start;
     if (xQueueSend(h264_queue, &in_frame, pdMS_TO_TICKS(timeout_ms)) != pdPASS) {
         return -1;
     }
@@ -142,9 +188,6 @@ static void i420_decode_thread(void *arg) {
     if (!s_buffers_initialized) {
         for (int i = 0; i < RGB565_BUFFER_COUNT; ++i) {
             uint8_t *buf = (uint8_t *)heap_caps_malloc(s_rgb_frame_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-            if (buf == NULL) {
-                buf = (uint8_t *)heap_caps_malloc(s_rgb_frame_bytes, MALLOC_CAP_8BIT);
-            }
             if (buf == NULL) {
                 ESP_LOGE("h264", "Failed to allocate RGB buffer");
                 vTaskDelete(NULL);

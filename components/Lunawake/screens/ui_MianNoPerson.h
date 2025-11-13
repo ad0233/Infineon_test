@@ -11,15 +11,19 @@ extern "C" {
 #endif
 
 // SCREEN: ui_MianNoPerson
-
 extern void ui_MianNoPerson_screen_init(void);
 extern void ui_MianNoPerson_screen_destroy(void);
+extern void ui_MianNoPerson_screen_relocalize(void);
 extern lv_obj_t * ui_MianNoPerson;
 extern lv_obj_t * ui_MianNoPersonImage;
 extern lv_obj_t * ui_MainHour;
 extern lv_obj_t * ui_MianNoPersonLabel1;
 extern lv_obj_t * ui_MainMinute;
-extern lv_obj_t * ui_MianNoPersonLabel2;
+extern lv_obj_t * ui_MainNightAlarm;
+extern lv_obj_t * ui_MainMorningAlarm;
+extern lv_obj_t * ui_MainMorningAlarmImg;
+extern lv_obj_t * ui_MainNightAlarmImg;
+extern lv_obj_t * ui_MainNightAlarmImg1;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

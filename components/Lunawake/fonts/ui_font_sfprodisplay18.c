@@ -1,7 +1,7 @@
 /*******************************************************************************
  * Size: 18 px
  * Bpp: 4
- * Opts: --bpp 4 --size 18 --font E:/squareline/demo/assets/SFProDisplay-Regular.ttf -o E:/squareline/demo/assets\ui_font_sfprodisplay18.c --format lvgl -r 0x20-0x7f --symbols ‘ --no-compress --no-prefilter
+ * Opts: --bpp 4 --size 18 --font E:/squareline/demo/assets/SFProDisplay-Regular.ttf -o E:/squareline/demo/assets\ui_font_sfprodisplay18.c --format lvgl -r 0x20-0x7f --no-compress --no-prefilter
  ******************************************************************************/
 
 #include "../ui.h"
@@ -809,10 +809,7 @@ static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] = {
     /* U+007E "~" */
     0x0, 0x0, 0x0, 0x0, 0x2, 0xcf, 0xd3, 0x0,
     0x69, 0xbd, 0x5b, 0xf6, 0x2d, 0xad, 0x60, 0x8,
-    0xff, 0xe2, 0x0, 0x0, 0x1, 0x30, 0x0,
-
-    /* U+2018 "‘" */
-    0xd, 0x71, 0xf4, 0x6f, 0x1a, 0xe0, 0x44, 0x0
+    0xff, 0xe2, 0x0, 0x0, 0x1, 0x30, 0x0
 };
 
 
@@ -916,8 +913,7 @@ static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] = {
     {.bitmap_index = 4367, .adv_w = 93, .box_w = 6, .box_h = 15, .ofs_x = 0, .ofs_y = -3},
     {.bitmap_index = 4412, .adv_w = 93, .box_w = 2, .box_h = 15, .ofs_x = 2, .ofs_y = -3},
     {.bitmap_index = 4427, .adv_w = 93, .box_w = 6, .box_h = 15, .ofs_x = 0, .ofs_y = -3},
-    {.bitmap_index = 4472, .adv_w = 174, .box_w = 9, .box_h = 5, .ofs_x = 1, .ofs_y = 3},
-    {.bitmap_index = 4495, .adv_w = 76, .box_w = 3, .box_h = 5, .ofs_x = 1, .ofs_y = 7}
+    {.bitmap_index = 4472, .adv_w = 174, .box_w = 9, .box_h = 5, .ofs_x = 1, .ofs_y = 3}
 };
 
 /*---------------------
@@ -931,10 +927,6 @@ static const lv_font_fmt_txt_cmap_t cmaps[] =
 {
     {
         .range_start = 32, .range_length = 95, .glyph_id_start = 1,
-        .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
-    },
-    {
-        .range_start = 8216, .range_length = 1, .glyph_id_start = 96,
         .unicode_list = NULL, .glyph_id_ofs_list = NULL, .list_length = 0, .type = LV_FONT_FMT_TXT_CMAP_FORMAT0_TINY
     }
 };
@@ -960,7 +952,7 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
     .cmaps = cmaps,
     .kern_dsc = NULL,
     .kern_scale = 0,
-    .cmap_num = 2,
+    .cmap_num = 1,
     .bpp = 4,
     .kern_classes = 0,
     .bitmap_format = 0,

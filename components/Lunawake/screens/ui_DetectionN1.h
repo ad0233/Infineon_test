@@ -13,9 +13,11 @@ extern "C" {
 // SCREEN: ui_DetectionN1
 extern void ui_DetectionN1_screen_init(void);
 extern void ui_DetectionN1_screen_destroy(void);
+extern void ui_DetectionN1_screen_relocalize(void);
 extern lv_obj_t * ui_DetectionN1;
 extern lv_obj_t * ui_DetectionN1Container;
 extern lv_obj_t * ui_DetectionN1Image;
+extern lv_obj_t * ui_DetectionN1Label;
 // CUSTOM VARIABLES
 
 #ifdef __cplusplus

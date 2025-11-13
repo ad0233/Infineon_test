@@ -1,0 +1,4 @@
+If:
+  PathMatch: [".git/", "build/", "managed_components/", "dependencies/"]
+Then:
+  Index: Never

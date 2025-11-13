@@ -34,20 +34,20 @@ void ui_Volume__screen_init(void)
     lv_obj_set_width(ui_VolumeArc, 300);
     lv_obj_set_height(ui_VolumeArc, 300);
     lv_obj_set_align(ui_VolumeArc, LV_ALIGN_CENTER);
-    lv_arc_set_value(ui_VolumeArc, 360);
+    lv_arc_set_value(ui_VolumeArc, 25);
     lv_arc_set_bg_angles(ui_VolumeArc, 270, 269);
     lv_obj_set_style_arc_color(ui_VolumeArc, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_arc_opa(ui_VolumeArc, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_set_style_arc_color(ui_VolumeArc, lv_color_hex(0x17C3D6), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_color(ui_VolumeArc, lv_color_hex(0xFF0C0C), LV_PART_INDICATOR | LV_STATE_DEFAULT);
     lv_obj_set_style_arc_opa(ui_VolumeArc, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
     lv_obj_set_style_arc_width(ui_VolumeArc, 7, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
-    lv_obj_set_style_bg_color(ui_VolumeArc, lv_color_hex(0x17C3D6), LV_PART_KNOB | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(ui_VolumeArc, lv_color_hex(0xFF0C0C), LV_PART_KNOB | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_VolumeArc, 0, LV_PART_KNOB | LV_STATE_DEFAULT);
 
     ui_VolumeImage = lv_image_create(ui_VolumeArc);
-    lv_image_set_src(ui_VolumeImage, &ui_img_1416476185);
+    lv_image_set_src(ui_VolumeImage, &ui_img_volumeyes_png);
     lv_obj_set_width(ui_VolumeImage, LV_SIZE_CONTENT);   /// 92
     lv_obj_set_height(ui_VolumeImage, LV_SIZE_CONTENT);    /// 92
     lv_obj_set_x(ui_VolumeImage, 0);
@@ -55,7 +55,6 @@ void ui_Volume__screen_init(void)
     lv_obj_set_align(ui_VolumeImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_VolumeImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_VolumeImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_VolumeImage, 166);
 
     ui_VolumeLabel = lv_label_create(ui_VolumeArc);
     lv_obj_set_width(ui_VolumeLabel, LV_SIZE_CONTENT);   /// 1
@@ -63,7 +62,7 @@ void ui_Volume__screen_init(void)
     lv_obj_set_x(ui_VolumeLabel, 0);
     lv_obj_set_y(ui_VolumeLabel, 30);
     lv_obj_set_align(ui_VolumeLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_VolumeLabel, "Volume: 100%");
+    lv_label_set_text(ui_VolumeLabel, "Volume: 25%");
     lv_obj_set_style_text_color(ui_VolumeLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_VolumeLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(ui_VolumeLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -81,5 +80,11 @@ void ui_Volume__screen_destroy(void)
     ui_VolumeArc = NULL;
     ui_VolumeImage = NULL;
     ui_VolumeLabel = NULL;
+
+}
+
+void ui_Volume__screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

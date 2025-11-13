@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_OfflineMode
 extern void ui_OfflineMode_screen_init(void);
 extern void ui_OfflineMode_screen_destroy(void);
+extern void ui_OfflineMode_screen_relocalize(void);
 extern lv_obj_t * ui_OfflineMode;
 extern lv_obj_t * ui_OfflineModeContainer;
 extern lv_obj_t * ui_OfflineModeLabel1;

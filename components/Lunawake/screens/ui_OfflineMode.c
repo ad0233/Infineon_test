@@ -57,7 +57,7 @@ void ui_OfflineMode_screen_init(void)
     lv_obj_set_style_text_font(ui_OfflineModeLabel2, &ui_font_sfprodisplay18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_OfflineModeImage = lv_image_create(ui_OfflineModeContainer);
-    lv_image_set_src(ui_OfflineModeImage, &ui_img_1416479258);
+    lv_image_set_src(ui_OfflineModeImage, &ui_img_offinternet_png);
     lv_obj_set_width(ui_OfflineModeImage, LV_SIZE_CONTENT);   /// 98
     lv_obj_set_height(ui_OfflineModeImage, LV_SIZE_CONTENT);    /// 88
     lv_obj_set_x(ui_OfflineModeImage, 0);
@@ -65,7 +65,6 @@ void ui_OfflineMode_screen_init(void)
     lv_obj_set_align(ui_OfflineModeImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_OfflineModeImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_OfflineModeImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_OfflineModeImage, 159);
 
 }
 
@@ -79,5 +78,11 @@ void ui_OfflineMode_screen_destroy(void)
     ui_OfflineModeLabel1 = NULL;
     ui_OfflineModeLabel2 = NULL;
     ui_OfflineModeImage = NULL;
+
+}
+
+void ui_OfflineMode_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

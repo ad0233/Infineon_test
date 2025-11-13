@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_MianYesPerson
 extern void ui_MianYesPerson_screen_init(void);
 extern void ui_MianYesPerson_screen_destroy(void);
+extern void ui_MianYesPerson_screen_relocalize(void);
 extern lv_obj_t * ui_MianYesPerson;
 extern lv_obj_t * ui_MianYesPersonImage;
 // CUSTOM VARIABLES

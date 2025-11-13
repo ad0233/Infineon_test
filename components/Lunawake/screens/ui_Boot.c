@@ -10,7 +10,6 @@ lv_obj_t * ui_BootImage = NULL;
 lv_obj_t * ui_BootLabel = NULL;
 // event funtions
 
-
 // build funtions
 
 void ui_Boot_screen_init(void)
@@ -21,15 +20,14 @@ void ui_Boot_screen_init(void)
     lv_obj_set_style_bg_opa(ui_Boot, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_BootImage = lv_image_create(ui_Boot);
-    lv_image_set_src(ui_BootImage, &ui_img_component_8_png);
+    lv_image_set_src(ui_BootImage, &ui_img_bootimage_png);
     lv_obj_set_width(ui_BootImage, LV_SIZE_CONTENT);   /// 149
     lv_obj_set_height(ui_BootImage, LV_SIZE_CONTENT);    /// 122
     lv_obj_set_x(ui_BootImage, 0);
-    lv_obj_set_y(ui_BootImage, -28);
+    lv_obj_set_y(ui_BootImage, -30);
     lv_obj_set_align(ui_BootImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_BootImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_BootImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_BootImage, 168);
 
     ui_BootLabel = lv_label_create(ui_Boot);
     lv_obj_set_width(ui_BootLabel, LV_SIZE_CONTENT);   /// 1
@@ -52,5 +50,11 @@ void ui_Boot_screen_destroy(void)
     ui_Boot = NULL;
     ui_BootImage = NULL;
     ui_BootLabel = NULL;
+
+}
+
+void ui_Boot_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

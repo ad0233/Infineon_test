@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_AlarmOFF
 extern void ui_AlarmOFF_screen_init(void);
 extern void ui_AlarmOFF_screen_destroy(void);
+extern void ui_AlarmOFF_screen_relocalize(void);
 extern lv_obj_t * ui_AlarmOFF;
 extern lv_obj_t * ui_AlarmOFFContainer;
 extern lv_obj_t * ui_AlarmOFFLabel1;

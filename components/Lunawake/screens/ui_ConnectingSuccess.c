@@ -11,7 +11,6 @@ lv_obj_t * ui_ConnectingSuccessLabel = NULL;
 lv_obj_t * ui_ConnectingSuccessImage = NULL;
 // event funtions
 
-
 // build funtions
 
 void ui_ConnectingSuccess_screen_init(void)
@@ -45,7 +44,7 @@ void ui_ConnectingSuccess_screen_init(void)
     lv_obj_set_style_text_font(ui_ConnectingSuccessLabel, &ui_font_sfprodisplay20, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_ConnectingSuccessImage = lv_image_create(ui_ConnectingSuccessContainer);
-    lv_image_set_src(ui_ConnectingSuccessImage, &ui_img_vector_png);
+    lv_image_set_src(ui_ConnectingSuccessImage, &ui_img_wifiyes_png);
     lv_obj_set_width(ui_ConnectingSuccessImage, LV_SIZE_CONTENT);   /// 93
     lv_obj_set_height(ui_ConnectingSuccessImage, LV_SIZE_CONTENT);    /// 94
     lv_obj_set_x(ui_ConnectingSuccessImage, 0);
@@ -53,7 +52,6 @@ void ui_ConnectingSuccess_screen_init(void)
     lv_obj_set_align(ui_ConnectingSuccessImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_ConnectingSuccessImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_ConnectingSuccessImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_ConnectingSuccessImage, 159);
 
 }
 
@@ -66,5 +64,11 @@ void ui_ConnectingSuccess_screen_destroy(void)
     ui_ConnectingSuccessContainer = NULL;
     ui_ConnectingSuccessLabel = NULL;
     ui_ConnectingSuccessImage = NULL;
+
+}
+
+void ui_ConnectingSuccess_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

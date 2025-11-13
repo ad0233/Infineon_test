@@ -11,9 +11,9 @@ extern "C" {
 #endif
 
 // SCREEN: ui_Boot
-
 extern void ui_Boot_screen_init(void);
 extern void ui_Boot_screen_destroy(void);
+extern void ui_Boot_screen_relocalize(void);
 extern lv_obj_t * ui_Boot;
 extern lv_obj_t * ui_BootImage;
 extern lv_obj_t * ui_BootLabel;

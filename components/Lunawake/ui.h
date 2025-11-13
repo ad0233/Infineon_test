@@ -13,27 +13,30 @@ extern "C" {
 #include "lvgl.h"
 
 #include "ui_helpers.h"
+#include "components/ui_comp.h"
+#include "components/ui_comp_hook.h"
 #include "ui_events.h"
 
+#include "ui_img_manager.h"
 
 ///////////////////// SCREENS ////////////////////
 
-#include "screens/ui_Memu.h"
-#include "screens/ui_WakeMode.h"
 #include "screens/ui_AlarmOFF.h"
 #include "screens/ui_AlarmON.h"
 #include "screens/ui_Volume_.h"
 #include "screens/ui_UnwindSelet.h"
-#include "screens/ui_UnwindOn.h"
 #include "screens/ui_NoiseTime.h"
 #include "screens/ui_Light.h"
 #include "screens/ui_SetTime.h"
-#include "screens/ui_MorningAnimation.h"
-#include "screens/ui_BluetoothMusic.h"
-#include "screens/ui_OTA.h"
-#include "screens/ui_sleepData.h"
+#include "screens/ui_Memu.h"
+#include "screens/ui_WakeModeTest.h"
 
-//satrt文件
+#include "screens/ui_NetworkBoot.h"
+#include "screens/ui_Connecting.h"
+#include "screens/ui_ConnectingSuccess.h"
+#include "screens/ui_ConnectingFailed.h"
+#include "screens/ui_OfflineMode.h"
+
 #include "screens/ui_Boot.h"
 #include "screens/ui_Detection.h"
 #include "screens/ui_DetectionY.h"
@@ -42,26 +45,94 @@ extern "C" {
 #include "screens/ui_MianNoPerson.h"
 #include "screens/ui_MianYesPerson.h"
 
-//网络相关屏幕
-#include "screens/ui_NetworkBoot.h"
-#include "screens/ui_Connecting.h"
-#include "screens/ui_ConnectingSuccess.h"
-#include "screens/ui_ConnectingFailed.h"
-#include "screens/ui_OfflineMode.h"
 
+#include "screens/ui_MorningAnimation.h"
+#include "screens/ui_BluetoothMusic.h"
+#include "screens/ui_OTA.h"
+#include "screens/ui_sleepData.h"
+#include "screens/ui_ReminderTomorrow.h"
 
 ///////////////////// VARIABLES ////////////////////
 
 extern lv_anim_t * Imagezoom_Animation(lv_obj_t * TargetObject, int delay);
+extern lv_anim_t * memuUp_Animation(lv_obj_t * TargetObject, int delay);
+extern lv_anim_t * memuDown_Animation(lv_obj_t * TargetObject, int delay);
 
 // EVENTS
 
 extern lv_obj_t * ui____initial_actions0;
 
 // IMAGES AND IMAGE SETS
-// 图片声明已自动生成，请查看 ui_images_auto.h
-// Image declarations are auto-generated, see ui_images_auto.h
-#include "ui_images_auto.h"
+extern lv_image_dsc_t ui_img_offalarm_png;   // assets/OffAlarm.png
+void ui_img_offalarm_png_load();
+extern lv_image_dsc_t ui_img_800502611;   // assets/：.png
+void ui_img_800502611_load();
+extern lv_image_dsc_t ui_img_volumeyes_png;   // assets/VolumeYes.png
+void ui_img_volumeyes_png_load();
+extern lv_image_dsc_t ui_img_swan_png;   // assets/swan.png
+void ui_img_swan_png_load();
+extern lv_image_dsc_t ui_img_light20_png;   // assets/light20.png
+void ui_img_light20_png_load();
+extern lv_image_dsc_t ui_img_vector_136_png;   // assets/Vector 136.png
+void ui_img_vector_136_png_load();
+extern lv_image_dsc_t ui_img_738525346;   // assets/1Wi-Fi.png
+void ui_img_738525346_load();
+extern lv_image_dsc_t ui_img_1757982151;   // assets/2Wi-Fi.png
+void ui_img_1757982151_load();
+extern lv_image_dsc_t ui_img_220829844;   // assets/3Wi-Fi.png
+void ui_img_220829844_load();
+extern lv_image_dsc_t ui_img_bell_png;   // assets/Bell.png
+void ui_img_bell_png_load();
+extern lv_image_dsc_t ui_img_bootimage_png;   // assets/BootImage.png
+void ui_img_bootimage_png_load();
+extern lv_image_dsc_t ui_img_cat_png;   // assets/cat.png
+void ui_img_cat_png_load();
+extern lv_image_dsc_t ui_img_detectionimage_png;   // assets/DetectionImage.png
+void ui_img_detectionimage_png_load();
+extern lv_image_dsc_t ui_img_detectionn1image_png;   // assets/DetectionN1Image.png
+void ui_img_detectionn1image_png_load();
+extern lv_image_dsc_t ui_img_detectionnimage_png;   // assets/DetectionNImage.png
+void ui_img_detectionnimage_png_load();
+extern lv_image_dsc_t ui_img_detectionylabel_png;   // assets/DetectionYLabel.png
+void ui_img_detectionylabel_png_load();
+extern lv_image_dsc_t ui_img_fox_png;   // assets/fox.png
+void ui_img_fox_png_load();
+extern lv_image_dsc_t ui_img_hummingbird_png;   // assets/hummingbird.png
+void ui_img_hummingbird_png_load();
+extern lv_image_dsc_t ui_img_koi_png;   // assets/Koi.png
+void ui_img_koi_png_load();
+extern lv_image_dsc_t ui_img_light100_png;   // assets/light100.png
+void ui_img_light100_png_load();
+extern lv_image_dsc_t ui_img_light30_png;   // assets/light30.png
+void ui_img_light30_png_load();
+extern lv_image_dsc_t ui_img_light40_png;   // assets/light40.png
+void ui_img_light40_png_load();
+extern lv_image_dsc_t ui_img_light50_png;   // assets/light50.png
+void ui_img_light50_png_load();
+extern lv_image_dsc_t ui_img_light60_png;   // assets/light60.png
+void ui_img_light60_png_load();
+extern lv_image_dsc_t ui_img_light70_png;   // assets/light70.png
+void ui_img_light70_png_load();
+extern lv_image_dsc_t ui_img_light80_png;   // assets/light80.png
+void ui_img_light80_png_load();
+extern lv_image_dsc_t ui_img_light90_png;   // assets/light90.png
+void ui_img_light90_png_load();
+extern lv_image_dsc_t ui_img_moon_png;   // assets/Moon.png
+void ui_img_moon_png_load();
+extern lv_image_dsc_t ui_img_offinternet_png;   // assets/OffInternet.png
+void ui_img_offinternet_png_load();
+extern lv_image_dsc_t ui_img_qrcode_png;   // assets/QRcode.png
+void ui_img_qrcode_png_load();
+extern lv_image_dsc_t ui_img_sun_png;   // assets/Sun.png
+void ui_img_sun_png_load();
+extern lv_image_dsc_t ui_img_up_png;   // assets/up.png
+void ui_img_up_png_load();
+extern lv_image_dsc_t ui_img_volumeno_png;   // assets/VolumeNo.png
+void ui_img_volumeno_png_load();
+extern lv_image_dsc_t ui_img_wifino_png;   // assets/WiFiNo.png
+void ui_img_wifino_png_load();
+extern lv_image_dsc_t ui_img_wifiyes_png;   // assets/WiFiYes.png
+void ui_img_wifiyes_png_load();
 
 // FONTS
 LV_FONT_DECLARE(ui_font_sfprodisplay14);
@@ -75,6 +146,7 @@ LV_FONT_DECLARE(ui_font_sfprodisplay60);
 // UI INIT
 void ui_init(void);
 void ui_destroy(void);
+void ui_relocalize(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

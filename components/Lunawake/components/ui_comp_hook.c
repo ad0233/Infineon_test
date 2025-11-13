@@ -3,3 +3,12 @@
 // LVGL version: 9.2.2
 // Project name: lvgl-function1
 
+#include "../ui.h"
+
+void ui_comp_demo_create_hook(lv_obj_t * comp)
+{
+}
+
+void ui_comp_Image_create_hook(lv_obj_t * comp)
+{
+}

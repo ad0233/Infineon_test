@@ -54,7 +54,7 @@ void ui_AlarmOFF_screen_init(void)
     lv_obj_set_style_text_font(ui_AlarmOFFLabel2, &ui_font_sfprodisplay24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_AlarmOFFImage = lv_image_create(ui_AlarmOFFContainer);
-    lv_image_set_src(ui_AlarmOFFImage, &ui_img_clock_png);
+    lv_image_set_src(ui_AlarmOFFImage, &ui_img_offalarm_png);
     lv_obj_set_width(ui_AlarmOFFImage, LV_SIZE_CONTENT);   /// 102
     lv_obj_set_height(ui_AlarmOFFImage, LV_SIZE_CONTENT);    /// 99
     lv_obj_set_x(ui_AlarmOFFImage, 0);
@@ -62,7 +62,6 @@ void ui_AlarmOFF_screen_init(void)
     lv_obj_set_align(ui_AlarmOFFImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_AlarmOFFImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_AlarmOFFImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_AlarmOFFImage, 179);
 
 }
 
@@ -76,5 +75,11 @@ void ui_AlarmOFF_screen_destroy(void)
     ui_AlarmOFFLabel1 = NULL;
     ui_AlarmOFFLabel2 = NULL;
     ui_AlarmOFFImage = NULL;
+
+}
+
+void ui_AlarmOFF_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }

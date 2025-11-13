@@ -13,6 +13,7 @@ extern "C" {
 // SCREEN: ui_Light
 extern void ui_Light_screen_init(void);
 extern void ui_Light_screen_destroy(void);
+extern void ui_Light_screen_relocalize(void);
 extern lv_obj_t * ui_Light;
 extern lv_obj_t * ui_LightContainer;
 extern lv_obj_t * ui_LightImage;

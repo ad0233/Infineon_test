@@ -34,7 +34,7 @@ void ui_UnwindSelet_screen_init(void)
     lv_obj_set_width(ui_UnwindSeletArc, 300);
     lv_obj_set_height(ui_UnwindSeletArc, 300);
     lv_obj_set_align(ui_UnwindSeletArc, LV_ALIGN_CENTER);
-    lv_arc_set_value(ui_UnwindSeletArc, 360);
+    lv_arc_set_value(ui_UnwindSeletArc, 0);
     lv_arc_set_bg_angles(ui_UnwindSeletArc, 270, 269);
     lv_obj_set_style_arc_color(ui_UnwindSeletArc, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_arc_opa(ui_UnwindSeletArc, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -47,21 +47,19 @@ void ui_UnwindSelet_screen_init(void)
     lv_obj_set_style_bg_opa(ui_UnwindSeletArc, 0, LV_PART_KNOB | LV_STATE_DEFAULT);
 
     ui_UnwindSeletImage = lv_image_create(ui_UnwindSeletContainer);
-    lv_image_set_src(ui_UnwindSeletImage, &ui_img_swan_1_png);
+    lv_image_set_src(ui_UnwindSeletImage, &ui_img_swan_png);
     lv_obj_set_width(ui_UnwindSeletImage, LV_SIZE_CONTENT);   /// 360
     lv_obj_set_height(ui_UnwindSeletImage, LV_SIZE_CONTENT);    /// 360
-    lv_obj_set_x(ui_UnwindSeletImage, 0);
-    lv_obj_set_y(ui_UnwindSeletImage, -15);
     lv_obj_set_align(ui_UnwindSeletImage, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_UnwindSeletImage, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_UnwindSeletImage, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_image_set_scale(ui_UnwindSeletImage, 160);
+    lv_image_set_scale(ui_UnwindSeletImage, 242);
 
     ui_UnwindSeletLabel = lv_label_create(ui_UnwindSeletContainer);
     lv_obj_set_width(ui_UnwindSeletLabel, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_UnwindSeletLabel, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_UnwindSeletLabel, 0);
-    lv_obj_set_y(ui_UnwindSeletLabel, 85);
+    lv_obj_set_y(ui_UnwindSeletLabel, 115);
     lv_obj_set_align(ui_UnwindSeletLabel, LV_ALIGN_CENTER);
     lv_label_set_text(ui_UnwindSeletLabel, "Piano Drift");
     lv_obj_set_style_text_color(ui_UnwindSeletLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -80,5 +78,11 @@ void ui_UnwindSelet_screen_destroy(void)
     ui_UnwindSeletArc = NULL;
     ui_UnwindSeletImage = NULL;
     ui_UnwindSeletLabel = NULL;
+
+}
+
+void ui_UnwindSelet_screen_relocalize(void)
+{
+    // label widgets on screen
 
 }
