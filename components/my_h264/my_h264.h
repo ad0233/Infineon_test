@@ -17,9 +17,15 @@ typedef enum {
     MY_H264_ANIM_SUCCESS2,
 } my_h264_animation_t;
 
+#define MY_H264_WAIT_FOREVER (0xFFFFFFFFU)
+
 void my_h264_init(my_h264_callback_t callback, void *context);
 
 int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms);
+
+void my_h264_set_fps(uint32_t fps);
+
+int my_h264_wait_done(uint32_t timeout_ms);
 
 #ifdef __cplusplus
 }

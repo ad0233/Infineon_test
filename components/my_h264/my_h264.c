@@ -7,6 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/event_groups.h"
 
 #include "esp_log.h"
 #include "esp_heap_caps.h"
@@ -31,17 +32,20 @@ extern const uint8_t _binary_success2_h264_end[];
 static QueueHandle_t h264_queue = NULL;
 static QueueHandle_t s_rgb_ready_queue = NULL;
 static QueueHandle_t s_rgb_free_queue = NULL;
+static EventGroupHandle_t s_playback_event_group = NULL;
 static my_h264_callback_t s_callback = NULL;
 static void *s_context = NULL;
 
 typedef struct {
     uint8_t *buf;
     size_t len;
+    bool is_end;
 } rgb565_frame_t;
 
 #define RGB565_BUFFER_COUNT (2)
 #define CLIP_TABLE_SIZE     (2048)
 #define CLIP_TABLE_OFFSET   (512)
+#define PLAYBACK_DONE_BIT   (1 << 0)
 
 static void ensure_lut_ready(void);
 static void ConvertYUV420SPToRGB565_LUT(const unsigned char *src,
@@ -52,6 +56,8 @@ static void ConvertYUV420SPToRGB565_LUT(const unsigned char *src,
                                         int dst_height);
 static void i420_decode_thread(void *arg);
 static void playback_thread(void *arg);
+static TickType_t fps_to_ticks(uint32_t fps);
+static TickType_t wait_timeout_to_ticks(uint32_t timeout_ms);
 
 static bool s_lut_ready = false;
 static int32_t s_y_table[256];
@@ -67,10 +73,33 @@ static uint16_t s_dst_width = 0;
 static uint16_t s_dst_height = 0;
 static size_t s_rgb_frame_bytes = 0;
 static bool s_buffers_initialized = false;
+static uint32_t s_target_fps = 24;
+static TickType_t s_frame_interval_ticks = 0;
 
 static inline uint16_t align16(uint16_t value)
 {
     return (value + 15) & ~0x0F;
+}
+
+static TickType_t fps_to_ticks(uint32_t fps)
+{
+    if (fps == 0) {
+        return 0;
+    }
+    uint32_t ticks_per_second = configTICK_RATE_HZ;
+    TickType_t interval = (TickType_t)((ticks_per_second + fps - 1) / fps);
+    if (interval == 0) {
+        interval = 1;
+    }
+    return interval;
+}
+
+static TickType_t wait_timeout_to_ticks(uint32_t timeout_ms)
+{
+    if (timeout_ms == MY_H264_WAIT_FOREVER) {
+        return portMAX_DELAY;
+    }
+    return pdMS_TO_TICKS(timeout_ms);
 }
 
 void my_h264_init(my_h264_callback_t callback, void *context)
@@ -84,6 +113,17 @@ void my_h264_init(my_h264_callback_t callback, void *context)
         ESP_LOGE("h264", "Failed to create queues");
         return;
     }
+    if (s_playback_event_group == NULL) {
+        s_playback_event_group = xEventGroupCreate();
+        if (s_playback_event_group == NULL) {
+            ESP_LOGE("h264", "Failed to create event group");
+            return;
+        }
+        xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+    } else {
+        xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+    }
+    s_frame_interval_ticks = fps_to_ticks(s_target_fps);
     if (xTaskCreatePinnedToCore(playback_thread, "h264_play_thread", 1024 * 6, NULL, 5, NULL, 1) != pdPASS) {
         ESP_LOGE("h264", "Failed to create playback task");
         return;
@@ -132,9 +172,18 @@ int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
         return -1;
     }
 
+    if (s_playback_event_group == NULL) {
+        return -1;
+    }
+    EventBits_t previous_bits = xEventGroupClearBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+    if ((previous_bits & PLAYBACK_DONE_BIT) == 0) {
+        return -1;
+    }
     in_frame.raw_data.buffer = start;
     in_frame.raw_data.len = end - start;
-    if (xQueueSend(h264_queue, &in_frame, pdMS_TO_TICKS(timeout_ms)) != pdPASS) {
+    TickType_t wait_ticks = wait_timeout_to_ticks(timeout_ms);
+    if (xQueueSend(h264_queue, &in_frame, wait_ticks) != pdPASS) {
+        xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
         return -1;
     }
     return 0;
@@ -207,10 +256,8 @@ static void i420_decode_thread(void *arg) {
     esp_h264_dec_in_frame_t in_frame;
     while (1) {
         if (xQueueReceive(h264_queue, &in_frame, portMAX_DELAY) == pdPASS) {
-            while (1) {
-                if (in_frame.raw_data.len <= 0) {
-                    break;
-                }
+            bool decode_failed = false;
+            while (in_frame.raw_data.len > 0) {
                 ret = esp_h264_dec_process(dec, &in_frame, &out_frame);
                 in_frame.raw_data.buffer += in_frame.consume;
                 in_frame.raw_data.len -= in_frame.consume;
@@ -218,6 +265,7 @@ static void i420_decode_thread(void *arg) {
                     uint8_t *rgb565_buf = NULL;
                     if (xQueueReceive(s_rgb_free_queue, &rgb565_buf, portMAX_DELAY) != pdPASS) {
                         ESP_LOGE("h264", "Failed to get free RGB buffer");
+                        decode_failed = true;
                         break;
                     }
                     ConvertYUV420SPToRGB565_LUT(out_frame.outbuf,
@@ -229,16 +277,37 @@ static void i420_decode_thread(void *arg) {
                     rgb565_frame_t frame = {
                         .buf = rgb565_buf,
                         .len = s_rgb_frame_bytes,
+                        .is_end = false,
                     };
                     if (xQueueSend(s_rgb_ready_queue, &frame, portMAX_DELAY) != pdPASS) {
                         ESP_LOGE("h264", "Failed to enqueue RGB frame");
                         xQueueSend(s_rgb_free_queue, &rgb565_buf, portMAX_DELAY);
+                        decode_failed = true;
                         break;
                     }
                 } else {
                     ESP_LOGE("h264", "decode failed. line %d \n", __LINE__);
+                    decode_failed = true;
                     break;
                 }
+            }
+            rgb565_frame_t end_frame = {
+                .buf = NULL,
+                .len = 0,
+                .is_end = true,
+            };
+            if (s_rgb_ready_queue != NULL) {
+                if (xQueueSend(s_rgb_ready_queue, &end_frame, portMAX_DELAY) != pdPASS) {
+                    ESP_LOGE("h264", "Failed to enqueue end frame");
+                    if (s_playback_event_group != NULL) {
+                        xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+                    }
+                }
+            } else if (s_playback_event_group != NULL) {
+                xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+            }
+            if (decode_failed && s_playback_event_group != NULL) {
+                xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
             }
         }
     }
@@ -326,16 +395,55 @@ static void ConvertYUV420SPToRGB565_LUT(const unsigned char *src,
 static void playback_thread(void *arg)
 {
     rgb565_frame_t frame;
+    TickType_t last_wake_time = 0;
+    bool has_last_wake_time = false;
     while (1) {
         if (s_rgb_ready_queue == NULL || s_rgb_free_queue == NULL) {
             vTaskDelay(pdMS_TO_TICKS(10));
             continue;
         }
         if (xQueueReceive(s_rgb_ready_queue, &frame, portMAX_DELAY) == pdPASS) {
+            if (frame.is_end) {
+                has_last_wake_time = false;
+                if (s_playback_event_group != NULL) {
+                    xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+                }
+                continue;
+            }
             if (s_callback != NULL) {
                 s_callback(frame.buf, frame.len, s_context);
             }
             xQueueSend(s_rgb_free_queue, &frame.buf, portMAX_DELAY);
+            TickType_t interval = s_frame_interval_ticks;
+            if (interval > 0) {
+                if (!has_last_wake_time) {
+                    last_wake_time = xTaskGetTickCount();
+                    has_last_wake_time = true;
+                }
+                vTaskDelayUntil(&last_wake_time, interval);
+            } else {
+                has_last_wake_time = false;
+            }
         }
     }
+}
+
+void my_h264_set_fps(uint32_t fps)
+{
+    s_target_fps = fps;
+    s_frame_interval_ticks = fps_to_ticks(fps);
+}
+
+int my_h264_wait_done(uint32_t timeout_ms)
+{
+    if (s_playback_event_group == NULL) {
+        return -1;
+    }
+    TickType_t wait_ticks = wait_timeout_to_ticks(timeout_ms);
+    EventBits_t bits = xEventGroupWaitBits(s_playback_event_group,
+                                           PLAYBACK_DONE_BIT,
+                                           pdFALSE,
+                                           pdTRUE,
+                                           wait_ticks);
+    return (bits & PLAYBACK_DONE_BIT) ? 0 : -1;
 }
