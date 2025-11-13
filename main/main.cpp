@@ -184,8 +184,18 @@ extern "C" void app_main()
 
     my_ui_network_guide();
     lvgl_port_stop();
+    my_h264_start(MY_H264_ANIM_BRAND_MOTION2, 100);
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
     my_h264_start(MY_H264_ANIM_FAIL2, 100);
-    vTaskDelay(6000 / portTICK_PERIOD_MS);
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    my_h264_start(MY_H264_ANIM_GO_UP, 100);
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    my_h264_start(MY_H264_ANIM_HUMAN_RECOGNIZED, 100);
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    my_h264_start(MY_H264_ANIM_PROCESSING, 100);
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    my_h264_start(MY_H264_ANIM_SUCCESS2, 100);
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
     lvgl_port_resume();
     my_lvgl_force_refresh();
     print_mem_info();
