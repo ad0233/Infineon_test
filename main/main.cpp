@@ -183,6 +183,16 @@ extern "C" void app_main()
     }, NULL);
     my_h264_set_fps(24);
 
+    auto iot_config_json = (char *)heap_caps_malloc(1024 * 10, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (iot_config_json == nullptr) {
+        ESP_LOGE(TAG, "Failed to allocate memory for iot config json");
+        vTaskDelete(nullptr);
+    }
+    my_nvs_read_iot_config_json(iot_config_json, 1024 * 10);
+    ESP_LOGI(TAG, "iot_config_json: %s", iot_config_json);
+    
+    heap_caps_free(iot_config_json);
+
     my_ui_network_guide();
     lvgl_port_stop();
     my_h264_start(MY_H264_ANIM_CAT, 100);

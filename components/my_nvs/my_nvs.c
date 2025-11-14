@@ -11,6 +11,10 @@
 #define NVS_IOT_KEY "iot_config"
 #define NVS_PRIVATE_KEY_KEY "priv_key"
 
+#define IOT_CFG_PARTITION_NAME "iot_config"
+#define IOT_CFG_NAMESPACE "iot_config"
+#define IOT_CFG_JSON_KEY "json"
+
 static device_config_t g_device_config;
 static bool g_initialized = false;
 
@@ -306,5 +310,37 @@ bool my_nvs_update_private_key_config(const struct private_key_config *new_cfg) 
     memcpy(&g_private_key_config.config, new_cfg, sizeof(struct private_key_config));
     g_private_key_config.config.checksum = private_key_config_calc_checksum(&g_private_key_config.config);
     return private_key_config_save_to_nvs(&g_private_key_config);
+}
+
+bool my_nvs_read_iot_config_json(char *out_buffer, size_t buffer_size) {
+    if (!out_buffer || buffer_size == 0) {
+        return false;
+    }
+
+    esp_err_t err = nvs_flash_init_partition(IOT_CFG_PARTITION_NAME);
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        nvs_flash_erase_partition(IOT_CFG_PARTITION_NAME);
+        err = nvs_flash_init_partition(IOT_CFG_PARTITION_NAME);
+    }
+    if (err != ESP_OK) return false;
+
+    nvs_handle_t handle;
+    err = nvs_open_from_partition(IOT_CFG_PARTITION_NAME, IOT_CFG_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return false;
+    }
+
+    size_t required = 0;
+    err = nvs_get_str(handle, IOT_CFG_JSON_KEY, NULL, &required);
+    if (err == ESP_OK) {
+        if (required > buffer_size) {
+            err = ESP_ERR_NVS_INVALID_LENGTH;
+        } else {
+            err = nvs_get_str(handle, IOT_CFG_JSON_KEY, out_buffer, &required);
+        }
+    }
+
+    nvs_close(handle);
+    return err == ESP_OK;
 }
 

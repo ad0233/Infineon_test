@@ -1,7 +1,9 @@
-# Name,       Type, SubType, Offset,  Size
-nvs,          data, nvs,           ,  0x4000
-phy_init,     data, phy,           ,  0x1000
-otadata,      data, ota,           ,  0x2000
-ota_0,        app,  ota_0,         ,      6M
-ota_1,        app,  ota_1,         ,      6M
-spiffs_data,  data, spiffs,        ,      2M
+# Name,          Type, SubType, Offset,  Size
+esp_secure_cert, 0x3F, ,              ,  0x4000
+nvs,             data, nvs,           ,  0x4000
+iot_config,      data, nvs,           ,  0x4000
+phy_init,        data, phy,           ,  0x1000
+otadata,         data, ota,           ,  0x2000
+ota_0,           app,  ota_0,         ,      6M
+ota_1,           app,  ota_1,         ,      6M
+spiffs_data,     data, spiffs,        ,      2M

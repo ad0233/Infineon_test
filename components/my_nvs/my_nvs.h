@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 // 固定1024字节的设备配置结构体
 #define DEVICE_CONFIG_SIZE 1024
@@ -144,6 +145,14 @@ const struct private_key_config *my_nvs_get_private_key_config(void);
  * @return true表示成功，false表示失败
  */
 bool my_nvs_update_private_key_config(const struct private_key_config *new_cfg);
+
+/**
+ * @brief 读取 iot_config 分区中的 JSON
+ * @param[out] out_buffer 存放 JSON 文本的缓冲区
+ * @param[in]  buffer_size 缓冲区大小
+ * @return true 表示读取成功且内容已写入缓冲区
+ */
+bool my_nvs_read_iot_config_json(char *out_buffer, size_t buffer_size);
 
 #ifdef __cplusplus
 }
