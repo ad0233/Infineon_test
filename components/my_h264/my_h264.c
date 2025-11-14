@@ -28,6 +28,8 @@ extern const uint8_t _binary_processing_h264_start[];
 extern const uint8_t _binary_processing_h264_end[];
 extern const uint8_t _binary_success2_h264_start[];
 extern const uint8_t _binary_success2_h264_end[];
+extern const uint8_t _binary_cat_h264_start[];
+extern const uint8_t _binary_cat_h264_end[];
 
 static QueueHandle_t h264_queue = NULL;
 static QueueHandle_t s_rgb_ready_queue = NULL;
@@ -164,6 +166,9 @@ int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
             start = _binary_success2_h264_start;
             end = _binary_success2_h264_end;
             break;
+        case MY_H264_ANIM_CAT:
+            start = _binary_cat_h264_start;
+            end = _binary_cat_h264_end;
         default:
             return -1;
     }
