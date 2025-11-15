@@ -185,8 +185,10 @@ extern "C" void app_main()
 
     my_ui_network_guide();
     lvgl_port_stop();
-    my_h264_start(MY_H264_ANIM_CAT, 100);
+    int err = my_h264_start(MY_H264_ANIM_CAT, 100);
+    ESP_LOGE(TAG, "my_h264_start %d", err);
     my_h264_wait_done(6000);
+    ESP_LOGE(TAG, "my_h264_wait_done");
     lvgl_port_resume();
     my_lvgl_force_refresh();
     print_mem_info();

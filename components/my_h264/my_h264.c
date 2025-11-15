@@ -169,19 +169,24 @@ int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
         case MY_H264_ANIM_CAT:
             start = _binary_cat_h264_start;
             end = _binary_cat_h264_end;
+            break;
         default:
+            ESP_LOGE("h264", "%s switch (animation)", __func__);
             return -1;
     }
 
     if (start == NULL || end == NULL || end <= start) {
+        ESP_LOGE("h264", "%s start == NULL || end == NULL || end <= start", __func__);
         return -1;
     }
 
     if (s_playback_event_group == NULL) {
+        ESP_LOGE("h264", "%s s_playback_event_group == NULL", __func__);
         return -1;
     }
     EventBits_t previous_bits = xEventGroupClearBits(s_playback_event_group, PLAYBACK_DONE_BIT);
     if ((previous_bits & PLAYBACK_DONE_BIT) == 0) {
+        ESP_LOGE("h264", "%s (previous_bits & PLAYBACK_DONE_BIT) == 0", __func__);
         return -1;
     }
     in_frame.raw_data.buffer = start;
@@ -189,6 +194,7 @@ int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
     TickType_t wait_ticks = wait_timeout_to_ticks(timeout_ms);
     if (xQueueSend(h264_queue, &in_frame, wait_ticks) != pdPASS) {
         xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+        ESP_LOGE("h264", "%s xQueueSend(h264_queue, &in_frame, wait_ticks) != pdPASS", __func__);
         return -1;
     }
     return 0;
