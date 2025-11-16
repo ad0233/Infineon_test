@@ -361,27 +361,6 @@ static char s_buf_mqtt_uri[192];
 static char s_buf_protocol[8];
 static char s_buf_endpoint[128];
 static char s_buf_thing_name[64];
-// topics 缓冲
-static char s_buf_topic_request[192];
-static char s_buf_topic_response[192];
-static char s_buf_topic_command[192];
-static char s_buf_topic_shadow_update[192];
-static char s_buf_topic_shadow_update_delta[192];
-static char s_buf_topic_shadow_update_accepted[192];
-static char s_buf_topic_shadow_update_rejected[192];
-static char s_buf_topic_shadow_get[192];
-static char s_buf_topic_shadow_get_accepted[192];
-static char s_buf_topic_shadow_get_rejected[192];
-
-static void assign_str_or_null(const cJSON *obj, const char *key, char *buf, size_t buflen, const char **out_ptr) {
-    const cJSON *it = cJSON_GetObjectItemCaseSensitive(obj, key);
-    if (cJSON_IsString(it) && it->valuestring && it->valuestring[0] != '\0') {
-        snprintf(buf, buflen, "%s", it->valuestring);
-        *out_ptr = buf;
-    } else {
-        *out_ptr = NULL;
-    }
-}
 
 static bool load_iot_view_once(void) {
     if (s_iot_view_loaded) return true;
@@ -427,32 +406,6 @@ static bool load_iot_view_once(void) {
         snprintf(s_buf_mqtt_uri, sizeof(s_buf_mqtt_uri), "%s", direct_uri->valuestring);
     } else {
         snprintf(s_buf_mqtt_uri, sizeof(s_buf_mqtt_uri), "%s://%s:%d", s_buf_protocol, s_buf_endpoint, port_val);
-    }
-
-    // topics
-    const cJSON *topics = cJSON_GetObjectItemCaseSensitive(root, "topics");
-    if (cJSON_IsObject(topics)) {
-        assign_str_or_null(topics, "request", s_buf_topic_request, sizeof(s_buf_topic_request), &s_iot_view.topic_request);
-        assign_str_or_null(topics, "response", s_buf_topic_response, sizeof(s_buf_topic_response), &s_iot_view.topic_response);
-        assign_str_or_null(topics, "command", s_buf_topic_command, sizeof(s_buf_topic_command), &s_iot_view.topic_command);
-        assign_str_or_null(topics, "shadow_update", s_buf_topic_shadow_update, sizeof(s_buf_topic_shadow_update), &s_iot_view.topic_shadow_update);
-        assign_str_or_null(topics, "shadow_update_delta", s_buf_topic_shadow_update_delta, sizeof(s_buf_topic_shadow_update_delta), &s_iot_view.topic_shadow_update_delta);
-        assign_str_or_null(topics, "shadow_update_accepted", s_buf_topic_shadow_update_accepted, sizeof(s_buf_topic_shadow_update_accepted), &s_iot_view.topic_shadow_update_accepted);
-        assign_str_or_null(topics, "shadow_update_rejected", s_buf_topic_shadow_update_rejected, sizeof(s_buf_topic_shadow_update_rejected), &s_iot_view.topic_shadow_update_rejected);
-        assign_str_or_null(topics, "shadow_get", s_buf_topic_shadow_get, sizeof(s_buf_topic_shadow_get), &s_iot_view.topic_shadow_get);
-        assign_str_or_null(topics, "shadow_get_accepted", s_buf_topic_shadow_get_accepted, sizeof(s_buf_topic_shadow_get_accepted), &s_iot_view.topic_shadow_get_accepted);
-        assign_str_or_null(topics, "shadow_get_rejected", s_buf_topic_shadow_get_rejected, sizeof(s_buf_topic_shadow_get_rejected), &s_iot_view.topic_shadow_get_rejected);
-    } else {
-        s_iot_view.topic_request = NULL;
-        s_iot_view.topic_response = NULL;
-        s_iot_view.topic_command = NULL;
-        s_iot_view.topic_shadow_update = NULL;
-        s_iot_view.topic_shadow_update_delta = NULL;
-        s_iot_view.topic_shadow_update_accepted = NULL;
-        s_iot_view.topic_shadow_update_rejected = NULL;
-        s_iot_view.topic_shadow_get = NULL;
-        s_iot_view.topic_shadow_get_accepted = NULL;
-        s_iot_view.topic_shadow_get_rejected = NULL;
     }
 
     s_iot_view.mqtt_uri     = s_buf_mqtt_uri;

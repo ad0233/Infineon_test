@@ -132,7 +132,7 @@ static void mqtt_app_start(const char *broker_uri, const char *client_id,
     esp_mqtt_client_start(client);
 }
 
-int my_mqtt_init_ex(const char *broker_uri,
+int my_mqtt_init(const char *broker_uri,
                     const char *client_id,
                     const char *const *topics,
                     int topic_count,

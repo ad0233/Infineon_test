@@ -18,7 +18,7 @@ struct my_mqtt_callbacks {
 };
 
 // 扩展初始化：传入 broker_uri、client_id、订阅主题列表与回调集合
-int my_mqtt_init_ex(const char *broker_uri,
+int my_mqtt_init(const char *broker_uri,
                     const char *client_id,
                     const char *const *topics,
                     int topic_count,

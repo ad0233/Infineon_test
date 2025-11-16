@@ -161,17 +161,6 @@ struct iot_config_view {
     const char *iot_endpoint;   // 主机名
     const char *thing_name;     // 设备名
     int         iot_port;       // 端口
-    // topics（如不存在则为 NULL）
-    const char *topic_request;
-    const char *topic_response;
-    const char *topic_command;
-    const char *topic_shadow_update;
-    const char *topic_shadow_update_delta;
-    const char *topic_shadow_update_accepted;
-    const char *topic_shadow_update_rejected;
-    const char *topic_shadow_get;
-    const char *topic_shadow_get_accepted;
-    const char *topic_shadow_get_rejected;
 };
 
 /**

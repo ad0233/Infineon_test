@@ -215,19 +215,43 @@ extern "C" void app_main()
         ESP_LOGE(TAG, "Failed to get iot config view");
         vTaskDelete(nullptr);
     }
-    const char* topics[10];
-    int tcount = 0;
-    if (iot_config_view->topic_request) topics[tcount++] = iot_config_view->topic_request;
-    if (iot_config_view->topic_response) topics[tcount++] = iot_config_view->topic_response;
-    if (iot_config_view->topic_command) topics[tcount++] = iot_config_view->topic_command;
-    if (iot_config_view->topic_shadow_update) topics[tcount++] = iot_config_view->topic_shadow_update;
-    if (iot_config_view->topic_shadow_update_delta) topics[tcount++] = iot_config_view->topic_shadow_update_delta;
-    if (iot_config_view->topic_shadow_update_accepted) topics[tcount++] = iot_config_view->topic_shadow_update_accepted;
-    if (iot_config_view->topic_shadow_update_rejected) topics[tcount++] = iot_config_view->topic_shadow_update_rejected;
-    if (iot_config_view->topic_shadow_get) topics[tcount++] = iot_config_view->topic_shadow_get;
-    if (iot_config_view->topic_shadow_get_accepted) topics[tcount++] = iot_config_view->topic_shadow_get_accepted;
-    if (iot_config_view->topic_shadow_get_rejected) topics[tcount++] = iot_config_view->topic_shadow_get_rejected;
-    my_mqtt_init_ex(iot_config_view->mqtt_uri, iot_config_view->thing_name, (tcount>0?topics:NULL), tcount, NULL, NULL);
+    // 按固定模板由 thing_name 生成订阅主题
+    static char t_req[128];
+    static char t_resp[128];
+    static char t_cmd[128];
+    static char t_shadow_upd[160];
+    static char t_shadow_upd_delta[200];
+    static char t_shadow_upd_acc[200];
+    static char t_shadow_upd_rej[200];
+    static char t_shadow_get[160];
+    static char t_shadow_get_acc[200];
+    static char t_shadow_get_rej[200];
+
+    snprintf(t_req, sizeof(t_req), "lunawake/%s/request", iot_config_view->thing_name);
+    snprintf(t_resp, sizeof(t_resp), "lunawake/%s/response", iot_config_view->thing_name);
+    snprintf(t_cmd, sizeof(t_cmd), "lunawake/%s/command", iot_config_view->thing_name);
+
+    snprintf(t_shadow_upd, sizeof(t_shadow_upd), "$aws/things/%s/shadow/update", iot_config_view->thing_name);
+    snprintf(t_shadow_upd_delta, sizeof(t_shadow_upd_delta), "$aws/things/%s/shadow/update/delta", iot_config_view->thing_name);
+    snprintf(t_shadow_upd_acc, sizeof(t_shadow_upd_acc), "$aws/things/%s/shadow/update/accepted", iot_config_view->thing_name);
+    snprintf(t_shadow_upd_rej, sizeof(t_shadow_upd_rej), "$aws/things/%s/shadow/update/rejected", iot_config_view->thing_name);
+    snprintf(t_shadow_get, sizeof(t_shadow_get), "$aws/things/%s/shadow/get", iot_config_view->thing_name);
+    snprintf(t_shadow_get_acc, sizeof(t_shadow_get_acc), "$aws/things/%s/shadow/get/accepted", iot_config_view->thing_name);
+    snprintf(t_shadow_get_rej, sizeof(t_shadow_get_rej), "$aws/things/%s/shadow/get/rejected", iot_config_view->thing_name);
+
+    const char* topics[] = {
+        t_req,
+        t_resp,
+        t_cmd,
+        t_shadow_upd,
+        t_shadow_upd_delta,
+        t_shadow_upd_acc,
+        t_shadow_upd_rej,
+        t_shadow_get,
+        t_shadow_get_acc,
+        t_shadow_get_rej,
+    };
+    my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
     
     // my_ota_start("https://lunawake.oss-cn-shenzhen.aliyuncs.com/Lunawake_main_1706a52_a8f0dcb6_20251108_164040.bin?x-oss-credential=LTAI5tKXsxzVgvKJaTE4Dgaa%2F20251108%2Fcn-shenzhen%2Foss%2Faliyun_v4_request&x-oss-date=20251108T084717Z&x-oss-expires=32400&x-oss-signature-version=OSS4-HMAC-SHA256&x-oss-signature=977c006b564eb20045ab5e3ae0c9337a2c50834c0de7cb6d9c24a80651c05ef6");
     return;
