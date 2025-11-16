@@ -154,6 +154,32 @@ bool my_nvs_update_private_key_config(const struct private_key_config *new_cfg);
  */
 bool my_nvs_read_iot_config_json(char *out_buffer, size_t buffer_size);
 
+// ===== 惰性加载的 IoT 视图结构（仅指针/只读） =====
+struct iot_config_view {
+    const char *mqtt_uri;       // 例如 mqtts://host:8883
+    const char *protocol;       // 例如 mqtt / mqtts
+    const char *iot_endpoint;   // 主机名
+    const char *thing_name;     // 设备名
+    int         iot_port;       // 端口
+    // topics（如不存在则为 NULL）
+    const char *topic_request;
+    const char *topic_response;
+    const char *topic_command;
+    const char *topic_shadow_update;
+    const char *topic_shadow_update_delta;
+    const char *topic_shadow_update_accepted;
+    const char *topic_shadow_update_rejected;
+    const char *topic_shadow_get;
+    const char *topic_shadow_get_accepted;
+    const char *topic_shadow_get_rejected;
+};
+
+/**
+ * @brief 获取 IoT 配置视图（惰性解析+缓存，返回只读指针）
+ * @return 成功返回只读视图指针；失败返回 NULL
+ */
+const struct iot_config_view *my_nvs_get_iot_config_view(void);
+
 #ifdef __cplusplus
 }
 #endif

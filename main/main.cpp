@@ -45,6 +45,7 @@
 #include "my_ble.h"
 #include "my_wifi.h"
 #include "my_ota.h"
+#include "my_mqtt.h"
 
 #include "rust_lunawake.h"
 #include "cmd_parse.h"
@@ -200,7 +201,6 @@ extern "C" void app_main()
     lvgl_port_resume();
     my_lvgl_force_refresh();
     print_mem_info();
-    return;
 
     if (fsm_main_init() != 0) {
         ESP_LOGE(TAG, "fsm_main_init failed");
@@ -208,7 +208,26 @@ extern "C" void app_main()
     }
     my_ble_init();
     my_wifi_init();
-    // my_wifi_connect("303", "Qq13543826488.");
+    my_wifi_connect("C301", "1124861985");
+
+    auto iot_config_view = my_nvs_get_iot_config_view();
+    if (iot_config_view == nullptr) {
+        ESP_LOGE(TAG, "Failed to get iot config view");
+        vTaskDelete(nullptr);
+    }
+    const char* topics[10];
+    int tcount = 0;
+    if (iot_config_view->topic_request) topics[tcount++] = iot_config_view->topic_request;
+    if (iot_config_view->topic_response) topics[tcount++] = iot_config_view->topic_response;
+    if (iot_config_view->topic_command) topics[tcount++] = iot_config_view->topic_command;
+    if (iot_config_view->topic_shadow_update) topics[tcount++] = iot_config_view->topic_shadow_update;
+    if (iot_config_view->topic_shadow_update_delta) topics[tcount++] = iot_config_view->topic_shadow_update_delta;
+    if (iot_config_view->topic_shadow_update_accepted) topics[tcount++] = iot_config_view->topic_shadow_update_accepted;
+    if (iot_config_view->topic_shadow_update_rejected) topics[tcount++] = iot_config_view->topic_shadow_update_rejected;
+    if (iot_config_view->topic_shadow_get) topics[tcount++] = iot_config_view->topic_shadow_get;
+    if (iot_config_view->topic_shadow_get_accepted) topics[tcount++] = iot_config_view->topic_shadow_get_accepted;
+    if (iot_config_view->topic_shadow_get_rejected) topics[tcount++] = iot_config_view->topic_shadow_get_rejected;
+    my_mqtt_init_ex(iot_config_view->mqtt_uri, iot_config_view->thing_name, (tcount>0?topics:NULL), tcount, NULL, NULL);
     
     // my_ota_start("https://lunawake.oss-cn-shenzhen.aliyuncs.com/Lunawake_main_1706a52_a8f0dcb6_20251108_164040.bin?x-oss-credential=LTAI5tKXsxzVgvKJaTE4Dgaa%2F20251108%2Fcn-shenzhen%2Foss%2Faliyun_v4_request&x-oss-date=20251108T084717Z&x-oss-expires=32400&x-oss-signature-version=OSS4-HMAC-SHA256&x-oss-signature=977c006b564eb20045ab5e3ae0c9337a2c50834c0de7cb6d9c24a80651c05ef6");
     return;
