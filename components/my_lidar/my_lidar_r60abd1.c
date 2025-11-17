@@ -40,6 +40,11 @@ static radar_respiratory_data_t cached_respiratory_data = {0};
 static radar_heart_rate_data_t cached_heart_rate_data = {0};
 static radar_product_info_t cached_product_info = {0};
 
+// 数据更新时间戳
+static uint32_t movement_timestamp = 0;
+static uint32_t respiratory_timestamp = 0;
+static uint32_t heart_rate_timestamp = 0;
+
 // 内部函数声明
 static void rx_task(void *arg);
 static bool parse_packet(const uint8_t *data, uint16_t length);
@@ -162,6 +167,28 @@ bool r60abd1_get_product_info(radar_product_info_t *info)
     if (info == NULL) return false;
     if (xSemaphoreTake(data_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         *info = cached_product_info;
+        xSemaphoreGive(data_mutex);
+        return true;
+    }
+    return false;
+}
+
+bool r60abd1_get_latest_data(radar_latest_data_t *data)
+{
+    if (data == NULL) return false;
+    
+    if (xSemaphoreTake(data_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        data->movement_param = cached_human_data.movement_param;
+        data->movement_timestamp = movement_timestamp;
+        data->respiratory_value = cached_respiratory_data.respiratory_value;
+        data->respiratory_timestamp = respiratory_timestamp;
+        data->heart_rate_value = cached_heart_rate_data.heart_rate_value;
+        data->heart_rate_timestamp = heart_rate_timestamp;
+        // 如果呼吸和心率数据有效（开关开启且值不为0），则认为数据有效
+        data->valid = (cached_respiratory_data.respiratory_switch && 
+                      cached_respiratory_data.respiratory_value > 0) ||
+                     (cached_heart_rate_data.heart_rate_switch && 
+                      cached_heart_rate_data.heart_rate_value > 0);
         xSemaphoreGive(data_mutex);
         return true;
     }
@@ -390,6 +417,7 @@ static bool parse_packet(const uint8_t *data, uint16_t length)
             if (data_len >= 1) {
                 if (xSemaphoreTake(data_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                     cached_human_data.movement_param = payload[0];
+                    movement_timestamp = esp_log_timestamp();
                     xSemaphoreGive(data_mutex);
                     
                     if (human_movement_callback != NULL) {
@@ -435,6 +463,7 @@ static bool parse_packet(const uint8_t *data, uint16_t length)
                 case RADAR_CMD_RESPIRATORY_VALUE:
                     if (data_len >= 1) {
                         cached_respiratory_data.respiratory_value = payload[0];
+                        respiratory_timestamp = esp_log_timestamp();
                     }
                     break;
                 case RADAR_CMD_RESPIRATORY_WAVEFORM:
@@ -471,6 +500,7 @@ static bool parse_packet(const uint8_t *data, uint16_t length)
                 case RADAR_CMD_HEART_RATE_VALUE:
                     if (data_len >= 1) {
                         cached_heart_rate_data.heart_rate_value = payload[0];
+                        heart_rate_timestamp = esp_log_timestamp();
                     }
                     break;
                 case RADAR_CMD_HEART_RATE_WAVEFORM:

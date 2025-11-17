@@ -110,6 +110,7 @@ bool r60abd1_get_human_data(radar_human_data_t *data);
 bool r60abd1_get_respiratory_data(radar_respiratory_data_t *data);
 bool r60abd1_get_heart_rate_data(radar_heart_rate_data_t *data);
 bool r60abd1_get_product_info(radar_product_info_t *info);
+bool r60abd1_get_latest_data(radar_latest_data_t *data);
 
 #ifdef __cplusplus
 }

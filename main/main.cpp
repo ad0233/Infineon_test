@@ -84,25 +84,25 @@ static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
 void human_presence_callback(const radar_human_data_t *data)
 {
     // 有人没人 - 状态变化时上报
-    ESP_LOGI("HUMAN", "有人: %s", data->presence ? "是" : "否");
+    // ESP_LOGI("HUMAN", "有人: %s", data->presence ? "是" : "否");
 }
 
 // 体动参数数据回调函数（已不使用，保留接口）
 void human_movement_callback(const radar_human_data_t *data)
 {
-    ESP_LOGI("HUMAN", "体动参数: %d", data->movement_param);
+    // ESP_LOGI("HUMAN", "体动参数: %d", data->movement_param);
 }
 
 // 呼吸监测数据回调函数
 void respiratory_data_callback(const radar_respiratory_data_t *data)
 {
-    ESP_LOGI("RESPIRATORY", "呼吸: %d 次/min", data->respiratory_value);
+    // ESP_LOGI("RESPIRATORY", "呼吸: %d 次/min", data->respiratory_value);
 }
 
 // 心率监测数据回调函数
 void heart_rate_data_callback(const radar_heart_rate_data_t *data)
 {
-    ESP_LOGI("HEART_RATE", "心率: %d 次/min", data->heart_rate_value);
+    // ESP_LOGI("HEART_RATE", "心率: %d 次/min", data->heart_rate_value);
 }
 
 #include "audio_recorder.h"
@@ -203,6 +203,16 @@ extern "C" void app_main()
     // 启动雷达监测（包含所有开关设置）
     my_radar_start();
     print_mem_info();
+
+    while(1) {
+        radar_latest_data_t data;
+        my_radar_get_latest_data(&data);
+        char *json_str = nullptr;
+        my_radar_data_to_json(&data, &json_str);
+        ESP_LOGI("RADAR", "json_str: %s", json_str);
+        free(json_str);
+        vTaskDelay(1000);
+    }
 
     return;
 }

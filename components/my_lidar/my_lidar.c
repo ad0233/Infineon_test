@@ -7,6 +7,9 @@
 #endif
 
 #include "esp_log.h"
+#include "cJSON.h"
+#include <stdlib.h>
+#include <string.h>
 
 static const char *TAG = "my_radar";
 
@@ -127,6 +130,65 @@ bool my_radar_get_product_info(radar_product_info_t *info)
 #else
     return r60abd1_get_product_info(info);
 #endif
+}
+
+bool my_radar_get_latest_data(radar_latest_data_t *data)
+{
+    if (data == NULL) {
+        return false;
+    }
+    
+#ifdef USE_AIRTOUCH_RADAR
+    ESP_LOGW(TAG, "艾睿雷达暂不支持该接口");
+    return false;
+#else
+    return r60abd1_get_latest_data(data);
+#endif
+}
+
+int my_radar_data_to_json(const radar_latest_data_t *data, char **json_str)
+{
+    if (data == NULL || json_str == NULL) {
+        return -1;
+    }
+    
+    // 创建 JSON 对象
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        return -1;
+    }
+    
+    // 添加体动数据
+    cJSON *movement = cJSON_CreateObject();
+    cJSON_AddNumberToObject(movement, "value", data->movement_param);
+    // cJSON_AddNumberToObject(movement, "timestamp", data->movement_timestamp);
+    cJSON_AddItemToObject(root, "movement", movement);
+    
+    // 添加呼吸数据
+    cJSON *respiratory = cJSON_CreateObject();
+    cJSON_AddNumberToObject(respiratory, "value", data->respiratory_value);
+    // cJSON_AddNumberToObject(respiratory, "timestamp", data->respiratory_timestamp);
+    cJSON_AddItemToObject(root, "respiratory", respiratory);
+    
+    // 添加心率数据
+    cJSON *heart_rate = cJSON_CreateObject();
+    cJSON_AddNumberToObject(heart_rate, "value", data->heart_rate_value);
+    // cJSON_AddNumberToObject(heart_rate, "timestamp", data->heart_rate_timestamp);
+    cJSON_AddItemToObject(root, "heart_rate", heart_rate);
+    
+    // 添加有效性标志
+    // cJSON_AddBoolToObject(root, "valid", data->valid);
+    
+    // 转换为字符串
+    char *json_string = cJSON_Print(root);
+    cJSON_Delete(root);
+    
+    if (json_string == NULL) {
+        return -1;
+    }
+    
+    *json_str = json_string;
+    return strlen(json_string);
 }
 
 // ============================================================================
