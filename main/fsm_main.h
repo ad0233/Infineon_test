@@ -71,8 +71,8 @@ enum fsm_main_event_enum {
     F_MAIN_E_BTN_CLICKED,       // 点击事件
     F_MAIN_E_BTN_L_CLICKED,     // 长按事件
     F_MAIN_E_KNOB_CW,           // 旋钮事件
+    F_MAIN_E_TIME,              // 等待事件（必须在 TIMEOUT 之前，保证值 < 255）
     F_MAIN_E_TIMEOUT = 255,     // 超时事件 特殊事件，不能改值，库内部要求，fsm_timeout_trig函数触发该事件
-    F_MAIN_E_TIME              //等待事件
 };
 void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg);
 uint8_t fsm_main_get_current_state(void);

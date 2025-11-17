@@ -54,25 +54,34 @@ enum fsm_main_state_enum {
 // 状态名称获取
 static const char* fsm_state_to_str(uint8_t state) {
     static const char* names[] = {
-        [F_MAIN_S_UNINIT] = "UNINIT",
-        [F_MAIN_S_UNINIT_PLAYING] = "UNINIT_PLAYING",
-        [F_MAIN_S_CLOCK] = "CLOCK",
-
-        [F_MAIN_S_FINDPERSONC_ANIM] = "FINDPERSONC_ANIM",
-        [F_MAIN_S_FINDPERSON] = "FINDPERSON",
-        [F_MAIN_S_FINDSUC] = "FINDSUC",
-        [F_MAIN_S_FINDFAIL] = "FINDFAIL",
-        [F_MAIN_S_FINDSUC_ANIM] = "FINDSUC_ANIM", 
-        [F_MAIN_S_FINDFAIL_ANIM] = "FINDFAIL_ANIM",  
-
-        [F_MAIN_S_WIFI_DETECT] = "WIFI_DETECT",
-        [F_MAIN_S_WIFI_GUIDE] = "WIFI_GUIDE",
-        [F_MAIN_S_WIFI_CONN] = "WIFI_CONN",
-        [F_MAIN_S_WIFI_CONN_SUC] = "WIFI_CONN_SUC",
-        [F_MAIN_S_WIFI_CONN_FAIL] = "WIFI_CONN_FAIL",
-
-        [F_MAIN_S_RTC_DETECT] = "RTC_DETECT",
-        [F_MAIN_S_RTC_DETECT_CLK] = "RTC_DETECT_CLK",
+        "UNINIT",                    // F_MAIN_S_UNINIT
+        "UNINIT_PLAYING",            // F_MAIN_S_UNINIT_PLAYING
+        "CLOCK",                     // F_MAIN_S_CLOCK
+        "CLOCK_AWAY",                // F_MAIN_S_CLOCK_AWAY
+        "CLOCK_BACK",                // F_MAIN_S_CLOCK_BACK
+        "FINDPERSONC_ANIM",          // F_MAIN_S_FINDPERSONC_ANIM
+        "FINDPERSON",                // F_MAIN_S_FINDPERSON
+        "FINDSUC",                   // F_MAIN_S_FINDSUC
+        "FINDFAIL",                  // F_MAIN_S_FINDFAIL
+        "FINDSUC_ANIM",              // F_MAIN_S_FINDSUC_ANIM
+        "FINDFAIL_ANIM",             // F_MAIN_S_FINDFAIL_ANIM
+        "WIFI_DETECT",               // F_MAIN_S_WIFI_DETECT
+        "WIFI_GUIDE",                // F_MAIN_S_WIFI_GUIDE
+        "WIFI_CONN",                 // F_MAIN_S_WIFI_CONN
+        "WIFI_CONN_SUC",             // F_MAIN_S_WIFI_CONN_SUC
+        "WIFI_CONN_FAIL",            // F_MAIN_S_WIFI_CONN_FAIL
+        "WIFI_OFFLINE",              // F_MAIN_S_WIFI_OFFLINE
+        "RTC_DETECT",                // F_MAIN_S_RTC_DETECT
+        "RTC_DETECT_CLK",            // F_MAIN_S_RTC_DETECT_CLK
+        "MENU",                      // F_MAIN_S_MENU
+        "MENU_SELECT",               // F_MAIN_S_MENU_SELECT
+        "MENU_WIFI",                 // F_MAIN_S_MENU_WIFI
+        "MENU_SLEEP_MODE",           // F_MAIN_S_MENU_SLEEP_MODE
+        "MENU_ALARM",                // F_MAIN_S_MENU_ALARM
+        "MENU_UNWIND",               // F_MAIN_S_MENU_UNWIND
+        "MENU_VOLUME",               // F_MAIN_S_MENU_VOLUME
+        "MENU_BRIGHTNESS",           // F_MAIN_S_MENU_BRIGHTNESS
+        "MENU_SET_TIME",             // F_MAIN_S_MENU_SET_TIME
     };
     return (state < sizeof(names)/sizeof(names[0]) && names[state]) ? names[state] : "UNKNOWN";
 }
@@ -83,26 +92,23 @@ static const char* fsm_event_to_str(uint8_t event) {
     if (event == F_MAIN_E_TIMEOUT) return "TIMEOUT";
     
     static const char* names[] = {
-        //找人
-        [F_MAIN_E_INIT] = "INIT",
-        [F_MAIN_E_ANIM_PLAY_SUC] = "ANIM_PLAY_SUC",
-        [F_MAIN_E_LIDAR_FIND] = "LIDAR_FIND",
-        [F_MAIN_E_LIDAR_UPDATE] = "LIDAR_UPDATE",
-        [F_MAIN_E_LIDAR_NOT_FOUND] = "LIDAR_NOT_FOUND",
-        [F_MAIN_E_DEV_MOVE] = "DEV_MOVE",
-        //wifi
-        [F_MAIN_E_WIFI_CMD_TRIG] = "WIFI_CMD_TRIG",
-        [F_MAIN_E_WIFI_C_CONN] = "WIFI_C_CONN",
-        [F_MAIN_E_WIFI_C_SUC] = "WIFI_C_SUC",
-        [F_MAIN_E_WIFI_C_FAIL] = "WIFI_C_FAIL",
-        [F_MAIN_E_WIFI_C_UNCFG] = "WIFI_C_UNCFG",
-        //rtc
-        [F_MAIN_E_RTC_EXIST] = "RTC_EXIST",
-        [F_MAIN_E_RTC_NOT_EXIST] = "RTC_NOT_EXIST",
-        //物理按键
-        [F_MAIN_E_BTN_CLICKED] = "BTN_CLICKED",
-        [F_MAIN_E_BTN_L_CLICKED] = "BTN_L_CLICKED",
-        [F_MAIN_E_KNOB_CW] = "KNOB_CW",
+        "INIT",                      // F_MAIN_E_INIT
+        "ANIM_PLAY_SUC",             // F_MAIN_E_ANIM_PLAY_SUC
+        "LIDAR_FIND",                // F_MAIN_E_LIDAR_FIND
+        "LIDAR_UPDATE",              // F_MAIN_E_LIDAR_UPDATE
+        "LIDAR_NOT_FOUND",           // F_MAIN_E_LIDAR_NOT_FOUND
+        "DEV_MOVE",                  // F_MAIN_E_DEV_MOVE
+        "WIFI_CMD_TRIG",             // F_MAIN_E_WIFI_CMD_TRIG
+        "WIFI_C_CONN",               // F_MAIN_E_WIFI_C_CONN
+        "WIFI_C_SUC",                // F_MAIN_E_WIFI_C_SUC
+        "WIFI_C_FAIL",               // F_MAIN_E_WIFI_C_FAIL
+        "WIFI_C_UNCFG",              // F_MAIN_E_WIFI_C_UNCFG
+        "RTC_EXIST",                 // F_MAIN_E_RTC_EXIST
+        "RTC_NOT_EXIST",             // F_MAIN_E_RTC_NOT_EXIST
+        "BTN_CLICKED",               // F_MAIN_E_BTN_CLICKED
+        "BTN_L_CLICKED",             // F_MAIN_E_BTN_L_CLICKED
+        "KNOB_CW",                   // F_MAIN_E_KNOB_CW
+        "TIME",                      // F_MAIN_E_TIME
     };
     return (event < sizeof(names)/sizeof(names[0]) && names[event]) ? names[event] : "UNKNOWN";
 }
