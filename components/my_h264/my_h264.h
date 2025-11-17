@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 typedef void (*my_h264_callback_t)(const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context);
+typedef void (*my_h264_done_callback_t)(void *context);
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,7 +21,7 @@ typedef enum {
 
 #define MY_H264_WAIT_FOREVER (0xFFFFFFFFU)
 
-void my_h264_init(my_h264_callback_t callback, void *context);
+void my_h264_init(my_h264_callback_t callback, void *context, my_h264_done_callback_t done_callback, void *done_context);
 
 int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms);
 

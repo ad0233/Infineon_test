@@ -180,7 +180,13 @@ extern "C" void app_main()
     my_lcd_init();
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
         my_lcd_draw_rgb565(reinterpret_cast<const uint16_t *>(rgb565_buf), rgb565_buf_len / 2);
-    }, NULL);
+    }, NULL, [](void *context) {
+        ESP_LOGI(TAG, "my_h264_playback_done");
+        lvgl_port_resume();
+        my_lvgl_force_refresh();
+        print_mem_info();
+        fsm_main_event_trig(F_MAIN_E_ANIM_PLAY_SUC, nullptr);
+    }, nullptr);
     my_h264_set_fps(24);
 
     my_ui_network_guide();
@@ -519,6 +525,12 @@ void encoder_test(void *arg)
                 fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, nullptr);
                 break;
             case RE_ET_CHANGED:
+            if (e.diff > 0)
+            {
+                /* code */
+            }
+            // fsm_main_event_trig(F_MAIN_E_TURN, (void *)(&e.diff));
+            
                 break;
             default:
                 break;

@@ -37,6 +37,8 @@ static QueueHandle_t s_rgb_free_queue = NULL;
 static EventGroupHandle_t s_playback_event_group = NULL;
 static my_h264_callback_t s_callback = NULL;
 static void *s_context = NULL;
+static my_h264_done_callback_t s_done_callback = NULL;
+static void *s_done_context = NULL;
 
 typedef struct {
     uint8_t *buf;
@@ -104,10 +106,12 @@ static TickType_t wait_timeout_to_ticks(uint32_t timeout_ms)
     return pdMS_TO_TICKS(timeout_ms);
 }
 
-void my_h264_init(my_h264_callback_t callback, void *context)
+void my_h264_init(my_h264_callback_t callback, void *context, my_h264_done_callback_t done_callback, void *done_context)
 {
     s_callback = callback;
     s_context = context;
+    s_done_callback = done_callback;
+    s_done_context = done_context;
     h264_queue = xQueueCreate(1, sizeof(esp_h264_dec_in_frame_t));
     s_rgb_ready_queue = xQueueCreate(RGB565_BUFFER_COUNT, sizeof(rgb565_frame_t));
     s_rgb_free_queue = xQueueCreate(RGB565_BUFFER_COUNT, sizeof(uint8_t *));
@@ -418,6 +422,9 @@ static void playback_thread(void *arg)
                 has_last_wake_time = false;
                 if (s_playback_event_group != NULL) {
                     xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+                }
+                if (s_done_callback != NULL) {
+                    s_done_callback(s_done_context);
                 }
                 continue;
             }
