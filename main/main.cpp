@@ -204,7 +204,7 @@ extern "C" void app_main()
         ESP_LOGE(TAG, "fsm_main_init failed");
         vTaskDelete(nullptr);
     }
-    my_ble_init();
+    my_ble_init(NULL);  // 使用默认名称，或传入自定义名称
     my_wifi_init();
     // my_wifi_connect("303", "Qq13543826488.");
     

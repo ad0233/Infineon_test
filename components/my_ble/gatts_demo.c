@@ -47,7 +47,9 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
 #define GATTS_DESCR_UUID_TEST_A     0x3333
 #define GATTS_NUM_HANDLE_TEST_A     4
 
-static char test_device_name[ESP_BLE_ADV_NAME_LEN_MAX] = "Lunawake-12345";
+// 蓝牙名称缓冲区，至少 14 字节（13 字符 + '\0'）
+// ESP_BLE_ADV_NAME_LEN_MAX 通常为 29，足够支持 13 字符
+static char test_device_name[ESP_BLE_ADV_NAME_LEN_MAX] = {0};
 
 #define TEST_MANUFACTURER_DATA_LEN  17
 
@@ -567,7 +569,7 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
     } while (0);
 }
 
-void my_ble_init(void)
+void my_ble_init(const char *device_name)
 {
     esp_err_t ret;
 
@@ -579,9 +581,26 @@ void my_ble_init(void)
     }
     ESP_ERROR_CHECK( ret );
 
-    #if CONFIG_EXAMPLE_CI_PIPELINE_ID
-    memcpy(test_device_name, esp_bluedroid_get_example_name(), ESP_BLE_ADV_NAME_LEN_MAX);
-    #endif
+    // 设置设备名称，最多支持 13 个字符
+    if (device_name != NULL && strlen(device_name) > 0) {
+        size_t name_len = strlen(device_name);
+        // 限制为 13 个字符（不含结束符）
+        if (name_len > 13) {
+            name_len = 13;
+            ESP_LOGW(GATTS_TAG, "Device name too long, truncated to 13 characters");
+        }
+        strncpy(test_device_name, device_name, name_len);
+        test_device_name[name_len] = '\0';
+        ESP_LOGI(GATTS_TAG, "BLE device name set to: %s (len: %zu)", test_device_name, name_len);
+    } else {
+        // 先设置临时默认名称，蓝牙初始化后再更新
+        #if CONFIG_EXAMPLE_CI_PIPELINE_ID
+        memcpy(test_device_name, esp_bluedroid_get_example_name(), ESP_BLE_ADV_NAME_LEN_MAX);
+        #else
+        strncpy(test_device_name, "Lunawake", 13);
+        test_device_name[13] = '\0';
+        #endif
+    }
 
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
 
@@ -609,13 +628,17 @@ void my_ble_init(void)
         return;
     }
 
-    // 根据MAC地址生成5位十六进制随机数作为设备名称后缀
-    const uint8_t *mac = esp_bt_dev_get_address();
-    if (mac != NULL) {
-        // 使用MAC后3字节计算5位十六进制数 (最大值0xFFFFF)
-        uint32_t suffix = ((mac[3] << 16) | (mac[4] << 8) | mac[5]) & 0xFFFFF;
-        snprintf(test_device_name, ESP_BLE_ADV_NAME_LEN_MAX, "Lunawake-%05lX", suffix);
-        ESP_LOGI(GATTS_TAG, "BLE device name: %s", test_device_name);
+    // 如果使用默认名称，根据MAC地址生成完整名称
+    if (device_name == NULL || strlen(device_name) == 0) {
+        #ifndef CONFIG_EXAMPLE_CI_PIPELINE_ID
+        const uint8_t *mac = esp_bt_dev_get_address();
+        if (mac != NULL) {
+            uint32_t suffix = ((mac[3] << 16) | (mac[4] << 8) | mac[5]) & 0xFFFFF;
+            snprintf(test_device_name, 14, "LW-%05lX", suffix);  // 限制为 13 字符
+            test_device_name[13] = '\0';
+            ESP_LOGI(GATTS_TAG, "BLE device name (default): %s", test_device_name);
+        }
+        #endif
     }
 
     ret = esp_ble_gatts_register_callback(gatts_event_handler);

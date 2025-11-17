@@ -9,7 +9,12 @@ extern "C" {
 
 typedef void (*ble_data_recv_callback_t)(const uint8_t *data, uint16_t len, void *context);
 
-void my_ble_init(void);
+/**
+ * @brief 初始化蓝牙
+ * @param device_name 设备名称，最多支持 13 个字符（不含结束符）
+ * @note 如果 device_name 为 NULL 或空字符串，将使用默认名称
+ */
+void my_ble_init(const char *device_name);
 void my_ble_register_recv_callback(ble_data_recv_callback_t callback, void *context);
 int my_ble_send_data(const uint8_t *data, uint16_t len, uint32_t timeout_ms);
 
