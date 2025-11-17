@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "my_lidar.h"  // 包含完整的类型定义
 
 // ============================================================================
 // R60ABD1 毫米波雷达协议定义（旧雷达）
@@ -94,6 +95,21 @@ bool r60abd1_query_human_motion(void);
 bool r60abd1_set_human_switch(bool enable);
 bool r60abd1_set_respiratory_switch(bool enable);
 bool r60abd1_set_heart_rate_switch(bool enable);
+
+// 回调函数设置
+void r60abd1_set_human_presence_callback(radar_human_callback_t callback);
+void r60abd1_set_human_movement_callback(radar_human_callback_t callback);
+void r60abd1_set_respiratory_callback(radar_respiratory_callback_t callback);
+void r60abd1_set_heart_rate_callback(radar_heart_rate_callback_t callback);
+
+// 状态查询
+bool r60abd1_is_connected(void);
+
+// 数据获取
+bool r60abd1_get_human_data(radar_human_data_t *data);
+bool r60abd1_get_respiratory_data(radar_respiratory_data_t *data);
+bool r60abd1_get_heart_rate_data(radar_heart_rate_data_t *data);
+bool r60abd1_get_product_info(radar_product_info_t *info);
 
 #ifdef __cplusplus
 }

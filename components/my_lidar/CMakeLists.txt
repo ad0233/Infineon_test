@@ -2,7 +2,7 @@ idf_component_register(
     SRCS
         ./my_lidar.c
         ./my_lidar_airtouch.c
-        # ./my_lidar_r60abd1.c  # R60ABD1实现待迁移
+        ./my_lidar_r60abd1.c
     INCLUDE_DIRS
         .
     REQUIRES
