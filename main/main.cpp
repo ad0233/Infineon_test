@@ -319,14 +319,12 @@ extern "C" void app_main()
     // 启动雷达监测（包含所有开关设置）
     my_radar_start();
     
-    // 获取蓝牙MAC地址（无冒号）
-    std::string mac_str;
-    const char *mac_no_colon = my_ble_get_mac(false);
-    if (mac_no_colon) {
-        mac_str = mac_no_colon;
+    const char *device_id = NULL;
+    const struct iot_config *iot_cfg = my_nvs_get_iot_config();
+    if (iot_cfg && strlen(iot_cfg->thing_name) > 0) {
+        device_id = iot_cfg->thing_name;
     }
-    
-    my_ui_generate_qr_code("https://lunawake.ai", "lunawake", "test", mac_str.c_str());
+    my_ui_generate_qr_code("https://lunawake.ai", device_id);
 
     xTaskCreate([](void *arg) {
         // while(esp_log_timestamp() < 3000) {

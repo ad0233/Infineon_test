@@ -100,7 +100,9 @@ void my_ui_clock_set_emoji(uint8_t emoji);
 void my_ui_clock_show_alarm(uint8_t hour, uint8_t min);
 
 // 二维码相关函数
-void my_ui_generate_qr_code(const char* url, const char* id, const char* name, const char* mac);
+// 生成二维码，格式: {url}?sn={device_id}
+// device_id 从 iot_config 的 thing_name 获取，如果没有则使用 MAC 地址
+void my_ui_generate_qr_code(const char* url, const char* device_id);
 void my_ui_clock_show_no_alarm(void);
 void my_ui_in_funtion();
 void my_ui_function_menu_up();
