@@ -216,7 +216,7 @@ extern "C" void app_main()
 
     print_mem_info();
 
-    my_wifi_connect("C301", "1124861985");
+    // my_wifi_connect("C301", "1124861985");
 
     esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
     esp_netif_sntp_init(&config);
@@ -273,14 +273,14 @@ extern "C" void app_main()
         t_shadow_get_acc,
         t_shadow_get_rej,
     };
-    my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
+    // my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
     
     print_mem_info();
 
     while(1) {
         radar_latest_data_t data;
         my_radar_get_latest_data(&data);
-        mqtt_publish_radar_data(&data, t_radar);
+        // mqtt_publish_radar_data(&data, t_radar);
         vTaskDelay(1000);
     }
 
