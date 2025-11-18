@@ -29,9 +29,11 @@ uint8_t fsm_clock_need_cfg(void);
 void fsm_main_uninit_playing(void *arg);
 
 //找人
+void fsm_main_lidar_find_boot(void *arg);
 void fsm_main_lidar_find_playing(void *arg);
 void fsm_main_find_someone(void *arg);
 void fsm_main_no_find_someone(void *arg);
+void fsm_main_enter_findperson(void *arg);
 
 void fsm_main_lidar_clock_update(void *arg);
 void fsm_main_lidar_find(void *arg);

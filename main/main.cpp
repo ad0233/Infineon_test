@@ -181,11 +181,13 @@ extern "C" void app_main()
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
         my_lcd_draw_rgb565(reinterpret_cast<const uint16_t *>(rgb565_buf), rgb565_buf_len / 2);
     }, NULL, [](void *context) {
-        ESP_LOGI(TAG, "my_h264_playback_done");
+        ESP_LOGI(TAG, "my_h264_playback_done, current state: %s", fsm_main_get_current_state_str());
         lvgl_port_resume();
         my_lvgl_force_refresh();
         print_mem_info();
+        ESP_LOGI(TAG, "Triggering F_MAIN_E_ANIM_PLAY_SUC event");
         fsm_main_event_trig(F_MAIN_E_ANIM_PLAY_SUC, nullptr);
+        ESP_LOGI(TAG, "After trigger, current state: %s", fsm_main_get_current_state_str());
     }, nullptr);
     my_h264_set_fps(24);
 
@@ -214,6 +216,13 @@ extern "C" void app_main()
     // xTaskCreate(rust_task, "rust_task", 8 * 1024, NULL, 5, NULL);
 
     print_mem_info();
+
+    // 触发状态机初始化事件，启动开机动画
+    xTaskCreate([](void *arg) {
+        vTaskDelay(100 / portTICK_PERIOD_MS);  // 短暂延迟确保所有初始化完成
+        fsm_main_event_trig(F_MAIN_E_INIT, nullptr);
+        vTaskDelete(nullptr);
+    }, "init_fsm_task", 1024 * 4, NULL, 5, NULL);
 
     return;
 }
@@ -270,14 +279,13 @@ void encoder_test(void *arg)
             case RE_ET_BTN_LONG_PRESSED:
                 fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, nullptr);
                 break;
-            case RE_ET_CHANGED:
-            if (e.diff > 0)
-            {
-                /* code */
-            }
-            // fsm_main_event_trig(F_MAIN_E_TURN, (void *)(&e.diff));
-            
-                break;
+            // case RE_ET_CHANGED:
+            // if (e.diff > 0)
+            // {
+                
+            // }
+            // // fsm_main_event_trig(F_MAIN_E_TURN, (void *)(&e.diff));
+            //     break; 
             default:
                 break;
         }

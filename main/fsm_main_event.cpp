@@ -16,55 +16,38 @@
 
 // ⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠
 // ⚠不能在这里的函数使用fsm_event_handle ⚠
-// ⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠
-// 静态变量：当前状态、定时器句柄（仅创建一次）
+// ⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠
+
+// 静态变量：当前状态、时间戳
 static enum fm_human_find_conn_state s_cur_state = FM_H_F_FAI;
-static TimerHandle_t s_timeout_timer = NULL;
+static uint32_t s_fail_start_time = 0;  // 失败状态开始的时间戳（ms）
+#define FIND_TIMEOUT_MS 15000  // 15秒超时
 
-
-// 定时器回调函数：15秒超时后触发，切换为超时状态
-static void timeout_cb(TimerHandle_t xTimer) {
-    s_cur_state = FM_H_F_TOUT;
-}
-
-
-// 初始化定时器（程序启动时调用一次即可）
-static void init_timer() {
-    if (s_timeout_timer == NULL) {
-        // 创建15秒单次触发定时器（超时后只回调一次）
-        s_timeout_timer = xTimerCreate(
-            "find_timeout",       // 定时器名称（调试用）
-            pdMS_TO_TICKS(15000), // 15秒（转换为FreeRTOS节拍数）
-            pdFALSE,              // 单次触发（不是周期性）
-            NULL,                 // 无参数
-            timeout_cb            // 超时回调函数
-        );
-    }
-}
-
-
-// 获取当前找人状态（含超时逻辑）
 enum fm_human_find_conn_state my_human_find_get_state(void) {
-    init_timer(); // 确保定时器已初始化
-
-    // 1. 生成随机结果（>10为成功，否则失败）
     int rand_val = rand() % 20;
+    ESP_LOGI(TAG, "I=%d",rand_val);
     uint8_t is_success = (rand_val > 10) ? 1 : 0;
 
-    // 2. 处理状态和定时器
     if (is_success) {
-        // 成功：更新状态，停止定时器（避免超时误触发）
+        // 成功：
         s_cur_state = FM_H_F_SUC;
-        xTimerStop(s_timeout_timer, 0); // 0表示不等待立即停止
+        s_fail_start_time = 0;  // 清除时间戳
     } else {
-        // 失败：如果当前不是失败/超时状态，启动定时器
+        // 失败
+        uint32_t current_time = esp_log_timestamp();
+        
         if (s_cur_state != FM_H_F_FAI && s_cur_state != FM_H_F_TOUT) {
+            // 刚进入失败状态，记录时间戳
             s_cur_state = FM_H_F_FAI;
-            xTimerStart(s_timeout_timer, 0); // 启动15秒定时器
+            s_fail_start_time = current_time;
+        } else if (s_cur_state == FM_H_F_FAI) {
+            // 已在失败状态，检查是否超时
+            if (current_time - s_fail_start_time >= FIND_TIMEOUT_MS) {
+                s_cur_state = FM_H_F_TOUT;
+            }
         }
-        // 若已在失败状态：定时器继续运行，超时后自动切为FM_H_F_TOUT
+        // 若已在超时状态：保持超时状态
     }
-
     return s_cur_state;
 }
 
@@ -77,12 +60,13 @@ uint8_t fm_has_h_fd_state(void) {
     //     ESP_LOGI(TAG, "wifi not configured");
     //     return FM_W_N_CFG;
     // }
-    switch (my_human_find_get_state())
+    uint16_t i  = FM_H_F_FAI;
+    switch (i)
     {
     case FM_H_F_SUC:
         ESP_LOGI(TAG, "human_find is successs");
         return FM_H_F_SUC;
-        break;
+            break;
     case FM_H_F_FAI:
         ESP_LOGI(TAG, "human_find_failed");
         return FM_H_F_FAI;
@@ -141,9 +125,16 @@ void fsm_main_lidar_clock_update(void *arg) {
 void fsm_main_uninit_playing(void *arg){
     lvgl_port_stop();
     my_h264_start(MY_H264_ANIM_BRAND_MOTION2,100);
-    my_h264_start(MY_H264_ANIM_GO_UP,100);
+
     
 }
+//找人动画前
+void fsm_main_lidar_find_boot(void *arg){
+    lvgl_port_stop();
+    my_h264_start(MY_H264_ANIM_GO_UP,100);
+}
+
+
 //找人动画
 void fsm_main_lidar_find_playing(void *arg){
     lvgl_port_stop();
