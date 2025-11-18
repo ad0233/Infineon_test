@@ -54,6 +54,7 @@
 #include "fsm_main.h"
 #include "my_h264.h"
 #include "mqtt_protocol.h"
+#include "ble_protocol.h"
 
 // 时间调整函数 - 根据编码器变化调整时间
 static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
@@ -190,22 +191,28 @@ extern "C" void app_main()
         ESP_LOGE(TAG, "fsm_main_init failed");
         vTaskDelete(nullptr);
     }
+    print_mem_info();
     my_ui_generate_qr_code("https://lunawake.ai", iot_config_view->thing_name);
     my_ble_init(iot_config_view->thing_name);  // 使用默认名称，或传入自定义名称
+    print_mem_info();
+    ble_protocol_init();  // 初始化蓝牙协议解析（不启用发送任务）
+    print_mem_info();
     my_wifi_init();
+    print_mem_info();
     my_rtc_init();
+    print_mem_info();
     my_radar_init();
     my_radar_start();
 
-    gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
-    gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    // gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
+    // gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
+    // vTaskDelay(100 / portTICK_PERIOD_MS);
 
-    board_handle = audio_board_init();
-    audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
+    // board_handle = audio_board_init();
+    // audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
     
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-    gpio_set_level(PA_ENABLE_GPIO, 0); // Enable PA
+    // vTaskDelay(100 / portTICK_PERIOD_MS);
+    // gpio_set_level(PA_ENABLE_GPIO, 0); // Enable PA
 
     print_mem_info();
 

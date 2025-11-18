@@ -149,6 +149,7 @@ void pre_encrypted_ota_task(void *pvParameter)
         OTA_TASK_EXIT();
     }
 
+    
     while (1) {
         err = esp_https_ota_perform(https_ota_handle);
         if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {

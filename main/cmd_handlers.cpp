@@ -336,7 +336,7 @@ int cmd_handle_private_key_config(cJSON *data) {
 struct test_conn_ota_params {
     char ssid[32];
     char password[64];
-    char ota_url[256];
+    char ota_url[512];
 };
 
 // 测试连接并OTA更新任务
