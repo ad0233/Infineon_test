@@ -169,26 +169,32 @@ static struct StateTable fsm_user_table[] = {
     {fm_has_h_fd_state   ,FM_H_F_FAI    ,F_MAIN_E_ANIM_PLAY_SUC      , F_MAIN_S_FINDPERSONC_ANIM    ,F_MAIN_S_FINDPERSONC_ANIM       ,0  ,false    ,fsm_main_lidar_find_playing},//没找到人继续找人动画
     {fm_has_h_fd_state   ,FM_H_F_SUC    ,F_MAIN_E_ANIM_PLAY_SUC      ,F_MAIN_S_FINDPERSONC_ANIM     ,F_MAIN_S_FINDSUC_ANIM     ,0  ,false    ,   fsm_main_find_someone },//找到人动画
     {fm_has_h_fd_state   ,FM_H_F_TOUT    ,F_MAIN_E_ANIM_PLAY_SUC   ,F_MAIN_S_FINDPERSONC_ANIM     ,F_MAIN_S_FINDFAIL_ANIM    ,0  ,false    ,  fsm_main_no_find_someone},//超时动画   
-    // //找人动画结束
-    // {nullptr             ,0            ,F_MAIN_E_ANIM_PLAY_SUC     ,F_MAIN_S_FINDSUC_ANIM   ,F_MAIN_S_FINDSUC           ,0  ,false    ,    fsm_main_lidar_find_suc }, //成功找人动画结束
-    // {nullptr             ,0            ,F_MAIN_E_ANIM_PLAY_SUC     ,F_MAIN_S_FINDFAIL_ANIM  ,F_MAIN_S_FINDFAIL          ,0  ,false    ,    fsm_main_lidar_find_fail },//找不人动画结束
-    // {nullptr             ,0            ,F_MAIN_E_DEV_MOVE          ,F_MAIN_S_FINDFAIL       ,F_MAIN_S_FINDPERSON        ,0  ,false    ,     fsm_main_lidar_find_playing},//移动设备重新找人
+    //找人动画结束
+    {nullptr             ,0            ,F_MAIN_E_ANIM_PLAY_SUC     ,F_MAIN_S_FINDSUC_ANIM   ,F_MAIN_S_FINDSUC           ,0  ,false    ,    fsm_main_lidar_find_suc }, //成功找人动画结束
+    {nullptr             ,0            ,F_MAIN_E_ANIM_PLAY_SUC     ,F_MAIN_S_FINDFAIL_ANIM  ,F_MAIN_S_FINDFAIL          ,0  ,false    ,    fsm_main_lidar_find_fail },//找不人动画结束
+    {nullptr             ,0            ,F_MAIN_E_DEV_MOVE          ,F_MAIN_S_FINDFAIL       ,F_MAIN_S_FINDPERSON        ,0  ,false    ,     fsm_main_lidar_find_playing},//移动设备重新找人
     // //找人---网络
     // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED        , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_DETECT     ,0    ,false        , nullptr},  //找人成功跳转检测wifi
     // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED       , F_MAIN_S_FINDFAIL         , F_MAIN_S_WIFI_DETECT    ,0    ,false         ,nullptr },  //找人失败跳转检测wifi
 
-    // { fm_has_w_c_state           ,FM_W_N_CFG   ,F_MAIN_E_WIFI_C_UNCFG    , F_MAIN_S_WIFI_DETECT     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         ,fsm_main_wifi_guide },  //未配置去二维码
-    // { fm_has_w_c_state           ,FM_W_CONN    ,F_MAIN_E_WIFI_C_CONN     , F_MAIN_S_WIFI_DETECT     , F_MAIN_S_WIFI_CONN         ,0   ,false          ,fsm_main_wifi_connecting },  //连接中
-    // { fm_has_w_c_state           ,FM_W_SUC     ,F_MAIN_E_WIFI_C_SUC      , F_MAIN_S_WIFI_DETECT     , F_MAIN_S_CLOCK             ,0    ,false          , fsm_main_to_clock},    //连接成功去主页面
-    // { fm_has_w_c_state           ,FM_W_FAI     ,F_MAIN_E_WIFI_C_FAIL     , F_MAIN_S_WIFI_DETECT     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         , fsm_main_wifi_guide},        //连接失败去二维码
-    // //连接状态判断
-    // { nullptr           ,0           ,F_MAIN_E_WIFI_C_SUC      , F_MAIN_S_WIFI_CONN         , F_MAIN_S_WIFI_CONN_SUC    ,0    ,false         , fsm_main_wifi_conn_suc}, //连接成功
-    //  { nullptr           ,0         ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_WIFI_CONN_SUC       , F_MAIN_S_CLOCK            ,0    ,false         ,fsm_main_to_clock }, //连接成功去时钟
+    { fm_has_w_c_state           ,FM_W_N_CFG   ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_FINDSUC     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         ,fsm_main_wifi_guide },  //未配置去二维码
+    { fm_has_w_c_state           ,FM_W_CONN    ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_FINDSUC     , F_MAIN_S_WIFI_CONN         ,0   ,false          ,fsm_main_wifi_connecting },  //连接中
+    { fm_has_w_c_state           ,FM_W_SUC     ,F_MAIN_E_BTN_CLICKED      , F_MAIN_S_FINDSUC     , F_MAIN_S_CLOCK             ,0    ,false          , fsm_main_to_clock},    //连接成功去主页面
+    { fm_has_w_c_state           ,FM_W_FAI     ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_FINDSUC     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         , fsm_main_wifi_guide},        //连接失败去二维码
+
+    
+    { fm_has_w_c_state           ,FM_W_N_CFG   ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_FINDFAIL     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         ,fsm_main_wifi_guide },           //未配置去二维码
+    { fm_has_w_c_state           ,FM_W_CONN    ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_FINDFAIL     , F_MAIN_S_WIFI_CONN         ,0   ,false          ,fsm_main_wifi_connecting },     //连接中
+    { fm_has_w_c_state           ,FM_W_SUC     ,F_MAIN_E_BTN_CLICKED      , F_MAIN_S_FINDFAIL     , F_MAIN_S_CLOCK             ,0    ,false          , fsm_main_to_clock},          //连接成功去主页面
+    { fm_has_w_c_state           ,FM_W_FAI     ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_FINDFAIL     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         , fsm_main_wifi_guide},           //连接失败去二维码
+    // //连接状态判断  -- wifi弄好才能弄这个  不是状态位置改变不了
+    // { nullptr           ,0           ,F_MAIN_E_WIFI_C_SUC      , F_MAIN_S_WIFI_CONN         , F_MAIN_S_WIFI_CONN_SUC    ,0    ,false         , fsm_main_wifi_conn_suc}, //连接中---连接成功
+    //  { nullptr           ,0         ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_WIFI_CONN_SUC       , F_MAIN_S_CLOCK            ,0    ,false         ,fsm_main_to_clock }, //连接成功-----时钟
     // { nullptr           ,0           ,F_MAIN_E_WIFI_C_FAIL     , F_MAIN_S_WIFI_CONN         , F_MAIN_S_WIFI_GUIDE       ,0    ,false         , fsm_main_wifi_guide}, //连接失败去二维码
-    // //二维码
-    // { nullptr           ,0            ,F_MAIN_E_WIFI_CMD_TRIG   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_WIFI_CONN        ,0    ,false          , fsm_main_wifi_connecting},   //二维码去连接中
-    // { nullptr           ,0            ,F_MAIN_E_BTN_L_CLICKED   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_RTC_DETECT       ,0    ,false          , nullptr},  //二维码去rtc
-    // //rtc
+    //二维码
+    { nullptr           ,0            ,F_MAIN_E_WIFI_CMD_TRIG   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_WIFI_CONN        ,0    ,false          , fsm_main_wifi_connecting},   //二维码去连接中
+    { nullptr           ,0            ,F_MAIN_E_BTN_L_CLICKED   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_RTC_DETECT       ,0    ,false          , nullptr},  //二维码去rtc
+    //rtc
     // { nullptr           ,0          ,F_MAIN_E_RTC_EXIST       , F_MAIN_S_RTC_DETECT         , F_MAIN_S_UNINIT_PLAYING   ,0    ,false        ,nullptr },//rtc 有去主页面
     // { nullptr           ,0          ,F_MAIN_E_RTC_NOT_EXIST   , F_MAIN_S_RTC_DETECT         , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false        , nullptr},//rtc 无去配置时间
     // { nullptr           ,0            ,F_MAIN_E_KNOB_CW         , F_MAIN_S_RTC_DETECT_CLK   , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false     ,nullptr },//rtc修改时间

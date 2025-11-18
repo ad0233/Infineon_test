@@ -182,9 +182,9 @@ extern "C" void app_main()
         my_lcd_draw_rgb565(reinterpret_cast<const uint16_t *>(rgb565_buf), rgb565_buf_len / 2);
     }, NULL, [](void *context) {
         ESP_LOGI(TAG, "my_h264_playback_done, current state: %s", fsm_main_get_current_state_str());
-        // lvgl_port_resume();
-        // my_lvgl_force_refresh();
-        // print_mem_info();
+        lvgl_port_resume();
+        my_lvgl_force_refresh();
+        print_mem_info();
         ESP_LOGI(TAG, "Triggering F_MAIN_E_ANIM_PLAY_SUC event");
         fsm_main_event_trig(F_MAIN_E_ANIM_PLAY_SUC, nullptr);
         ESP_LOGI(TAG, "After trigger, current state: %s", fsm_main_get_current_state_str());
