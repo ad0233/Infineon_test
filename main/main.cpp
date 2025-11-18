@@ -53,6 +53,7 @@
 
 #include "fsm_main.h"
 #include "my_h264.h"
+#include "mqtt_protocol.h"
 
 // 时间调整函数 - 根据编码器变化调整时间
 static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
@@ -162,6 +163,12 @@ extern "C" void app_main()
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
 
+    auto iot_config_view = my_nvs_get_iot_config_view();
+    if (iot_config_view == nullptr) {
+        ESP_LOGE(TAG, "Failed to get iot config view");
+        vTaskDelete(nullptr);
+    }
+    
     rust_lib_init();
     my_lcd_init();
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
@@ -183,9 +190,12 @@ extern "C" void app_main()
         ESP_LOGE(TAG, "fsm_main_init failed");
         vTaskDelete(nullptr);
     }
-    my_ble_init(NULL);  // 使用默认名称，或传入自定义名称
+    my_ui_generate_qr_code("https://lunawake.ai", iot_config_view->thing_name);
+    my_ble_init(iot_config_view->thing_name);  // 使用默认名称，或传入自定义名称
     my_wifi_init();
     my_rtc_init();
+    my_radar_init();
+    my_radar_start();
 
     gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
@@ -218,11 +228,6 @@ extern "C" void app_main()
     tzset();
     localtime_r(&now, &timeinfo);
 
-    auto iot_config_view = my_nvs_get_iot_config_view();
-    if (iot_config_view == nullptr) {
-        ESP_LOGE(TAG, "Failed to get iot config view");
-        vTaskDelete(nullptr);
-    }
     // 按固定模板由 thing_name 生成订阅主题
     static char t_req[128];
     static char t_resp[128];
@@ -268,12 +273,7 @@ extern "C" void app_main()
     while(1) {
         radar_latest_data_t data;
         my_radar_get_latest_data(&data);
-        char *json_str = nullptr;
-        uint32_t utc_timestamp = get_utc_timestamp_s();
-        my_radar_data_to_json(&data, utc_timestamp, &json_str);
-        my_mqtt_publish(t_radar, json_str, strlen(json_str), 0, 0);
-        // ESP_LOGI("RADAR", "publish: %s", json_str);
-        free(json_str);
+        mqtt_publish_radar_data(&data, t_radar);
         vTaskDelay(1000);
     }
 
