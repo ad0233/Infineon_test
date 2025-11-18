@@ -16,14 +16,31 @@ enum fm_wifi_conn_state {
     FM_W_SUC,
     FM_W_FAI,
 };
+enum fm_rtc_conn_state {
+    FM_RTC_EXIST,
+    FM_RTC_NO_EXIST,
+};
 
 enum fm_human_find_conn_state {
     FM_H_F_SUC,
     FM_H_F_FAI,
     FM_H_F_TOUT,
 };
+
+enum fsm_clock_need_cfg {
+    FM_MEMU_WIFI_SC,
+    FM_MEMU_WIFI_FA,
+    FM_MEMU_WAKE_MOD,
+    FM_MEMU_ALARM,
+    FM_MEMU_UNWIND,
+    FM_MEMU_VOL,
+    FM_MEMU_SC_BR,
+    FM_MEMU_SETTIME,
+};
 uint8_t fm_has_h_fd_state(void); //雷达找人检测
 uint8_t fm_has_w_c_state(void);//wifi检测
+uint8_t fm_has_rtc_state(void); //RTC检测
+uint8_t fm_has_memu_state(void); //菜单状态检测
 uint8_t fsm_clock_need_cfg(void);
 //开机
 void fsm_main_uninit_playing(void *arg);
@@ -50,7 +67,20 @@ void fsm_main_wifi_forget(void *arg);
 void fsm_main_in_offline(void *arg);
 
 void fsm_main_to_clock(void *arg);
-void fsm_main_menu_turn(void *arg);
+void fsm_main_set_time(void *arg);
+void fsm_main_rtc_adjust_time(void *arg);
+void fsm_main_rtc_save_and_exit(void *arg);
+
+void fsm_main_in_memu(void *arg);
+void fsm_menu_next_item(void *arg);
+void fsm_main_in_wifi_sc(void *arg);
+void fsm_main_in_wifi_fa(void *arg);
+void fsm_main_in_wake_mode(void *arg);
+void fsm_main_in_alarm(void *arg);
+void fsm_main_in_unwind(void *arg);
+void fsm_main_in_volume(void *arg);
+void fsm_main_in_light(void *arg);
+void fsm_main_in_set_time(void *arg);
 
 enum fsm_main_event_enum {
     F_MAIN_E_INIT,              // 初始化事件

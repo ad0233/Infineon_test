@@ -36,9 +36,8 @@ enum fsm_main_state_enum {
     F_MAIN_S_RTC_DETECT_CLK,     // RTC时间
     //菜单
     F_MAIN_S_MENU,               //菜单
-    F_MAIN_S_MENU_SELECT,        //菜单选择
 
-    F_MAIN_S_MENU_WIFI,        //设置wifi页面
+
     F_MAIN_S_MENU_SLEEP_MODE,   //睡眠模式页面
     F_MAIN_S_MENU_ALARM,        //闹钟页面
     F_MAIN_S_MENU_UNWIND,        //选择歌曲页面
@@ -192,34 +191,34 @@ static struct StateTable fsm_user_table[] = {
     //  { nullptr           ,0         ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_WIFI_CONN_SUC       , F_MAIN_S_CLOCK            ,0    ,false         ,fsm_main_to_clock }, //连接成功-----时钟
     // { nullptr           ,0           ,F_MAIN_E_WIFI_C_FAIL     , F_MAIN_S_WIFI_CONN         , F_MAIN_S_WIFI_GUIDE       ,0    ,false         , fsm_main_wifi_guide}, //连接失败去二维码
     //二维码
-    { nullptr           ,0            ,F_MAIN_E_WIFI_CMD_TRIG   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_WIFI_CONN        ,0    ,false          , fsm_main_wifi_connecting},   //二维码去连接中
-    { nullptr           ,0            ,F_MAIN_E_BTN_L_CLICKED   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_RTC_DETECT       ,0    ,false          , nullptr},  //二维码去rtc
+    { nullptr           ,0                  ,F_MAIN_E_WIFI_CMD_TRIG   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_WIFI_CONN        ,0    ,false          , fsm_main_wifi_connecting},   //二维码去连接中
     //rtc
-    // { nullptr           ,0          ,F_MAIN_E_RTC_EXIST       , F_MAIN_S_RTC_DETECT         , F_MAIN_S_UNINIT_PLAYING   ,0    ,false        ,nullptr },//rtc 有去主页面
-    // { nullptr           ,0          ,F_MAIN_E_RTC_NOT_EXIST   , F_MAIN_S_RTC_DETECT         , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false        , nullptr},//rtc 无去配置时间
-    // { nullptr           ,0            ,F_MAIN_E_KNOB_CW         , F_MAIN_S_RTC_DETECT_CLK   , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false     ,nullptr },//rtc修改时间
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_RTC_DETECT_CLK   , F_MAIN_S_CLOCK             ,0    ,false        , nullptr},//rtc去主页面
-    // //主页面
+    { fm_has_rtc_state   ,FM_RTC_EXIST       ,F_MAIN_E_BTN_L_CLICKED    , F_MAIN_S_WIFI_GUIDE         , F_MAIN_S_CLOCK   ,0    ,false        ,fsm_main_to_clock },//二维码去 rtc 有主页面
+    { fm_has_rtc_state   ,FM_RTC_NO_EXIST   ,F_MAIN_E_BTN_L_CLICKED   , F_MAIN_S_WIFI_GUIDE         , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false        , fsm_main_set_time},//二维码去 rtc 无配置时间
+    { nullptr           ,0                  ,F_MAIN_E_KNOB_CW         , F_MAIN_S_RTC_DETECT_CLK   , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false           ,fsm_main_rtc_adjust_time },//rtc修改时间
+    { nullptr           ,0                  ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_RTC_DETECT_CLK   , F_MAIN_S_CLOCK             ,0    ,false          , fsm_main_rtc_save_and_exit},//rtc保存时间并去主页面
+    //主页面
     // { nullptr           ,0            ,F_MAIN_E_LIDAR_NOT_FOUND  , F_MAIN_S_CLOCK           , F_MAIN_S_CLOCK_AWAY        ,0    ,false        , nullptr},//主页面人走
     // { nullptr           ,0            ,F_MAIN_E_LIDAR_FIND      , F_MAIN_S_CLOCK_AWAY        , F_MAIN_S_CLOCK_BACK       ,0    ,false        , nullptr},//主页面人回---过度
-    // { nullptr           ,0            ,F_MAIN_E_LIDAR_FIND      , F_MAIN_S_CLOCK_BACK        , F_MAIN_S_CLOCK            ,0    ,false        , nullptr},//主页面 过度--人在 
-    // { nullptr           ,0            ,F_MAIN_E_KNOB_CW         , F_MAIN_S_CLOCK             , F_MAIN_S_MENU             ,0    ,false        , nullptr},//主页面 去菜单  
-    // //菜单
-    // { nullptr           ,0            ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU             , F_MAIN_S_MENU_SELECT       ,0    ,false        , nullptr},//菜单选择
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_SELECT      , F_MAIN_S_MENU_WIFI         ,0    ,false        , nullptr},//菜单选择wifi    
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_SELECT      , F_MAIN_S_MENU_SLEEP_MODE   ,0    ,false        , nullptr},//菜单选择唤醒模式 
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_SELECT      , F_MAIN_S_MENU_ALARM        ,0    ,false        , nullptr},//菜单选择闹钟
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_SELECT      , F_MAIN_S_MENU_UNWIND       ,0    ,false        , nullptr},//菜单选择歌曲选择
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_SELECT      , F_MAIN_S_MENU_VOLUME       ,0    ,false        , nullptr},//菜单选择声音
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_SELECT      , F_MAIN_S_MENU_BRIGHTNESS   ,0    ,false        , nullptr},//菜单选择亮度
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_SELECT      , F_MAIN_S_MENU_SET_TIME     ,0    ,false        , nullptr},//菜单选择设置时间  
-    // //wifi设置
-    // { nullptr           ,0            ,F_MAIN_E_WIFI_CMD_TRIG       , F_MAIN_S_MENU_SELECT      , F_MAIN_S_WIFI_DETECT     ,0    ,false          , nullptr},//wifi 检测（不知道F_MAIN_E_WIFI_CMD_TRIG 是否正确可能要更改）
-    // { nullptr           ,0            ,F_MAIN_E_TIME                , F_MAIN_S_WIFI_DETECT      , F_MAIN_S_WIFI_CONN_SUC     ,0   ,false          , nullptr},// 有wifi
-    // { nullptr           ,0            ,F_MAIN_E_TIME                , F_MAIN_S_WIFI_DETECT      , F_MAIN_S_WIFI_OFFLINE     ,0    ,false          , nullptr}, //无wifi 要重启配置wifi
-    // { nullptr           ,0            ,F_MAIN_E_BTN_L_CLICKED       , F_MAIN_S_WIFI_CONN_SUC    , F_MAIN_S_WIFI_OFFLINE     ,0    ,false          , nullptr},//手动关闭wifi
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_WIFI_DETECT      , F_MAIN_S_WIFI_OFFLINE     ,0    ,false          , nullptr},//有wifi 短按退回菜单
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_WIFI_CONN_SUC    , F_MAIN_S_WIFI_OFFLINE     ,0    ,false          , nullptr},//无wifi 短按退回菜单 
+    // { nullptr           ,0            ,F_MAIN_E_LIDAR_FIND      , F_MAIN_S_CLOCK_BACK        , F_MAIN_S_CLOCK            ,0      ,false        , nullptr},//主页面 过度--人在 
+    { nullptr           ,0              ,F_MAIN_E_KNOB_CW               , F_MAIN_S_CLOCK             , F_MAIN_S_MENU             ,0    ,false        , fsm_main_in_memu},//主页面 去菜单  
+    //菜单
+    { nullptr          ,0        ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU             , F_MAIN_S_MENU       ,0    ,false              , fsm_menu_next_item},//菜单选择
+    //wifi 设置
+    { fm_has_memu_state           ,FM_MEMU_WIFI_SC              ,F_MAIN_E_BTN_CLICKED           , F_MAIN_S_MENU             , F_MAIN_S_WIFI_CONN_SUC        ,0    ,false        , fsm_main_in_wifi_sc},//菜单---有wifi 根据wifi检测判断
+    { fm_has_memu_state           ,FM_MEMU_WIFI_FA              ,F_MAIN_E_BTN_CLICKED           , F_MAIN_S_MENU             , F_MAIN_S_WIFI_OFFLINE         ,0    ,false        , fsm_main_in_wifi_fa},//菜单--无wifi
+    { nullptr                     ,0                            ,F_MAIN_E_BTN_L_CLICKED       , F_MAIN_S_WIFI_CONN_SUC        , F_MAIN_S_WIFI_OFFLINE       ,0    ,false          , fsm_main_in_wifi_fa},//手动关闭wifi
+    { nullptr                     ,0                            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_WIFI_CONN_SUC       , F_MAIN_S_MENU             ,0    ,false          , fsm_main_in_memu},//有wifi 短按退回菜单
+    { nullptr                    ,0                             ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_WIFI_OFFLINE        , F_MAIN_S_MENU                ,0    ,false          , fsm_main_in_memu},//无wifi 短按退回菜单 
+    //唤醒模式
+    { fm_has_memu_state           ,FM_MEMU_WAKE_MOD            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_SLEEP_MODE   ,0    ,false    , fsm_main_in_wake_mode},//菜单选择唤醒模式
+
+    { fm_has_memu_state           ,FM_MEMU_ALARM            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_ALARM        ,0    ,false        , fsm_main_in_wake_mode},//菜单选择闹钟
+    { fm_has_memu_state           ,FM_MEMU_UNWIND            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_wake_mode},//菜单选择歌曲选择
+    { fm_has_memu_state           ,FM_MEMU_VOL            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_VOLUME       ,0    ,false         , fsm_main_in_wake_mode},//菜单选择声音
+    { fm_has_memu_state           ,FM_MEMU_SC_BR            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_BRIGHTNESS   ,0    ,false       , fsm_main_in_wake_mode},//菜单选择亮度
+    { fm_has_memu_state           ,FM_MEMU_SETTIME            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_SET_TIME     ,0    ,false     , fsm_main_in_wake_mode},//菜单选择设置时间  
+    
     //唤醒模式
     // { nullptr           ,0            ,F_MAIN_E_KNOB_CW         , F_MAIN_S_MENU_SLEEP_MODE    , F_MAIN_S_MENU_SLEEP_MODE     ,0    ,false          , nullptr},//唤醒模式 选择模式
     // { nullptr           ,0            ,F_MAIN_E_KNOB_CW         , F_MAIN_S_MENU_SLEEP_MODE    , F_MAIN_S_MENU_SLEEP_MODE     ,0    ,false          , nullptr},//唤醒模式 选择模式     
@@ -291,6 +290,7 @@ void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg) {
         break;
     case -1:
         // 找不到分支
+        ESP_LOGW(TAG, "fsm_main_event_trig %s,%s -> no match (err=-1)", fsm_event_to_str(event), last_state);
         break;
     case -2:
         ESP_LOGW(TAG, "fsm_main_event_trig sem trig");

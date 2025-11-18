@@ -275,17 +275,17 @@ void encoder_test(void *arg)
         {
             case RE_ET_BTN_CLICKED:
                 fsm_main_event_trig(F_MAIN_E_BTN_CLICKED, nullptr);
+                ESP_LOGI(TAG, "RE_ET_BTN_CLICKED");
                 break;
             case RE_ET_BTN_LONG_PRESSED:
                 fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, nullptr);
+                ESP_LOGI(TAG, "F_MAIN_E_BTN_L_CLICKED");
                 break;
-            // case RE_ET_CHANGED:
-            // if (e.diff > 0)
-            // {
-                
-            // }
-            // // fsm_main_event_trig(F_MAIN_E_TURN, (void *)(&e.diff));
-            //     break; 
+            case RE_ET_CHANGED:
+                // 传递旋钮变化量，正数=右旋(增加)，负数=左旋(减少)
+                ESP_LOGI(TAG, "RE_ET_CHANGED, diff: %" PRId32 ", current state: %s", e.diff, fsm_main_get_current_state_str());
+                fsm_main_event_trig(F_MAIN_E_KNOB_CW, (void *)(&e.diff));
+                break; 
             default:
                 break;
         }
