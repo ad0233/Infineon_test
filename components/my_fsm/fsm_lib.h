@@ -27,11 +27,11 @@ void fsm_deinit(fsm_handle_t handle);
 
 uint8_t fsm_get_current_state(fsm_handle_t handle);
 
-uint8_t fsm_event_handle(fsm_handle_t handle, uint8_t event,void *arg);
+int fsm_event_handle(fsm_handle_t handle, uint8_t event,void *arg);
 
 void fsm_user_set_table_timeout(fsm_handle_t handle, uint8_t state, uint16_t sec);
 
-void fsm_timeout_trig(fsm_handle_t handle);
+int fsm_timeout_trig(fsm_handle_t handle);
 
 #ifdef __cplusplus
 }

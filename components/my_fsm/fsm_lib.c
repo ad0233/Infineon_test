@@ -70,8 +70,8 @@ static int fsm_check_table(fsm_handle_t handle) {
     return 0;
 }
 
-void fsm_timeout_trig(fsm_handle_t handle) {
-    fsm_event_handle(handle, 255, (void*)(size_t)fsm_get_current_state(handle));
+int fsm_timeout_trig(fsm_handle_t handle) {
+    return fsm_event_handle(handle, 255, (void*)(size_t)fsm_get_current_state(handle));
 }
 
 void fsm_deinit(fsm_handle_t handle) {
@@ -88,7 +88,7 @@ static void inline fsmStateTransfer(fsm_handle_t handle, uint8_t state) {
 }
 
 /*事件处理*/
-uint8_t fsm_event_handle(fsm_handle_t handle, uint8_t event,void *arg) {
+int fsm_event_handle(fsm_handle_t handle, uint8_t event,void *arg) {
     struct StateTable* pActTable = handle->stateTable;
     void (*act_fun)() = NULL;  //函数指针初始化为空
     uint8_t next_state;
