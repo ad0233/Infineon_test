@@ -4,5 +4,5 @@ idf_component_register(
     INCLUDE_DIRS
         .
     REQUIRES
-        driver nvs_flash
+        driver nvs_flash json
 )

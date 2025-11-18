@@ -4,9 +4,5 @@ idf_component_register(
     INCLUDE_DIRS
         .
     REQUIRES
-        mqtt my_ble
-    EMBED_FILES
-        client_cert.crt
-        client_key.crt
-        root_ca.crt
+        main
 )

@@ -7,6 +7,8 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include <string.h>
+#include <time.h>
+#include <sys/time.h>
 
 static const char *TAG = "MY_UTILS";
 
@@ -351,5 +353,15 @@ esp_err_t my_thread_delete(TaskHandle_t xTaskToDelete)
 
     ESP_LOGI(TAG, "Task deleted and queued for cleanup");
     return ESP_OK;
+}
+
+uint32_t get_utc_timestamp_s(void)
+{
+    struct timeval tv;
+    if (gettimeofday(&tv, NULL) == 0) {
+        return (uint32_t)tv.tv_sec;
+    }
+    // 如果获取失败，返回0
+    return 0;
 }
 

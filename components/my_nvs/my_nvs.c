@@ -2,6 +2,7 @@
 
 
 #include <string.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include "nvs_flash.h"
 #include "nvs.h"
@@ -10,6 +11,10 @@
 #define NVS_KEY "config"
 #define NVS_IOT_KEY "iot_config"
 #define NVS_PRIVATE_KEY_KEY "priv_key"
+
+#define IOT_CFG_PARTITION_NAME "iot_config"
+#define IOT_CFG_NAMESPACE "iot_config"
+#define IOT_CFG_JSON_KEY "json"
 
 static device_config_t g_device_config;
 static bool g_initialized = false;
@@ -306,5 +311,116 @@ bool my_nvs_update_private_key_config(const struct private_key_config *new_cfg) 
     memcpy(&g_private_key_config.config, new_cfg, sizeof(struct private_key_config));
     g_private_key_config.config.checksum = private_key_config_calc_checksum(&g_private_key_config.config);
     return private_key_config_save_to_nvs(&g_private_key_config);
+}
+
+bool my_nvs_read_iot_config_json(char *out_buffer, size_t buffer_size) {
+    if (!out_buffer || buffer_size == 0) {
+        return false;
+    }
+
+    esp_err_t err = nvs_flash_init_partition(IOT_CFG_PARTITION_NAME);
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        nvs_flash_erase_partition(IOT_CFG_PARTITION_NAME);
+        err = nvs_flash_init_partition(IOT_CFG_PARTITION_NAME);
+    }
+    if (err != ESP_OK) return false;
+
+    nvs_handle_t handle;
+    err = nvs_open_from_partition(IOT_CFG_PARTITION_NAME, IOT_CFG_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return false;
+    }
+
+    size_t required = 0;
+    err = nvs_get_str(handle, IOT_CFG_JSON_KEY, NULL, &required);
+    if (err == ESP_OK) {
+        if (required > buffer_size) {
+            err = ESP_ERR_NVS_INVALID_LENGTH;
+        } else {
+            err = nvs_get_str(handle, IOT_CFG_JSON_KEY, out_buffer, &required);
+        }
+    }
+
+    nvs_close(handle);
+    return err == ESP_OK;
+}
+
+#include "cJSON.h"
+
+static const char *s_keys_mqtt_uri[] = {
+    "mqtt_uri",
+    "broker_uri",
+    "endpoint",
+    "url",
+};
+
+// ===== 惰性加载缓存 =====
+static struct iot_config_view s_iot_view;
+static bool s_iot_view_loaded = false;
+static char s_buf_mqtt_uri[192];
+static char s_buf_protocol[8];
+static char s_buf_endpoint[128];
+static char s_buf_thing_name[64];
+
+static bool load_iot_view_once(void) {
+    if (s_iot_view_loaded) return true;
+
+    char json_buf[2048];
+    if (!my_nvs_read_iot_config_json(json_buf, sizeof(json_buf))) {
+        return false;
+    }
+
+    cJSON *root = cJSON_Parse(json_buf);
+    if (!root) return false;
+
+    // protocol
+    const cJSON *protocol = cJSON_GetObjectItemCaseSensitive(root, "protocol");
+    const char *proto = (cJSON_IsString(protocol) && protocol->valuestring) ? protocol->valuestring : "mqtts";
+    snprintf(s_buf_protocol, sizeof(s_buf_protocol), "%s", proto);
+
+    // endpoint
+    const cJSON *endpoint = cJSON_GetObjectItemCaseSensitive(root, "iot_endpoint");
+    const char *host = (cJSON_IsString(endpoint) && endpoint->valuestring) ? endpoint->valuestring : "";
+    snprintf(s_buf_endpoint, sizeof(s_buf_endpoint), "%s", host);
+
+    // port
+    const cJSON *port = cJSON_GetObjectItemCaseSensitive(root, "iot_port");
+    int port_val = cJSON_IsNumber(port) ? port->valueint : 8883;
+
+    // thing_name
+    const cJSON *thing = cJSON_GetObjectItemCaseSensitive(root, "thing_name");
+    const char *thing_str = (cJSON_IsString(thing) && thing->valuestring) ? thing->valuestring : "";
+    snprintf(s_buf_thing_name, sizeof(s_buf_thing_name), "%s", thing_str);
+
+    // 优先直接 URI
+    const cJSON *direct_uri = NULL;
+    for (size_t i = 0; i < sizeof(s_keys_mqtt_uri)/sizeof(s_keys_mqtt_uri[0]); ++i) {
+        const cJSON *it = cJSON_GetObjectItemCaseSensitive(root, s_keys_mqtt_uri[i]);
+        if (cJSON_IsString(it) && it->valuestring && it->valuestring[0] != '\0') {
+            direct_uri = it;
+            break;
+        }
+    }
+
+    if (direct_uri) {
+        snprintf(s_buf_mqtt_uri, sizeof(s_buf_mqtt_uri), "%s", direct_uri->valuestring);
+    } else {
+        snprintf(s_buf_mqtt_uri, sizeof(s_buf_mqtt_uri), "%s://%s:%d", s_buf_protocol, s_buf_endpoint, port_val);
+    }
+
+    s_iot_view.mqtt_uri     = s_buf_mqtt_uri;
+    s_iot_view.protocol     = s_buf_protocol;
+    s_iot_view.iot_endpoint = s_buf_endpoint;
+    s_iot_view.thing_name   = s_buf_thing_name;
+    s_iot_view.iot_port     = port_val;
+
+    cJSON_Delete(root);
+    s_iot_view_loaded = true;
+    return true;
+}
+
+const struct iot_config_view *my_nvs_get_iot_config_view(void) {
+    if (!load_iot_view_once()) return NULL;
+    return &s_iot_view;
 }
 

@@ -9,7 +9,7 @@
 // 选择使用的雷达类型：
 // - 注释下面的宏使用R60ABD1雷达（旧雷达）
 // - 启用下面的宏使用艾睿雷达（新雷达，BhrDetInfo自动上报）
-#define USE_AIRTOUCH_RADAR
+// #define USE_AIRTOUCH_RADAR
 
 // ============================================================================
 // 通用雷达数据结构（统一接口）
@@ -51,6 +51,17 @@ typedef struct {
     char firmware_version[32];   // 固件版本
 } radar_product_info_t;
 
+// 最近监测数据汇总结构
+typedef struct {
+    uint8_t movement_param;      // 体动参数 (0-100)
+    uint32_t movement_timestamp; // 体动数据更新时间戳 (ms)
+    uint8_t respiratory_value;   // 呼吸数值 (0-35, 次/分)
+    uint32_t respiratory_timestamp; // 呼吸数据更新时间戳 (ms)
+    uint8_t heart_rate_value;    // 心率数值 (60-120, 次/分)
+    uint32_t heart_rate_timestamp; // 心率数据更新时间戳 (ms)
+    bool valid;                  // 数据是否有效
+} radar_latest_data_t;
+
 // ============================================================================
 // 回调函数类型定义
 // ============================================================================
@@ -90,6 +101,14 @@ bool my_radar_get_human_data(radar_human_data_t *data);
 bool my_radar_get_respiratory_data(radar_respiratory_data_t *data);
 bool my_radar_get_heart_rate_data(radar_heart_rate_data_t *data);
 bool my_radar_get_product_info(radar_product_info_t *info);
+
+// 获取最近的体动、呼吸、心率数据
+bool my_radar_get_latest_data(radar_latest_data_t *data);
+
+// 将雷达数据转换为 JSON 字符串
+// 返回 JSON 字符串长度，失败返回 -1
+// 注意：调用者需要释放返回的字符串（使用 free）
+int my_radar_data_to_json(const radar_latest_data_t *data, uint32_t timestamp, char **json_str);
 
 // ============================================================================
 // 特定雷达功能（仅当使用对应雷达时可用）

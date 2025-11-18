@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 // 固定1024字节的设备配置结构体
 #define DEVICE_CONFIG_SIZE 1024
@@ -144,6 +145,29 @@ const struct private_key_config *my_nvs_get_private_key_config(void);
  * @return true表示成功，false表示失败
  */
 bool my_nvs_update_private_key_config(const struct private_key_config *new_cfg);
+
+/**
+ * @brief 读取 iot_config 分区中的 JSON
+ * @param[out] out_buffer 存放 JSON 文本的缓冲区
+ * @param[in]  buffer_size 缓冲区大小
+ * @return true 表示读取成功且内容已写入缓冲区
+ */
+bool my_nvs_read_iot_config_json(char *out_buffer, size_t buffer_size);
+
+// ===== 惰性加载的 IoT 视图结构（仅指针/只读） =====
+struct iot_config_view {
+    const char *mqtt_uri;       // 例如 mqtts://host:8883
+    const char *protocol;       // 例如 mqtt / mqtts
+    const char *iot_endpoint;   // 主机名
+    const char *thing_name;     // 设备名
+    int         iot_port;       // 端口
+};
+
+/**
+ * @brief 获取 IoT 配置视图（惰性解析+缓存，返回只读指针）
+ * @return 成功返回只读视图指针；失败返回 NULL
+ */
+const struct iot_config_view *my_nvs_get_iot_config_view(void);
 
 #ifdef __cplusplus
 }
