@@ -281,7 +281,7 @@ extern "C" void app_main()
         uint32_t utc_timestamp = get_utc_timestamp_s();
         my_radar_data_to_json(&data, utc_timestamp, &json_str);
         my_mqtt_publish(t_radar, json_str, strlen(json_str), 0, 0);
-        ESP_LOGI("RADAR", "publish: %s", json_str);
+        // ESP_LOGI("RADAR", "publish: %s", json_str);
         free(json_str);
         vTaskDelay(1000);
     }

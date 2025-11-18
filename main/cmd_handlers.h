@@ -46,6 +46,14 @@ int cmd_handle_iot_config(cJSON *data);
  */
 int cmd_handle_private_key_config(cJSON *data);
 
+/**
+ * @brief 处理测试连接并OTA更新命令
+ * 
+ * @param params JSON params 对象
+ * @return int 0成功，-1失败
+ */
+int cmd_handle_test_conn_ota(cJSON *params);
+
 #ifdef __cplusplus
 }
 #endif

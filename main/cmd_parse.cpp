@@ -51,6 +51,8 @@ static int parse_json_cmd(const char *json_str) {
             ret = cmd_handle_wifi_connect(params);
         } else if (strcmp(cmd, "test_forget_wifi") == 0) {
             ret = cmd_handle_forget_wifi(params);
+        } else if (strcmp(cmd, "test_conn_ota") == 0) {
+            ret = cmd_handle_test_conn_ota(params);
         } else {
             ESP_LOGW(TAG, "Unknown command: %s", cmd);
             ret = -1;
