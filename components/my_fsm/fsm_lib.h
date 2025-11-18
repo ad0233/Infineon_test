@@ -15,7 +15,7 @@ struct StateTable {
     void (*act_fun)(void *arg);  // 函数指针
 };
 
-typedef struct fsm_impl* fsm_handle_t;
+typedef struct fsmImpl* fsm_handle_t;
 
 #ifdef __cplusplus
 extern "C" {

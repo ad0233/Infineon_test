@@ -1,2 +1,2 @@
-idf_component_register(INCLUDE_DIRS ".")
-target_link_libraries(${COMPONENT_LIB} INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/libmy_fsm.a")
+idf_component_register(SRCS fsm_lib.c INCLUDE_DIRS ".")
+# target_link_libraries(${COMPONENT_LIB} INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/libmy_fsm.a")
