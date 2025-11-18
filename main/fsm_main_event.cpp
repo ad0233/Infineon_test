@@ -149,7 +149,7 @@ uint8_t fm_has_memu_state(void){
             return FM_MEMU_SETTIME;
         default:
             ESP_LOGW(TAG, "Unknown menu index: %d", current_index);
-            return FM_MEMU_WIFI;  // 默认返回第一个
+            return 0;  // 默认返回第一个
     }
 }
 
