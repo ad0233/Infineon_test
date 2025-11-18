@@ -193,6 +193,7 @@ int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
         ESP_LOGE("h264", "%s (previous_bits & PLAYBACK_DONE_BIT) == 0", __func__);
         return -1;
     }
+    memset(&in_frame, 0, sizeof(in_frame));
     in_frame.raw_data.buffer = start;
     in_frame.raw_data.len = end - start;
     TickType_t wait_ticks = wait_timeout_to_ticks(timeout_ms);
