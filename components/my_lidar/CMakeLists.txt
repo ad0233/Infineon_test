@@ -9,4 +9,5 @@ idf_component_register(
         driver
         my_lcd         # 需要 UI 行为函数
         json           # JSON 序列化支持
+        my_utils       # UTC 时间戳函数
 )

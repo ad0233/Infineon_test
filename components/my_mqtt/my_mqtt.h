@@ -25,6 +25,17 @@ int my_mqtt_init(const char *broker_uri,
                     const struct my_mqtt_callbacks *cbs,
                     void *user_ctx);
 
+/**
+ * @brief 发布 MQTT 消息
+ * @param topic 主题
+ * @param payload 消息内容
+ * @param payload_len 消息长度（若为 -1，则按字符串长度计算）
+ * @param qos QoS 等级（0 或 1）
+ * @param retain 是否保留消息
+ * @return 成功返回消息 ID（>=0），失败返回 -1
+ */
+int my_mqtt_publish(const char *topic, const char *payload, int payload_len, int qos, int retain);
+
 #ifdef __cplusplus
 }
 #endif

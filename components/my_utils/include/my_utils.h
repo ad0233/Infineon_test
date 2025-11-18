@@ -6,6 +6,7 @@
 #ifndef MY_UTILS_H
 #define MY_UTILS_H
 
+#include <stdint.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -93,6 +94,13 @@ StreamBufferHandle_t my_stream_buffer_create(size_t xBufferSizeBytes, size_t xTr
  * @return Message buffer handle on success, NULL on failure
  */
 MessageBufferHandle_t my_message_buffer_create(size_t xBufferSizeBytes);
+
+/**
+ * @brief Get UTC timestamp in seconds
+ *
+ * @return UTC timestamp in seconds since epoch, 0 on failure
+ */
+uint32_t get_utc_timestamp_s(void);
 
 #ifdef __cplusplus
 }

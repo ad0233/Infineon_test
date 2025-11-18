@@ -7,6 +7,7 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
  
+#include <cstdint>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -190,8 +191,11 @@ extern "C" void app_main()
         ESP_LOGE(TAG, "fsm_main_init failed");
         vTaskDelete(nullptr);
     }
-    my_ble_init();
+    print_mem_info();
+    // my_ble_init();
+    // print_mem_info();
     my_wifi_init();
+    print_mem_info();
     my_rtc_init();
     my_radar_init();
     // 设置雷达监测数据回调
@@ -204,12 +208,80 @@ extern "C" void app_main()
     my_radar_start();
     print_mem_info();
 
+    my_wifi_connect("C301", "1124861985");
+
+    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+    esp_netif_sntp_init(&config);
+    print_mem_info();
+
+    // wait for time to be set
+    int retry = 0;
+    const int retry_count = 5;
+    while (esp_netif_sntp_sync_wait(3000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && ++retry < retry_count) {
+        ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
+    }
+    // Set timezone to China Standard Time
+    time_t now = 0;
+    struct tm timeinfo;
+    setenv("TZ", "CST-8", 1);
+    tzset();
+    localtime_r(&now, &timeinfo);
+
+    auto iot_config_view = my_nvs_get_iot_config_view();
+    if (iot_config_view == nullptr) {
+        ESP_LOGE(TAG, "Failed to get iot config view");
+        vTaskDelete(nullptr);
+    }
+    // 按固定模板由 thing_name 生成订阅主题
+    static char t_req[128];
+    static char t_resp[128];
+    static char t_cmd[128];
+    static char t_shadow_upd[160];
+    static char t_shadow_upd_delta[200];
+    static char t_shadow_upd_acc[200];
+    static char t_shadow_upd_rej[200];
+    static char t_shadow_get[160];
+    static char t_shadow_get_acc[200];
+    static char t_shadow_get_rej[200];
+    static char t_radar[128];
+
+    snprintf(t_req, sizeof(t_req), "lunawake/%s/request", iot_config_view->thing_name);
+    snprintf(t_resp, sizeof(t_resp), "lunawake/%s/response", iot_config_view->thing_name);
+    snprintf(t_cmd, sizeof(t_cmd), "lunawake/%s/command", iot_config_view->thing_name);
+
+    snprintf(t_shadow_upd, sizeof(t_shadow_upd), "$aws/things/%s/shadow/update", iot_config_view->thing_name);
+    snprintf(t_shadow_upd_delta, sizeof(t_shadow_upd_delta), "$aws/things/%s/shadow/update/delta", iot_config_view->thing_name);
+    snprintf(t_shadow_upd_acc, sizeof(t_shadow_upd_acc), "$aws/things/%s/shadow/update/accepted", iot_config_view->thing_name);
+    snprintf(t_shadow_upd_rej, sizeof(t_shadow_upd_rej), "$aws/things/%s/shadow/update/rejected", iot_config_view->thing_name);
+    snprintf(t_shadow_get, sizeof(t_shadow_get), "$aws/things/%s/shadow/get", iot_config_view->thing_name);
+    snprintf(t_shadow_get_acc, sizeof(t_shadow_get_acc), "$aws/things/%s/shadow/get/accepted", iot_config_view->thing_name);
+    snprintf(t_shadow_get_rej, sizeof(t_shadow_get_rej), "$aws/things/%s/shadow/get/rejected", iot_config_view->thing_name);
+
+    snprintf(t_radar, sizeof(t_radar), "lunawake/%s/body_signal_tick", iot_config_view->thing_name);
+    const char* topics[] = {
+        t_req,
+        t_resp,
+        t_cmd,
+        t_shadow_upd,
+        t_shadow_upd_delta,
+        t_shadow_upd_acc,
+        t_shadow_upd_rej,
+        t_shadow_get,
+        t_shadow_get_acc,
+        t_shadow_get_rej,
+    };
+    my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
+    
+    print_mem_info();
+
     while(1) {
         radar_latest_data_t data;
         my_radar_get_latest_data(&data);
         char *json_str = nullptr;
-        my_radar_data_to_json(&data, &json_str);
-        ESP_LOGI("RADAR", "json_str: %s", json_str);
+        uint32_t utc_timestamp = get_utc_timestamp_s();
+        my_radar_data_to_json(&data, utc_timestamp, &json_str);
+        my_mqtt_publish(t_radar, json_str, strlen(json_str), 0, 0);
+        ESP_LOGI("RADAR", "publish: %s", json_str);
         free(json_str);
         vTaskDelay(1000);
     }

@@ -1,6 +1,7 @@
 #include "my_lidar_r60abd1.h"
 #include "my_lidar.h"
 #include "my_ui_behavior.h"
+#include "my_utils.h"
 
 #include "driver/uart.h"
 #include "driver/gpio.h"
@@ -417,7 +418,7 @@ static bool parse_packet(const uint8_t *data, uint16_t length)
             if (data_len >= 1) {
                 if (xSemaphoreTake(data_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                     cached_human_data.movement_param = payload[0];
-                    movement_timestamp = esp_log_timestamp();
+                    movement_timestamp = get_utc_timestamp_s();
                     xSemaphoreGive(data_mutex);
                     
                     if (human_movement_callback != NULL) {
@@ -463,7 +464,7 @@ static bool parse_packet(const uint8_t *data, uint16_t length)
                 case RADAR_CMD_RESPIRATORY_VALUE:
                     if (data_len >= 1) {
                         cached_respiratory_data.respiratory_value = payload[0];
-                        respiratory_timestamp = esp_log_timestamp();
+                        respiratory_timestamp = get_utc_timestamp_s();
                     }
                     break;
                 case RADAR_CMD_RESPIRATORY_WAVEFORM:
@@ -500,7 +501,7 @@ static bool parse_packet(const uint8_t *data, uint16_t length)
                 case RADAR_CMD_HEART_RATE_VALUE:
                     if (data_len >= 1) {
                         cached_heart_rate_data.heart_rate_value = payload[0];
-                        heart_rate_timestamp = esp_log_timestamp();
+                        heart_rate_timestamp = get_utc_timestamp_s();
                     }
                     break;
                 case RADAR_CMD_HEART_RATE_WAVEFORM:

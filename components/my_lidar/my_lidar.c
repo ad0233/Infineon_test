@@ -146,7 +146,7 @@ bool my_radar_get_latest_data(radar_latest_data_t *data)
 #endif
 }
 
-int my_radar_data_to_json(const radar_latest_data_t *data, char **json_str)
+int my_radar_data_to_json(const radar_latest_data_t *data, uint32_t timestamp, char **json_str)
 {
     if (data == NULL || json_str == NULL) {
         return -1;
@@ -158,26 +158,26 @@ int my_radar_data_to_json(const radar_latest_data_t *data, char **json_str)
         return -1;
     }
     
+    // 添加时间戳
+    cJSON_AddNumberToObject(root, "timestamp", timestamp);
+    
     // 添加体动数据
     cJSON *movement = cJSON_CreateObject();
     cJSON_AddNumberToObject(movement, "value", data->movement_param);
-    // cJSON_AddNumberToObject(movement, "timestamp", data->movement_timestamp);
+    cJSON_AddNumberToObject(movement, "timestamp", data->movement_timestamp);
     cJSON_AddItemToObject(root, "movement", movement);
     
     // 添加呼吸数据
     cJSON *respiratory = cJSON_CreateObject();
     cJSON_AddNumberToObject(respiratory, "value", data->respiratory_value);
-    // cJSON_AddNumberToObject(respiratory, "timestamp", data->respiratory_timestamp);
+    cJSON_AddNumberToObject(respiratory, "timestamp", data->respiratory_timestamp);
     cJSON_AddItemToObject(root, "respiratory", respiratory);
     
     // 添加心率数据
     cJSON *heart_rate = cJSON_CreateObject();
     cJSON_AddNumberToObject(heart_rate, "value", data->heart_rate_value);
-    // cJSON_AddNumberToObject(heart_rate, "timestamp", data->heart_rate_timestamp);
+    cJSON_AddNumberToObject(heart_rate, "timestamp", data->heart_rate_timestamp);
     cJSON_AddItemToObject(root, "heart_rate", heart_rate);
-    
-    // 添加有效性标志
-    // cJSON_AddBoolToObject(root, "valid", data->valid);
     
     // 转换为字符串
     char *json_string = cJSON_Print(root);

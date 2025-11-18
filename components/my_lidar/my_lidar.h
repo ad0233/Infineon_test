@@ -108,7 +108,7 @@ bool my_radar_get_latest_data(radar_latest_data_t *data);
 // 将雷达数据转换为 JSON 字符串
 // 返回 JSON 字符串长度，失败返回 -1
 // 注意：调用者需要释放返回的字符串（使用 free）
-int my_radar_data_to_json(const radar_latest_data_t *data, char **json_str);
+int my_radar_data_to_json(const radar_latest_data_t *data, uint32_t timestamp, char **json_str);
 
 // ============================================================================
 // 特定雷达功能（仅当使用对应雷达时可用）
