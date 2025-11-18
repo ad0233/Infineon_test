@@ -271,6 +271,16 @@ static void i420_decode_thread(void *arg) {
     esp_h264_dec_in_frame_t in_frame;
     while (1) {
         if (xQueueReceive(h264_queue, &in_frame, portMAX_DELAY) == pdPASS) {
+            // 重置解码器状态：关闭并重新打开
+            esp_h264_dec_close(dec);
+            ret = esp_h264_dec_open(dec);
+            if (ret != ESP_H264_ERR_OK) {
+                ESP_LOGE("h264", "reopen failed. line %d \n", __LINE__);
+                if (s_playback_event_group != NULL) {
+                    xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+                }
+                continue;
+            }
             bool decode_failed = false;
             while (in_frame.raw_data.len > 0) {
                 ret = esp_h264_dec_process(dec, &in_frame, &out_frame);
