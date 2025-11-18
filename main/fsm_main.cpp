@@ -39,7 +39,8 @@ enum fsm_main_state_enum {
 
 
     F_MAIN_S_MENU_SLEEP_MODE,   //睡眠模式页面
-    F_MAIN_S_MENU_ALARM,        //闹钟页面
+    F_MAIN_S_MENU_ALARM,        //有闹钟页面
+    F_MAIN_S_NO_MENU_ALARM,        //无闹钟页面
     F_MAIN_S_MENU_UNWIND,        //选择歌曲页面
     F_MAIN_S_MENU_VOLUME,        //声音页面
     F_MAIN_S_MENU_BRIGHTNESS,      //亮度页面
@@ -53,36 +54,38 @@ enum fsm_main_state_enum {
 // 状态名称获取
 static const char* fsm_state_to_str(uint8_t state) {
     static const char* names[] = {
-        "UNINIT",                    // F_MAIN_S_UNINIT
-        "UNINIT_PLAYING",            // F_MAIN_S_UNINIT_PLAYING
-        "CLOCK",                     // F_MAIN_S_CLOCK
-        "CLOCK_AWAY",                // F_MAIN_S_CLOCK_AWAY
-        "CLOCK_BACK",                // F_MAIN_S_CLOCK_BACK
-        "FINDPERSONC_ANIM",          // F_MAIN_S_FINDPERSONC_ANIM
-        "FINDPERSON",                // F_MAIN_S_FINDPERSON
-        "FINDSUC",                   // F_MAIN_S_FINDSUC
-        "FINDFAIL",                  // F_MAIN_S_FINDFAIL
-        "FINDSUC_ANIM",              // F_MAIN_S_FINDSUC_ANIM
-        "FINDFAIL_ANIM",             // F_MAIN_S_FINDFAIL_ANIM
-        "WIFI_DETECT",               // F_MAIN_S_WIFI_DETECT
-        "WIFI_GUIDE",                // F_MAIN_S_WIFI_GUIDE
-        "WIFI_CONN",                 // F_MAIN_S_WIFI_CONN
-        "WIFI_CONN_SUC",             // F_MAIN_S_WIFI_CONN_SUC
-        "WIFI_CONN_FAIL",            // F_MAIN_S_WIFI_CONN_FAIL
-        "WIFI_OFFLINE",              // F_MAIN_S_WIFI_OFFLINE
-        "RTC_DETECT",                // F_MAIN_S_RTC_DETECT
-        "RTC_DETECT_CLK",            // F_MAIN_S_RTC_DETECT_CLK
-        "MENU",                      // F_MAIN_S_MENU
-        "MENU_SELECT",               // F_MAIN_S_MENU_SELECT
-        "MENU_WIFI",                 // F_MAIN_S_MENU_WIFI
-        "MENU_SLEEP_MODE",           // F_MAIN_S_MENU_SLEEP_MODE
-        "MENU_ALARM",                // F_MAIN_S_MENU_ALARM
-        "MENU_UNWIND",               // F_MAIN_S_MENU_UNWIND
-        "MENU_VOLUME",               // F_MAIN_S_MENU_VOLUME
-        "MENU_BRIGHTNESS",           // F_MAIN_S_MENU_BRIGHTNESS
-        "MENU_SET_TIME",             // F_MAIN_S_MENU_SET_TIME
+        "UNINIT",                    // F_MAIN_S_UNINIT (0)
+        "UNINIT_PLAYING",            // F_MAIN_S_UNINIT_PLAYING (1)
+        "CLOCK",                     // F_MAIN_S_CLOCK (2)
+        "CLOCK_AWAY",                // F_MAIN_S_CLOCK_AWAY (3)
+        "CLOCK_BACK",                // F_MAIN_S_CLOCK_BACK (4)
+        "FINDPERSONC_ANIM",          // F_MAIN_S_FINDPERSONC_ANIM (5)
+        "FINDPERSON",                // F_MAIN_S_FINDPERSON (6)
+        "FINDSUC",                   // F_MAIN_S_FINDSUC (7)
+        "FINDFAIL",                  // F_MAIN_S_FINDFAIL (8)
+        "FINDSUC_ANIM",              // F_MAIN_S_FINDSUC_ANIM (9)
+        "FINDFAIL_ANIM",             // F_MAIN_S_FINDFAIL_ANIM (10)
+        "WIFI_DETECT",               // F_MAIN_S_WIFI_DETECT (11)
+        "WIFI_GUIDE",                // F_MAIN_S_WIFI_GUIDE (12)
+        "WIFI_CONN",                 // F_MAIN_S_WIFI_CONN (13)
+        "WIFI_CONN_SUC",             // F_MAIN_S_WIFI_CONN_SUC (14)
+        "WIFI_CONN_FAIL",            // F_MAIN_S_WIFI_CONN_FAIL (15)
+        "WIFI_OFFLINE",              // F_MAIN_S_WIFI_OFFLINE (16)
+        "RTC_DETECT",                // F_MAIN_S_RTC_DETECT (17)
+        "RTC_DETECT_CLK",            // F_MAIN_S_RTC_DETECT_CLK (18)
+        "MENU",                      // F_MAIN_S_MENU (19)
+        "MENU_SLEEP_MODE",           // F_MAIN_S_MENU_SLEEP_MODE (20)
+        "MENU_ALARM",                // F_MAIN_S_MENU_ALARM (21)
+        "NO_MENU_ALARM",             // F_MAIN_S_NO_MENU_ALARM (22)
+        "MENU_UNWIND",               // F_MAIN_S_MENU_UNWIND (23)
+        "MENU_VOLUME",               // F_MAIN_S_MENU_VOLUME (24)
+        "MENU_BRIGHTNESS",           // F_MAIN_S_MENU_BRIGHTNESS (25)
+        "MENU_SET_TIME",             // F_MAIN_S_MENU_SET_TIME (26)
     };
-    return (state < sizeof(names)/sizeof(names[0]) && names[state]) ? names[state] : "UNKNOWN";
+    if (state < sizeof(names)/sizeof(names[0]) && names[state]) {
+        return names[state];
+    }
+    return "UNKNOWN";
 }
 
 
@@ -201,27 +204,42 @@ static struct StateTable fsm_user_table[] = {
     // { nullptr           ,0            ,F_MAIN_E_LIDAR_NOT_FOUND  , F_MAIN_S_CLOCK           , F_MAIN_S_CLOCK_AWAY        ,0    ,false        , nullptr},//主页面人走
     // { nullptr           ,0            ,F_MAIN_E_LIDAR_FIND      , F_MAIN_S_CLOCK_AWAY        , F_MAIN_S_CLOCK_BACK       ,0    ,false        , nullptr},//主页面人回---过度
     // { nullptr           ,0            ,F_MAIN_E_LIDAR_FIND      , F_MAIN_S_CLOCK_BACK        , F_MAIN_S_CLOCK            ,0      ,false        , nullptr},//主页面 过度--人在 
-    { nullptr           ,0              ,F_MAIN_E_KNOB_CW               , F_MAIN_S_CLOCK             , F_MAIN_S_MENU             ,0    ,false        , fsm_main_in_memu},//主页面 去菜单  
+    { nullptr           ,0              ,F_MAIN_E_KNOB_CW         , F_MAIN_S_CLOCK             , F_MAIN_S_MENU             ,0    ,false        , fsm_main_in_memu},//主页面 去菜单  
     //菜单
     { nullptr          ,0        ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU             , F_MAIN_S_MENU       ,0    ,false              , fsm_menu_next_item},//菜单选择
     //wifi 设置
     { fm_has_memu_state           ,FM_MEMU_WIFI_SC              ,F_MAIN_E_BTN_CLICKED           , F_MAIN_S_MENU             , F_MAIN_S_WIFI_CONN_SUC        ,0    ,false        , fsm_main_in_wifi_sc},//菜单---有wifi 根据wifi检测判断
-    { fm_has_memu_state           ,FM_MEMU_WIFI_FA              ,F_MAIN_E_BTN_CLICKED           , F_MAIN_S_MENU             , F_MAIN_S_WIFI_OFFLINE         ,0    ,false        , fsm_main_in_wifi_fa},//菜单--无wifi
+    { fm_has_memu_state           ,FM_MEMU_WIFI_FA              ,F_MAIN_E_BTN_CLICKED           , F_MAIN_S_MENU             , F_MAIN_S_WIFI_OFFLINE         ,0    ,false        , fsm_main_in_wifi_fa},//菜单---无wifi
     { nullptr                     ,0                            ,F_MAIN_E_BTN_L_CLICKED       , F_MAIN_S_WIFI_CONN_SUC        , F_MAIN_S_WIFI_OFFLINE       ,0    ,false          , fsm_main_in_wifi_fa},//手动关闭wifi
     { nullptr                     ,0                            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_WIFI_CONN_SUC       , F_MAIN_S_MENU             ,0    ,false          , fsm_main_in_memu},//有wifi 短按退回菜单
     { nullptr                    ,0                             ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_WIFI_OFFLINE        , F_MAIN_S_MENU                ,0    ,false          , fsm_main_in_memu},//无wifi 短按退回菜单 
     //唤醒模式
-    { fm_has_memu_state           ,FM_MEMU_WAKE_MOD            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_SLEEP_MODE   ,0    ,false    , fsm_main_in_wake_mode},//菜单选择唤醒模式
+    { fm_has_memu_state           ,FM_MEMU_WAKE_MOD            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_SLEEP_MODE     ,0    ,false    , fsm_main_in_wake_mode},//菜单选择唤醒模式
+    { nullptr                     ,0                           ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_SLEEP_MODE   , F_MAIN_S_MENU_SLEEP_MODE     ,0    ,false    , fsm_wake_mode_next_item},//唤醒模式的二级菜单切换
+    { nullptr                     ,0                           ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_SLEEP_MODE   , F_MAIN_S_MENU               ,0    ,false    , fsm_main_in_memu},//唤醒模式---菜单
+    //闹钟
+    { fm_has_memu_state   ,FM_MEMU_ALARM_SC     ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_ALARM       ,0      ,false        , fsm_main_in_alarm},//菜单--有闹钟
+    { fm_has_memu_state   ,FM_MEMU_ALARM_FA     ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_NO_MENU_ALARM    ,0      ,false        , fsm_main_in_no_alarm},//菜单--无闹钟
+    { nullptr             ,0                 ,F_MAIN_E_KNOB_CW              , F_MAIN_S_MENU_ALARM          , F_MAIN_S_MENU_ALARM      ,0      ,false        , fsm_set_alarm_item},//闹钟设置时间
+    { nullptr             ,0                ,F_MAIN_E_BTN_L_CLICKED          , F_MAIN_S_MENU_ALARM         , F_MAIN_S_NO_MENU_ALARM      ,0      ,false        , fsm_main_in_no_alarm},//闹钟--关闭闹钟
+    { nullptr             ,0                ,F_MAIN_E_BTN_L_CLICKED          , F_MAIN_S_NO_MENU_ALARM       , F_MAIN_S_MENU_ALARM     ,0      ,false        , fsm_main_in_alarm},//无闹钟--开启闹钟
+    { nullptr             ,0                ,F_MAIN_E_BTN_CLICKED          , F_MAIN_S_MENU_ALARM             , F_MAIN_S_MENU     ,0      ,false       , fsm_main_in_memu},//闹钟--菜单
+    { nullptr             ,0                ,F_MAIN_E_BTN_CLICKED          , F_MAIN_S_NO_MENU_ALARM          , F_MAIN_S_MENU     ,0      ,false       , fsm_main_in_memu},//无脑闹钟--菜单
+    //UNWIND 
+    { fm_has_memu_state           ,FM_MEMU_UNWIND            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//菜单选择歌曲选择
+    { nullptr                     ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_unwind_next_item},//切换歌曲
+    { nullptr                     ,0                         ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU              ,0    ,false       , fsm_main_in_memu},//歌曲--菜单
+    //声音
+    { fm_has_memu_state           ,FM_MEMU_VOL            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_VOLUME       ,0    ,false         , fsm_main_in_volume},//菜单选择声音
+    { nullptr                     ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_VOLUME       , F_MAIN_S_MENU_VOLUME       ,0    ,false         , fsm_volume_next_item},//设置声音
+    { nullptr                     ,0                         ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_VOLUME       , F_MAIN_S_MENU              ,0    ,false         , fsm_main_in_memu},//声音--菜单
 
-    { fm_has_memu_state           ,FM_MEMU_ALARM            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_ALARM        ,0    ,false        , fsm_main_in_wake_mode},//菜单选择闹钟
-    { fm_has_memu_state           ,FM_MEMU_UNWIND            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_wake_mode},//菜单选择歌曲选择
-    { fm_has_memu_state           ,FM_MEMU_VOL            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_VOLUME       ,0    ,false         , fsm_main_in_wake_mode},//菜单选择声音
-    { fm_has_memu_state           ,FM_MEMU_SC_BR            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_BRIGHTNESS   ,0    ,false       , fsm_main_in_wake_mode},//菜单选择亮度
-    { fm_has_memu_state           ,FM_MEMU_SETTIME            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_SET_TIME     ,0    ,false     , fsm_main_in_wake_mode},//菜单选择设置时间  
+    { fm_has_memu_state           ,FM_MEMU_SC_BR            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_BRIGHTNESS   ,0    ,false       , fsm_main_in_light},//菜单选择亮度
+    { nullptr                       ,0                      ,F_MAIN_E_KNOB_CW           , F_MAIN_S_MENU_BRIGHTNESS        , F_MAIN_S_MENU_BRIGHTNESS   ,0    ,false       , fsm_light_next_item},//设置亮度
+    { nullptr                       ,0                      ,F_MAIN_E_BTN_CLICKED        , F_MAIN_S_MENU_BRIGHTNESS    , F_MAIN_S_MENU                  ,0    ,false      , fsm_main_in_memu},//亮度--菜单
     
-    //唤醒模式
-    // { nullptr           ,0            ,F_MAIN_E_KNOB_CW         , F_MAIN_S_MENU_SLEEP_MODE    , F_MAIN_S_MENU_SLEEP_MODE     ,0    ,false          , nullptr},//唤醒模式 选择模式
-    // { nullptr           ,0            ,F_MAIN_E_KNOB_CW         , F_MAIN_S_MENU_SLEEP_MODE    , F_MAIN_S_MENU_SLEEP_MODE     ,0    ,false          , nullptr},//唤醒模式 选择模式     
+    { fm_has_memu_state           ,FM_MEMU_SETTIME            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_SET_TIME     ,0    ,false     , fsm_main_in_set_time},//菜单选择设置时间  
+        
 };
 
 

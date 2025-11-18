@@ -25,6 +25,10 @@ static uint8_t s_saved_state = FM_H_F_FAI;  // 保存的检测结果
 static bool s_state_valid = false;  // 检测结果是否有效
 #define FIND_TIMEOUT_MS 15000  // 15秒超时
 
+// 静态变量：闹钟开关状态
+static bool s_alarm_enabled = true;  // true=有闹钟, false=无闹钟
+static bool s_alarm_state_initialized = false;  // 状态是否已初始化
+
 // 执行一次检测并保存结果
 static void do_detection(void) {
     // 使用ESP32硬件随机数生成器
@@ -124,33 +128,63 @@ static int getCurrentMenuIndex(void) {
 }
 
 uint8_t fm_has_memu_state(void){
+    // 第一次调用时，从NVS读取闹钟状态
+    if (!s_alarm_state_initialized) {
+        const struct device_config *cfg = my_nvs_get_config();
+        if (cfg != nullptr) {
+            s_alarm_enabled = (cfg->alarm_enable != 0);
+            ESP_LOGI(TAG, "Initialized alarm state from NVS: %s", s_alarm_enabled ? "enabled" : "disabled");
+        } else {
+            s_alarm_enabled = true;  // 默认启用
+            ESP_LOGW(TAG, "Failed to load alarm state from NVS, using default enabled");
+        }
+        s_alarm_state_initialized = true;
+    }
+    
     int current_index = getCurrentMenuIndex();
     ESP_LOGI(TAG, "fm_has_memu_state, current_index: %d", current_index);
     // 根据当前索引返回对应的菜单状态
+    uint8_t ret = 0;
     switch(current_index) {
         case 0: // Wi-Fi
             if(1){    //这里需要放入有无wifi的判断
-                return FM_MEMU_WIFI_SC;
+                ret = FM_MEMU_WIFI_SC;
             }
             else{
-                return FM_MEMU_WIFI_FA;
+                ret = FM_MEMU_WIFI_FA;
             }
+            break;
         case 1: // Wake Mode
-            return FM_MEMU_WAKE_MOD;
+            ret = FM_MEMU_WAKE_MOD;
+            break;
         case 2: // Alarm
-            return FM_MEMU_ALARM;
+            if(s_alarm_enabled){    // 根据闹钟开关状态判断
+                ret = FM_MEMU_ALARM_SC;
+            }
+            else{
+                ret = FM_MEMU_ALARM_FA;
+            }
+            break;
         case 3: // Unwind
-            return FM_MEMU_UNWIND;
+            ret = FM_MEMU_UNWIND;
+            break;
         case 4: // Volume
-            return FM_MEMU_VOL;
+            ret = FM_MEMU_VOL;
+            break;
         case 5: // Screen Brightness
-            return FM_MEMU_SC_BR;
+            ret = FM_MEMU_SC_BR;
+            break;
         case 6: // Set Time
-            return FM_MEMU_SETTIME;
+            ret = FM_MEMU_SETTIME;
+            break;
         default:
             ESP_LOGW(TAG, "Unknown menu index: %d", current_index);
-            return 0;  // 默认返回第一个
+            ret = 0;  // 默认返回第一个
+            break;
     }
+    ESP_LOGI(TAG, "fm_has_memu_state, returning: %d (FM_MEMU_WIFI_SC=%d, FM_MEMU_ALARM_SC=%d)", 
+             ret, FM_MEMU_WIFI_SC, FM_MEMU_ALARM_SC);
+    return ret;
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
@@ -311,7 +345,7 @@ void fsm_main_to_clock(void *arg) {
     ESP_LOGI(TAG, "Clock time updated: %02d:%02d", hour, minute);
 }
 
-/*------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/*----------------------------------------------------------------------------菜单的切换----------------------------------------------------------------------------------------*/
 
 
 void fsm_menu_next_item(void *arg) {
@@ -332,9 +366,220 @@ void fsm_menu_next_item(void *arg) {
         // 向上切换（上一个菜单项）
         my_ui_function_menu_up();
     }
+    
+    // 获取切换后的菜单索引和名称
+    int current_index = getCurrentMenuIndex();
+    const char* menu_names[] = {
+        "Wi-Fi",           // 0
+        "Wake Mode",       // 1
+        "Alarm",           // 2
+        "Unwind",          // 3
+        "Volume",          // 4
+        "Screen Brightness", // 5
+        "Set Time"         // 6
+    };
+    
+    const char* menu_name = "Unknown";
+    if (current_index >= 0 && current_index < 7) {
+        menu_name = menu_names[current_index];
+    }
+    
+    ESP_LOGI(TAG, "Menu switched: index=%d, name=%s", current_index, menu_name);
 }
 
 
+/*-------------------------------------------------------------------------------------唤醒的切换------------------------------------------------------------------------------*/
+
+void fsm_wake_mode_next_item(void *arg) {
+    if (arg == nullptr) {
+        return;
+    }
+    
+    int32_t diff = *(int32_t*)arg;
+    
+    ESP_LOGI(TAG, "fsm_menu_next_item, diff: %" PRId32, diff);
+    
+    // 根据旋钮方向切换菜单项
+    // diff > 0: 右旋（向下），diff < 0: 左旋（向上）
+    if (diff > 0) {
+        // 向下切换（下一个菜单项）
+        wakeModeTestDown();
+    } else if (diff < 0) {
+        // 向上切换（上一个菜单项）
+        wakeModeTestUP();
+    }
+}
+
+/*-----------------------------------------------------------------------------------设置时间-------------------------------------------------------------------------------------*/
+// 静态变量：保存当前编辑的闹钟时间
+static uint8_t s_alarm_editing_hour = 8;
+static uint8_t s_alarm_editing_minute = 0;
+static bool s_alarm_editing_hour_mode = false;  // true=编辑小时, false=编辑分钟
+
+void fsm_set_alarm_item(void *arg) {
+    if (arg == nullptr) {
+        return;
+    }
+    
+    // 获取旋钮变化量，正数=右旋(增加)，负数=左旋(减少)
+    int32_t diff = *(int32_t*)arg;
+    
+    // 步进改为5
+    int32_t step = diff * 5;
+    
+    // 先获取当前时间（从UI读取）
+    uint8_t hour, minute;
+    my_ui_alarm_get_time(&hour, &minute);
+    s_alarm_editing_hour = hour;
+    s_alarm_editing_minute = minute;
+    
+    if (s_alarm_editing_hour_mode) {
+        // 编辑小时
+        int new_hour = s_alarm_editing_hour + step;
+        if (new_hour > 23) {
+            s_alarm_editing_hour = new_hour - 24;
+        } else if (new_hour < 0) {
+            s_alarm_editing_hour = new_hour + 24;
+        } else {
+            s_alarm_editing_hour = new_hour;
+        }
+        
+        // 使用 my_ui_alarm_set_time 更新闹钟时间显示
+        my_ui_alarm_set_time(s_alarm_editing_hour, s_alarm_editing_minute);
+        
+        // 保存时间到NVS
+        const struct device_config *cfg = my_nvs_get_config();
+        if (cfg != nullptr) {
+            struct device_config new_cfg = *cfg;
+            new_cfg.alarm_hour = s_alarm_editing_hour;
+            new_cfg.alarm_minute = s_alarm_editing_minute;
+            new_cfg.alarm_enable = 1;
+            my_nvs_update_config(&new_cfg);
+            ESP_LOGI(TAG, "Saved alarm time to NVS: %02d:%02d", s_alarm_editing_hour, s_alarm_editing_minute);
+        }
+        
+        ESP_LOGI(TAG, "Adjust alarm hour: %d (step: %" PRId32 ")", s_alarm_editing_hour, step);
+    } else {
+        // 编辑分钟
+        int new_minute = s_alarm_editing_minute + step;
+        if (new_minute > 59) {
+            s_alarm_editing_minute = new_minute - 60;
+            // 分钟进位，小时也要增加
+            s_alarm_editing_hour = (s_alarm_editing_hour + 1) % 24;
+        } else if (new_minute < 0) {
+            s_alarm_editing_minute = new_minute + 60;
+            // 分钟借位，小时也要减少
+            if (s_alarm_editing_hour == 0) {
+                s_alarm_editing_hour = 23;
+            } else {
+                s_alarm_editing_hour -= 1;
+            }
+        } else {
+            s_alarm_editing_minute = new_minute;
+        }
+        
+        // 使用 my_ui_alarm_set_time 更新闹钟时间显示
+        my_ui_alarm_set_time(s_alarm_editing_hour, s_alarm_editing_minute);
+        
+        // 保存时间到NVS
+        const struct device_config *cfg = my_nvs_get_config();
+        if (cfg != nullptr) {
+            struct device_config new_cfg = *cfg;
+            new_cfg.alarm_hour = s_alarm_editing_hour;
+            new_cfg.alarm_minute = s_alarm_editing_minute;
+            new_cfg.alarm_enable = 1;
+            my_nvs_update_config(&new_cfg);
+            ESP_LOGI(TAG, "Saved alarm time to NVS: %02d:%02d", s_alarm_editing_hour, s_alarm_editing_minute);
+        }
+        
+        ESP_LOGI(TAG, "Adjust alarm minute: %d (step: %" PRId32 ")", s_alarm_editing_minute, step);
+    }
+}
+
+/*----------------------------------------------------------------------------------unwind-------------------------------------------------------------------------------------*/
+void fsm_unwind_next_item(void *arg) {
+    if (arg == nullptr) {
+        ESP_LOGW(TAG, "fsm_unwind_next_item: arg is nullptr");
+        return;
+    }
+    
+    int32_t diff = *(int32_t*)arg;
+    
+    ESP_LOGI(TAG, "fsm_unwind_next_item, diff: %" PRId32, diff);
+    
+    // 根据旋钮方向切换菜单项
+    // diff > 0: 右旋（向下），diff < 0: 左旋（向上）
+    if (diff > 0) {
+        // 向下切换（下一个菜单项）
+        ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_next_animal()");
+        my_ui_unwind_next_animal();
+    } else if (diff < 0) {
+        // 向上切换（上一个菜单项）
+        ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_prev_animal()");
+        my_ui_unwind_prev_animal();
+    } else {
+        ESP_LOGI(TAG, "fsm_unwind_next_item: diff is 0, no action");
+    }
+}
+
+/*----------------------------------------------------------------------------------volume-------------------------------------------------------------------------------------*/
+void fsm_volume_next_item(void *arg) {
+    if (arg == nullptr) {
+        ESP_LOGW(TAG, "fsm_volume_next_item: arg is nullptr");
+        return;
+    }
+    
+    // 获取旋钮变化量，正数=右旋(增加)，负数=左旋(减少)
+    int32_t diff = *(int32_t*)arg;
+    
+    ESP_LOGI(TAG, "fsm_volume_next_item, diff: %" PRId32, diff);
+    
+    // 获取当前音量
+    uint8_t current_volume = my_ui_volume_get();
+    
+    // 计算新音量
+    int32_t step = diff ;
+    int new_volume = current_volume + step;
+    
+    // 限制音量范围在0-100
+    if (new_volume > 100) {
+        new_volume = 100;
+    } else if (new_volume < 0) {
+        new_volume = 0;
+    }
+    
+    ESP_LOGI(TAG, "fsm_volume_next_item: volume %d -> %d (step: %" PRId32 ")", current_volume, new_volume, step);
+    
+    // 设置新音量
+    my_ui_volume_set(new_volume);
+}
+
+/*----------------------------------------------------------------------------------light-------------------------------------------------------------------------------------*/
+void fsm_light_next_item(void *arg) {
+    if (arg == nullptr) {
+        ESP_LOGW(TAG, "fsm_light_next_item: arg is nullptr");
+        return;
+    }
+    
+    // 获取旋钮变化量，正数=右旋(增加)，负数=左旋(减少)
+    int32_t diff = *(int32_t*)arg;
+    
+    ESP_LOGI(TAG, "fsm_light_next_item, diff: %" PRId32, diff);
+    
+    // 根据旋钮方向切换亮度
+    // diff > 0: 右旋（增加），diff < 0: 左旋（减少）
+    if (diff > 0) {
+        // 右旋，增加亮度
+        ESP_LOGI(TAG, "fsm_light_next_item: calling my_ui_light_next()");
+        my_ui_light_next();
+    } else if (diff < 0) {
+        // 左旋，减少亮度
+        ESP_LOGI(TAG, "fsm_light_next_item: calling my_ui_light_prev()");
+        my_ui_light_prev();
+    } else {
+        ESP_LOGI(TAG, "fsm_light_next_item: diff is 0, no action");
+    }
+}
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 uint8_t fsm_clock_need_cfg(void) {
     return my_rtc_is_time_valid();
@@ -479,9 +724,54 @@ void fsm_main_in_wake_mode(void *arg) {
 //alarm
 void fsm_main_in_alarm(void *arg) {
     ESP_LOGI(TAG, "in alarm mode...");
-    lvgl_port_lock(0);
-    lv_disp_load_scr(ui_AlarmON);
-    lvgl_port_unlock();
+    
+    // 设置闹钟状态为开启
+    s_alarm_enabled = true;
+    
+    // 从NVS读取保存的闹钟时间
+    const struct device_config *cfg = my_nvs_get_config();
+    if (cfg != nullptr && cfg->alarm_enable != 0) {
+        s_alarm_editing_hour = cfg->alarm_hour;
+        s_alarm_editing_minute = cfg->alarm_minute;
+        ESP_LOGI(TAG, "Loaded alarm time from NVS: %02d:%02d", s_alarm_editing_hour, s_alarm_editing_minute);
+    } else {
+        // 如果没有保存的时间，使用默认值
+        s_alarm_editing_hour = 8;
+        s_alarm_editing_minute = 0;
+        ESP_LOGI(TAG, "No saved alarm time, using default: %02d:%02d", s_alarm_editing_hour, s_alarm_editing_minute);
+    }
+    
+    s_alarm_editing_hour_mode = false;  // 默认先编辑分钟
+    
+    // 先加载UI页面
+    my_ui_in_alarm();
+    
+    // 显示保存的时间（在 my_ui_in_alarm 之后调用，覆盖默认的8:00）
+    my_ui_alarm_set_time(s_alarm_editing_hour, s_alarm_editing_minute);
+    
+    // 更新NVS中的闹钟使能状态
+    if (cfg != nullptr) {
+        struct device_config new_cfg = *cfg;
+        new_cfg.alarm_enable = 1;
+        my_nvs_update_config(&new_cfg);
+    }
+}
+void fsm_main_in_no_alarm(void *arg) {
+    ESP_LOGI(TAG, "in no alarm mode...");
+    
+    // 设置闹钟状态为关闭
+    s_alarm_enabled = false;
+    
+    // 更新NVS中的闹钟使能状态
+    const struct device_config *cfg = my_nvs_get_config();
+    if (cfg != nullptr) {
+        struct device_config new_cfg = *cfg;
+        new_cfg.alarm_enable = 0;
+        my_nvs_update_config(&new_cfg);
+        ESP_LOGI(TAG, "Alarm disabled, saved to NVS");
+    }
+    
+    my_ui_in_no_alarm();
 }
 
 
@@ -495,17 +785,13 @@ void fsm_main_in_unwind(void *arg) {
 
 void fsm_main_in_volume(void *arg) {
     ESP_LOGI(TAG, "in_volume mode...");
-    lvgl_port_lock(0);
-    lv_disp_load_scr(ui_Volume_);
-    lvgl_port_unlock();
+    my_ui_in_volume();
 }
 
 
 void fsm_main_in_light(void *arg) {
     ESP_LOGI(TAG, "in light mode...");
-    lvgl_port_lock(0);
-    lv_disp_load_scr(ui_Light);
-    lvgl_port_unlock();
+    my_ui_in_light();
 }
 
 

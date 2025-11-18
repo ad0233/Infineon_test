@@ -31,7 +31,8 @@ enum fsm_clock_need_cfg {
     FM_MEMU_WIFI_SC,
     FM_MEMU_WIFI_FA,
     FM_MEMU_WAKE_MOD,
-    FM_MEMU_ALARM,
+    FM_MEMU_ALARM_SC,
+    FM_MEMU_ALARM_FA,
     FM_MEMU_UNWIND,
     FM_MEMU_VOL,
     FM_MEMU_SC_BR,
@@ -70,6 +71,7 @@ void fsm_main_to_clock(void *arg);
 void fsm_main_set_time(void *arg);
 void fsm_main_rtc_adjust_time(void *arg);
 void fsm_main_rtc_save_and_exit(void *arg);
+void fsm_wake_mode_next_item(void *arg);
 
 void fsm_main_in_memu(void *arg);
 void fsm_menu_next_item(void *arg);
@@ -77,9 +79,14 @@ void fsm_main_in_wifi_sc(void *arg);
 void fsm_main_in_wifi_fa(void *arg);
 void fsm_main_in_wake_mode(void *arg);
 void fsm_main_in_alarm(void *arg);
+void fsm_set_alarm_item(void *arg);
+void fsm_main_in_no_alarm(void *arg);
 void fsm_main_in_unwind(void *arg);
+void fsm_unwind_next_item(void *arg);
 void fsm_main_in_volume(void *arg);
+void fsm_volume_next_item(void *arg);
 void fsm_main_in_light(void *arg);
+void fsm_light_next_item(void *arg);
 void fsm_main_in_set_time(void *arg);
 
 enum fsm_main_event_enum {
