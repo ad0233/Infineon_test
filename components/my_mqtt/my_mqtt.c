@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
-#include <stdbool.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -28,7 +27,6 @@ static void *s_user_ctx = NULL;
 
 // MQTT 客户端句柄
 static esp_mqtt_client_handle_t s_client = NULL;
-static bool s_connected = false;
 
 static void my_mqtt_load_topics(const char *const *topics, int topic_count)
 {
@@ -49,7 +47,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-        s_connected = true;
         for (int i = 0; i < s_topic_count; ++i) {
             int msg_id = esp_mqtt_client_subscribe(client, s_topics[i], 0);
             ESP_LOGI(TAG, "subscribe %s, msg_id=%d", s_topics[i], msg_id);
@@ -59,7 +56,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
-        s_connected = false;
         if (s_cbs.on_disconnected) s_cbs.on_disconnected(s_user_ctx);
         break;
 
@@ -71,22 +67,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
 
     case MQTT_EVENT_ERROR:
-        ESP_LOGE(TAG, "MQTT_EVENT_ERROR: error_handle=%p, error_type=%d", 
-                 event->error_handle, 
-                 event->error_handle ? event->error_handle->error_type : -1);
-        if (event->error_handle) {
-            if (event->error_handle->error_type == MQTT_ERROR_TYPE_ESP_TLS) {
-                ESP_LOGE(TAG, "TLS error: esp_tls_last_err=%d, esp_tls_stack_err=%d, esp_tls_cert_verify_flags=%lu",
-                         event->error_handle->esp_tls_last_esp_err,
-                         event->error_handle->esp_tls_stack_err,
-                         event->error_handle->esp_tls_cert_verify_flags);
-            } else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
-                ESP_LOGE(TAG, "Connection refused: connect_return_code=%d", 
-                         event->error_handle->connect_return_code);
-            }
-        }
-        s_connected = false;
-        if (s_cbs.on_error) s_cbs.on_error(event->error_handle ? event->error_handle->error_type : 0, s_user_ctx);
+        ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
+        if (s_cbs.on_error) s_cbs.on_error(0, s_user_ctx);
         break;
 
     default:
@@ -141,10 +123,6 @@ static void mqtt_app_start(const char *broker_uri, const char *client_id,
             .disable_clean_session = false,
             .keepalive = 60,
         },
-        .buffer = {
-            .size = 4096,        // 增大输入缓冲区
-            .out_size = 2048,    // 增大输出缓冲区
-        },
     };
 
     ESP_LOGI(TAG, "broker_uri: %s", broker_uri);
@@ -174,10 +152,6 @@ int my_mqtt_publish(const char *topic, const char *payload, int payload_len, int
         ESP_LOGE(TAG, "MQTT client not initialized");
         return -1;
     }
-    if (!s_connected) {
-        ESP_LOGW(TAG, "MQTT not connected, skip publish to topic: %s", topic);
-        return -1;
-    }
     if (!topic || !payload) {
         ESP_LOGE(TAG, "Invalid topic or payload");
         return -1;
@@ -185,15 +159,11 @@ int my_mqtt_publish(const char *topic, const char *payload, int payload_len, int
     if (payload_len < 0) {
         payload_len = strlen(payload);
     }
-    if (payload_len > 128 * 1024) {  // AWS IoT 最大载荷 128KB
-        ESP_LOGE(TAG, "Payload too large: %d bytes (max 128KB)", payload_len);
-        return -1;
-    }
     int msg_id = esp_mqtt_client_publish(s_client, topic, payload, payload_len, qos, retain);
     if (msg_id < 0) {
-        ESP_LOGE(TAG, "Failed to publish message to topic: %s, msg_id=%d", topic, msg_id);
+        ESP_LOGE(TAG, "Failed to publish message to topic: %s", topic);
         return -1;
     }
-    ESP_LOGI(TAG, "Published to %s, msg_id=%d, len=%d", topic, msg_id, payload_len);
+    ESP_LOGI(TAG, "Published to %s, msg_id=%d", topic, msg_id);
     return msg_id;
 }
