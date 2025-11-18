@@ -276,8 +276,23 @@ int fsm_main_init(void) {
 }
 
 void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg) {
-    ESP_LOGI(TAG, "Event: %s | State: %s", fsm_event_to_str(event), fsm_main_get_current_state_str());
-    fsm_event_handle(s_fsm_handle, event, arg);
+    auto last_state = fsm_main_get_current_state_str();
+    auto err = fsm_event_handle(s_fsm_handle, event, arg);
+    switch (err)
+    {
+    case 0:
+        ESP_LOGI(TAG, "fsm_main_event_trig %s,%s -> %s", fsm_event_to_str(event), last_state, fsm_main_get_current_state_str());
+        break;
+    case -1:
+        // 找不到分支
+        break;
+    case -2:
+        ESP_LOGW(TAG, "fsm_main_event_trig sem trig");
+        break;
+    default:
+        ESP_LOGE(TAG, "fsm_main_event_trig unknow err %d", err);
+        break;
+    }
 }
 
 uint8_t fsm_main_get_current_state(void) {
