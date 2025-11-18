@@ -166,46 +166,37 @@ extern "C" void app_main()
     my_lcd_init();
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
         my_lcd_draw_rgb565(reinterpret_cast<const uint16_t *>(rgb565_buf), rgb565_buf_len / 2);
-    }, NULL);
+    }, NULL, [](void *context) {
+        ESP_LOGI(TAG, "my_h264_playback_done, current state: %s", fsm_main_get_current_state_str());
+        // lvgl_port_resume();
+        // my_lvgl_force_refresh();
+        // print_mem_info();
+        ESP_LOGI(TAG, "Triggering F_MAIN_E_ANIM_PLAY_SUC event");
+        fsm_main_event_trig(F_MAIN_E_ANIM_PLAY_SUC, nullptr);
+        ESP_LOGI(TAG, "After trigger, current state: %s", fsm_main_get_current_state_str());
+    }, nullptr);
     my_h264_set_fps(24);
 
-    auto iot_config_json = (char *)heap_caps_malloc(1024 * 10, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (iot_config_json == nullptr) {
-        ESP_LOGE(TAG, "Failed to allocate memory for iot config json");
-        vTaskDelete(nullptr);
-    }
-    my_nvs_read_iot_config_json(iot_config_json, 1024 * 10);
-    ESP_LOGI(TAG, "iot_config_json: %s", iot_config_json);
-    
-    heap_caps_free(iot_config_json);
-
-    my_ui_network_guide();
-    lvgl_port_stop();
-    my_h264_start(MY_H264_ANIM_CAT, 100);
-    my_h264_wait_done(6000);
-    lvgl_port_resume();
-    my_lvgl_force_refresh();
     print_mem_info();
 
     if (fsm_main_init() != 0) {
         ESP_LOGE(TAG, "fsm_main_init failed");
         vTaskDelete(nullptr);
     }
-    print_mem_info();
-    // my_ble_init();
-    // print_mem_info();
+    my_ble_init(NULL);  // 使用默认名称，或传入自定义名称
     my_wifi_init();
-    print_mem_info();
     my_rtc_init();
-    my_radar_init();
-    // 设置雷达监测数据回调
-    my_radar_set_human_presence_callback(human_presence_callback);
-    my_radar_set_human_movement_callback(human_movement_callback);
-    my_radar_set_respiratory_callback(respiratory_data_callback);
-    my_radar_set_heart_rate_callback(heart_rate_data_callback);
+
+    gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
+    gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
+    board_handle = audio_board_init();
+    audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
     
-    // 启动雷达监测（包含所有开关设置）
-    my_radar_start();
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    gpio_set_level(PA_ENABLE_GPIO, 0); // Enable PA
+
     print_mem_info();
 
     my_wifi_connect("C301", "1124861985");
@@ -341,8 +332,13 @@ void encoder_test(void *arg)
             case RE_ET_BTN_LONG_PRESSED:
                 fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, nullptr);
                 break;
-            case RE_ET_CHANGED:
-                break;
+            // case RE_ET_CHANGED:
+            // if (e.diff > 0)
+            // {
+                
+            // }
+            // // fsm_main_event_trig(F_MAIN_E_TURN, (void *)(&e.diff));
+            //     break; 
             default:
                 break;
         }

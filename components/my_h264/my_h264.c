@@ -37,6 +37,8 @@ static QueueHandle_t s_rgb_free_queue = NULL;
 static EventGroupHandle_t s_playback_event_group = NULL;
 static my_h264_callback_t s_callback = NULL;
 static void *s_context = NULL;
+static my_h264_done_callback_t s_done_callback = NULL;
+static void *s_done_context = NULL;
 
 typedef struct {
     uint8_t *buf;
@@ -78,6 +80,12 @@ static bool s_buffers_initialized = false;
 static uint32_t s_target_fps = 24;
 static TickType_t s_frame_interval_ticks = 0;
 
+#define H264_ANIM_COUNT (7)
+// 单个共享 PSRAM 缓冲区：存储当前播放的动画数据（大小为最大动画的大小）
+static uint8_t *s_h264_shared_buf = NULL;
+static size_t s_h264_shared_buf_size = 0;
+static bool s_psram_buffer_allocated = false;
+
 static inline uint16_t align16(uint16_t value)
 {
     return (value + 15) & ~0x0F;
@@ -104,10 +112,25 @@ static TickType_t wait_timeout_to_ticks(uint32_t timeout_ms)
     return pdMS_TO_TICKS(timeout_ms);
 }
 
-void my_h264_init(my_h264_callback_t callback, void *context)
+const struct {
+    const uint8_t *start;
+    const uint8_t *end;
+} anim_data[H264_ANIM_COUNT] = {
+    {_binary_brand_motion2_h264_start, _binary_brand_motion2_h264_end},
+    {_binary_fail2_h264_start, _binary_fail2_h264_end},
+    {_binary_go_up_h264_start, _binary_go_up_h264_end},
+    {_binary_human_recognized_h264_start, _binary_human_recognized_h264_end},
+    {_binary_processing_h264_start, _binary_processing_h264_end},
+    {_binary_success2_h264_start, _binary_success2_h264_end},
+    {_binary_cat_h264_start, _binary_cat_h264_end},
+};
+
+void my_h264_init(my_h264_callback_t callback, void *context, my_h264_done_callback_t done_callback, void *done_context)
 {
     s_callback = callback;
     s_context = context;
+    s_done_callback = done_callback;
+    s_done_context = done_context;
     h264_queue = xQueueCreate(1, sizeof(esp_h264_dec_in_frame_t));
     s_rgb_ready_queue = xQueueCreate(RGB565_BUFFER_COUNT, sizeof(rgb565_frame_t));
     s_rgb_free_queue = xQueueCreate(RGB565_BUFFER_COUNT, sizeof(uint8_t *));
@@ -125,6 +148,30 @@ void my_h264_init(my_h264_callback_t callback, void *context)
     } else {
         xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
     }
+    
+    // 分配单个共享 PSRAM 缓冲区（大小为最大动画的大小）
+    if (!s_psram_buffer_allocated) {
+        // 找到最大动画大小
+        size_t max_size = 0;
+        for (int i = 0; i < H264_ANIM_COUNT; i++) {
+            size_t len = anim_data[i].end - anim_data[i].start;
+            if (len > max_size) {
+                max_size = len;
+            }
+        }
+        
+        if (max_size > 0) {
+            s_h264_shared_buf = (uint8_t *)heap_caps_malloc(max_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+            if (s_h264_shared_buf == NULL) {
+                ESP_LOGE("h264", "Failed to allocate shared PSRAM buffer, size: %zu", max_size);
+                return;
+            }
+            s_h264_shared_buf_size = max_size;
+            s_psram_buffer_allocated = true;
+            ESP_LOGI("h264", "Allocated shared PSRAM buffer, size: %zu", max_size);
+        }
+    }
+    
     s_frame_interval_ticks = fps_to_ticks(s_target_fps);
     if (xTaskCreatePinnedToCore(playback_thread, "h264_play_thread", 1024 * 6, NULL, 5, NULL, 1) != pdPASS) {
         ESP_LOGE("h264", "Failed to create playback task");
@@ -138,57 +185,45 @@ void my_h264_init(my_h264_callback_t callback, void *context)
 int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
 {
     esp_h264_dec_in_frame_t in_frame;
-    const uint8_t *start = NULL;
-    const uint8_t *end = NULL;
+    uint8_t *start = NULL;
+    size_t len;
 
-    switch (animation) {
-        case MY_H264_ANIM_BRAND_MOTION2:
-            start = _binary_brand_motion2_h264_start;
-            end = _binary_brand_motion2_h264_end;
-            break;
-        case MY_H264_ANIM_FAIL2:
-            start = _binary_fail2_h264_start;
-            end = _binary_fail2_h264_end;
-            break;
-        case MY_H264_ANIM_GO_UP:
-            start = _binary_go_up_h264_start;
-            end = _binary_go_up_h264_end;
-            break;
-        case MY_H264_ANIM_HUMAN_RECOGNIZED:
-            start = _binary_human_recognized_h264_start;
-            end = _binary_human_recognized_h264_end;
-            break;
-        case MY_H264_ANIM_PROCESSING:
-            start = _binary_processing_h264_start;
-            end = _binary_processing_h264_end;
-            break;
-        case MY_H264_ANIM_SUCCESS2:
-            start = _binary_success2_h264_start;
-            end = _binary_success2_h264_end;
-            break;
-        case MY_H264_ANIM_CAT:
-            start = _binary_cat_h264_start;
-            end = _binary_cat_h264_end;
-        default:
-            return -1;
-    }
-
-    if (start == NULL || end == NULL || end <= start) {
+    if (animation < 0 || animation >= H264_ANIM_COUNT) {
+        ESP_LOGE("h264", "%s invalid animation: %d", __func__, animation);
         return -1;
     }
 
+    if (!s_psram_buffer_allocated || s_h264_shared_buf == NULL) {
+        ESP_LOGE("h264", "%s PSRAM buffer not allocated", __func__);
+        return -1;
+    }
+
+    len = anim_data[animation].end - anim_data[animation].start;
+    if (len == 0 || len > s_h264_shared_buf_size) {
+        ESP_LOGE("h264", "%s invalid animation size: %zu (max: %zu)", __func__, len, s_h264_shared_buf_size);
+        return -1;
+    }
+
+    // 每次播放都从 flash 复制到共享缓冲区
+    memcpy(s_h264_shared_buf, anim_data[animation].start, len);
+    start = s_h264_shared_buf;
+
     if (s_playback_event_group == NULL) {
+        ESP_LOGE("h264", "%s s_playback_event_group == NULL", __func__);
         return -1;
     }
     EventBits_t previous_bits = xEventGroupClearBits(s_playback_event_group, PLAYBACK_DONE_BIT);
     if ((previous_bits & PLAYBACK_DONE_BIT) == 0) {
+        ESP_LOGE("h264", "%s (previous_bits & PLAYBACK_DONE_BIT) == 0", __func__);
         return -1;
     }
+    memset(&in_frame, 0, sizeof(in_frame));
     in_frame.raw_data.buffer = start;
-    in_frame.raw_data.len = end - start;
+    in_frame.raw_data.len = len;
     TickType_t wait_ticks = wait_timeout_to_ticks(timeout_ms);
     if (xQueueSend(h264_queue, &in_frame, wait_ticks) != pdPASS) {
         xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+        ESP_LOGE("h264", "%s xQueueSend(h264_queue, &in_frame, wait_ticks) != pdPASS", __func__);
         return -1;
     }
     return 0;
@@ -412,6 +447,9 @@ static void playback_thread(void *arg)
                 has_last_wake_time = false;
                 if (s_playback_event_group != NULL) {
                     xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+                }
+                if (s_done_callback != NULL) {
+                    s_done_callback(s_done_context);
                 }
                 continue;
             }

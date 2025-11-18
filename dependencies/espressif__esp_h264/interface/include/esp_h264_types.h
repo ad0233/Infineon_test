@@ -84,7 +84,7 @@ typedef enum {
  * @brief  H.264 Data packet
  */
 typedef struct {
-    const uint8_t *buffer;  /*<! Data buffer */
+    uint8_t *buffer;  /*<! Data buffer */
     uint32_t len;     /*<! It is buffer length in byte */
 } esp_h264_pkt_t;
 

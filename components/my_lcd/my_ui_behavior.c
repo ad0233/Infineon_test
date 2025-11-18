@@ -7,6 +7,8 @@
 
 #include "esp_log.h"
 #include "my_lcd.h"
+#include "my_nvs.h"
+#include "my_ble.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -44,15 +46,14 @@ void my_ui_in_start() {
 }
 
 // 动态生成二维码的函数
-void my_ui_generate_qr_code(const char* url, const char* id, const char* name, const char* mac) {
+// 新格式: https://lunawake.ai?sn={device_id}
+void my_ui_generate_qr_code(const char* url, const char* device_id) {
     static char qr_url[256];
     
-    // 拼接完整URL
-    snprintf(qr_url, sizeof(qr_url), "%s?d=%s&name=%s&mac=%s", 
-             url ? url : "https://lunawake.com/wx",
-             id ? id : "",
-             name ? name : "",
-             mac ? mac : "");
+    // 拼接完整URL: https://lunawake.ai?sn={device_id}
+    snprintf(qr_url, sizeof(qr_url), "%s?sn=%s", 
+             url ? url : "",
+             device_id ? device_id : "");
     
     ESP_LOGI(TAG, "生成二维码URL: %s", qr_url);
     
