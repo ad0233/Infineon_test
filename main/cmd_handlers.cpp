@@ -362,7 +362,7 @@ static void test_conn_ota_task(void *arg) {
     }
     
     // 启动 OTA 更新
-    int ota_ret = my_ota_start(params->ota_url);
+    int ota_ret = my_ota_start(params->ota_url, nullptr, nullptr);
     if (ota_ret != 0) {
         ESP_LOGE(TAG, "OTA start failed: %d", ota_ret);
     } else {
