@@ -37,7 +37,7 @@ static audio_board_handle_t board_handle = 0;
 audio_board_handle_t audio_board_init(void)
 {
     if (board_handle) {
-        ESP_LOGW(TAG, "The board has already been initialized!");
+        // ESP_LOGW(TAG, "The board has already been initialized!");
         return board_handle;
     }
     board_handle = (audio_board_handle_t) audio_calloc(1, sizeof(struct audio_board_handle));

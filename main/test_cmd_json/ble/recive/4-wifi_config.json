@@ -1,7 +1,7 @@
 {
   "cmd": "wifi_connect",
   "params": {
-    "ssid": "C301",
-    "password": "1124861985"
+    "ssid": "lunawake",
+    "password": "12345678"
   }
 }

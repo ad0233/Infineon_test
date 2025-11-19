@@ -6,6 +6,8 @@
 #include "esp_lvgl_port.h"
 #include "ui.h"
 
+#include "board.h"
+
 #include "my_ui_behavior.h"
 #include "my_nvs.h"
 #include <my_wifi.h>
@@ -537,6 +539,9 @@ void fsm_volume_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
     
     // 设置新音量
     my_ui_volume_set(new_volume);
+    // TODO: 更新音量
+    audio_board_handle_t board_handle = audio_board_init();
+    // audio_hal_set_volume(board_handle->audio_hal, new_volume);
 }
 
 /*----------------------------------------------------------------------------------light-------------------------------------------------------------------------------------*/

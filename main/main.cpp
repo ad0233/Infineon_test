@@ -258,7 +258,8 @@ extern "C" void app_main()
 
     board_handle = audio_board_init();
     audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
-    
+    audio_hal_set_volume(board_handle->audio_hal, 25);
+
     vTaskDelay(100 / portTICK_PERIOD_MS);
     gpio_set_level(PA_ENABLE_GPIO, 0); // Enable PA
 
@@ -267,6 +268,24 @@ extern "C" void app_main()
     esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
     esp_netif_sntp_init(&config);
     print_mem_info();
+
+    periph_spiffs_cfg_t spiffs_cfg = {
+        .root = "/spiffs",
+        .partition_label = "spiffs_data",
+        .max_files = 5,
+        .format_if_mount_failed = true};
+    esp_periph_handle_t spiffs_handle = periph_spiffs_init(&spiffs_cfg);
+    esp_periph_start(set, spiffs_handle);
+
+    // Wait until spiffs is mounted
+    while (!periph_spiffs_is_mounted(spiffs_handle)) {
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+
+    void tone_play_callback(audio_element_status_t evt);
+    audio_tone_init(tone_play_callback);
+
+    audio_tone_play("spiffs://spiffs/water-fountain.mp3");
 
     // // wait for time to be set
     // int retry = 0;
