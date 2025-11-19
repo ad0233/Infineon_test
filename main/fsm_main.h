@@ -94,6 +94,8 @@ void fsm_main_in_radarinfo(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_in_GoodMorning_demo(void *arg, uint8_t last_state, uint8_t next_state); 
 void fsm_main_in_reminder_tomorrow(void *arg, uint8_t last_state, uint8_t next_state);
 
+void fsm_main_in_OTA(void *arg, uint8_t last_state, uint8_t next_state);
+
 enum fsm_main_event_enum {
     F_MAIN_E_INIT,              // 初始化事件
     F_MAIN_E_ANIM_PLAY_SUC,     //播放结束
@@ -111,6 +113,9 @@ enum fsm_main_event_enum {
 
     F_MAIN_E_RTC_EXIST,        // RTC有（检测到RTC模块存在且正常）
     F_MAIN_E_RTC_NOT_EXIST,     // RTC无（未检测到RTC模块，或模块故障无法识别）
+
+    // TODO:这个事件要弄一下
+    F_MAIN_E_OTA_UPDATE, //OTA更新事件 
 
     F_MAIN_E_BTN_CLICKED,       // 点击事件
     F_MAIN_E_BTN_L_CLICKED,     // 长按事件
@@ -161,6 +166,8 @@ enum fsm_main_state_enum {
     F_MAIN_S_RadarInfo,         //雷达数据
     F_MAIN_S_GoodMorning_DEMO,  //早报demo
     F_MAIN_S_REMINDER,          //明天提醒
+    //ota
+    F_MAIN_S_OTA,         //睡眠数据
 };
 
 void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg);

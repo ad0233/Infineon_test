@@ -164,12 +164,35 @@ static struct StateTable fsm_user_table[] = {
     {nullptr             ,0                     , F_MAIN_E_TIMEOUT    ,F_MAIN_S_RadarInfo              ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//睡眠数据--主页面 
     {nullptr             ,0                     , F_MAIN_E_TIMEOUT    ,F_MAIN_S_GoodMorning_DEMO       ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//早报dome--主页面 
     {nullptr             ,0                     , F_MAIN_E_TIMEOUT   ,F_MAIN_S_REMINDER               ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//提醒--主页面  
+    // //其他状态 
+    //TODO://ota  更新行为
+    {nullptr             ,0                     ,0      ,F_MAIN_S_UNINIT_PLAYING                   ,F_MAIN_S_OTA     ,0  ,false    ,    fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_FINDSUC_ANIM                   ,F_MAIN_S_OTA     ,0  ,false    ,      fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_FINDFAIL_ANIM                   ,F_MAIN_S_OTA     ,0  ,false    ,     fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_FINDSUC                   ,F_MAIN_S_OTA     ,0  ,false    ,           fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_FINDFAIL                   ,F_MAIN_S_OTA     ,0  ,false    ,          fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_FINDPERSON                   ,F_MAIN_S_OTA     ,0  ,false    ,        fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_WIFI_GUIDE                   ,F_MAIN_S_OTA     ,0  ,false    ,        fsm_main_in_OTA},//ota 
+    {nullptr             ,0                     ,0      ,F_MAIN_S_WIFI_CONN                   ,F_MAIN_S_OTA     ,0  ,false    ,         fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_CLOCK                   ,F_MAIN_S_OTA     ,0  ,false    ,             fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_WIFI_CONN_SUC                   ,F_MAIN_S_OTA     ,0  ,false    ,     fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_RTC_DETECT_CLK                   ,F_MAIN_S_OTA     ,0  ,false    ,    fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_MENU                   ,F_MAIN_S_OTA     ,0  ,false    ,              fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_MEMU_WIFI_SUC                   ,F_MAIN_S_OTA     ,0  ,false    ,     fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_MEMU_WIFI_FAILE                  ,F_MAIN_S_OTA     ,0  ,false    ,    fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_MENU_SLEEP_MODE                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota 
+    {nullptr             ,0                     ,0      ,F_MAIN_S_MENU_ALARM                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_NO_MENU_ALARM                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_MENU_UNWIND                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_MENU_VOLUME                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_MENU_BRIGHTNESS                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_MEMU_FINDPERSONC_ANIM                  ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_BOYA_DATA                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_RadarInfo                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota 
+    {nullptr             ,0                     ,0      ,F_MAIN_S_GoodMorning_DEMO                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
+    {nullptr             ,0                     ,0      ,F_MAIN_S_REMINDER                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
 
 
-    // //其他状态  所有页面只要到时间了都能进入   自动进入状态   0代表所有界面
-    // {nullptr             ,0                     ,0      ,0                   ,F_MAIN_S_CLOCK     ,10  ,true    ,  fsm_main_to_clock},//睡眠数据--主页面 
-    // {nullptr             ,0                     ,0      ,0                   ,F_MAIN_S_CLOCK     ,10  ,true    ,  fsm_main_to_clock},//早报dome--主页面 
-    // {nullptr             ,0                     ,0      ,0                   ,F_MAIN_S_CLOCK     ,10  ,true    ,  fsm_main_to_clock},//提醒--主页面  
 };
 
 
