@@ -3,7 +3,9 @@
     "params": {
         "ssid": "Your_WiFi_SSID",
         "password": "your_wifi_password",
+        "ota_size": 2589088,
         "ota_url": "https://testbyhenry.oss-cn-shenzhen.aliyuncs.com/Lunawake_feat_ssl_23d6ca6_994adc0a_20251118_090957.bin?Expires=1763429028&OSSAccessKeyId=TMP.3KroBHUDPt6yBEDzASi2yDL5f9kzQmLrqHtuhMoNuHw8pH8Bx6jqAVUZGPwCNy5boezhvMrPogv2C7FSjQXSST5xt4b5Ko&Signature=IoxE5gtwuBxYlNSNkkzJkdAbdmQ%3D"
     }
 }
+
 

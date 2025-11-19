@@ -200,6 +200,7 @@ extern "C" void app_main()
     ble_protocol_init();  // 初始化蓝牙协议解析（不启用发送任务）
     print_mem_info();
     my_wifi_init();
+    my_wifi_auto_connect();
     my_wifi_set_event_callback([](wifi_state_t state, void *context){
         switch (state)
         {
@@ -243,18 +244,18 @@ extern "C" void app_main()
     esp_netif_sntp_init(&config);
     print_mem_info();
 
-    // wait for time to be set
-    int retry = 0;
-    const int retry_count = 5;
-    while (esp_netif_sntp_sync_wait(3000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && ++retry < retry_count) {
-        ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
-    }
-    // Set timezone to China Standard Time
-    time_t now = 0;
-    struct tm timeinfo;
-    setenv("TZ", "CST-8", 1);
-    tzset();
-    localtime_r(&now, &timeinfo);
+    // // wait for time to be set
+    // int retry = 0;
+    // const int retry_count = 5;
+    // while (esp_netif_sntp_sync_wait(3000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && ++retry < retry_count) {
+    //     ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
+    // }
+    // // Set timezone to China Standard Time
+    // time_t now = 0;
+    // struct tm timeinfo;
+    // setenv("TZ", "CST-8", 1);
+    // tzset();
+    // localtime_r(&now, &timeinfo);
 
     // 按固定模板由 thing_name 生成订阅主题
     static char t_req[128];

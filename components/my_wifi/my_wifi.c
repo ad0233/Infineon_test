@@ -17,7 +17,6 @@ static const char *TAG = "my_wifi";
 #define WIFI_FAIL_BIT      BIT1
 #define MAX_RETRY          5
 
-static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_num = 0;
 static wifi_state_t s_wifi_state = WIFI_STATE_IDLE;
 static wifi_event_callback_t s_event_callback = NULL;
@@ -46,7 +45,6 @@ static void event_handler(void* arg, esp_event_base_t event_base,
             ESP_LOGI(TAG, "Retry connecting to WiFi (%d/%d)", s_retry_num, MAX_RETRY);
             set_wifi_state(WIFI_STATE_CONNECTING);
         } else {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
             set_wifi_state(WIFI_STATE_FAILED);
             ESP_LOGE(TAG, "Failed to connect to WiFi");
         }
@@ -54,15 +52,12 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
         set_wifi_state(WIFI_STATE_CONNECTED);
     }
 }
 
 esp_err_t my_wifi_init(void)
 {
-    s_wifi_event_group = xEventGroupCreate();
-    
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     s_sta_netif = esp_netif_create_default_wifi_sta();
@@ -108,22 +103,7 @@ esp_err_t my_wifi_connect(const char *ssid, const char *password)
     
     ESP_LOGI(TAG, "Connecting to SSID: %s", ssid);
     
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-            pdFALSE,
-            pdFALSE,
-            portMAX_DELAY);
-    
-    if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(TAG, "Connected to SSID: %s", ssid);
-        return ESP_OK;
-    } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGE(TAG, "Failed to connect to SSID: %s", ssid);
-        return ESP_FAIL;
-    } else {
-        ESP_LOGE(TAG, "Unexpected event");
-        return ESP_FAIL;
-    }
+    return ESP_OK;
 }
 
 esp_err_t my_wifi_disconnect(void)

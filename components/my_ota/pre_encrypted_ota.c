@@ -38,6 +38,7 @@ static TaskHandle_t s_ota_task_handle = NULL;
 // 进度回调函数指针
 static ota_progress_callback_t s_progress_cb = NULL;
 static void *s_progress_user_ctx = NULL;
+static int s_ota_total_size = 0;
 
 extern const char rsa_private_pem_start[] asm("_binary_rsa_priv_key_pem_start");
 extern const char rsa_private_pem_end[]   asm("_binary_rsa_priv_key_pem_end");
@@ -162,7 +163,7 @@ void pre_encrypted_ota_task(void *pvParameter)
         // 调用进度回调
         if (s_progress_cb != NULL) {
             int bytes_read = esp_https_ota_get_image_len_read(https_ota_handle);
-            s_progress_cb(bytes_read, 0, s_progress_user_ctx);
+            s_progress_cb(bytes_read, s_ota_total_size, s_progress_user_ctx);
         }
         // 每 5 秒打印一次日志
         if (esp_timer_get_time() - start_time > 5000) {
@@ -202,16 +203,21 @@ ota_end:
     OTA_TASK_EXIT();
 }
 
-int my_ota_start(const char *url_ota_file, ota_progress_callback_t progress_cb, void *user_ctx)
+void my_ota_register_progress_callback(ota_progress_callback_t progress_cb, void *user_ctx)
+{
+    s_progress_cb = progress_cb;
+    s_progress_user_ctx = user_ctx;
+}
+
+int my_ota_start(const char *url_ota_file, int ota_size)
 {
     if (url_ota_file == NULL) {
         ESP_LOGE(TAG, "OTA URL is NULL");
         return -1;
     }
     
-    // 注册进度回调
-    s_progress_cb = progress_cb;
-    s_progress_user_ctx = user_ctx;
+    // 保存 OTA 总大小
+    s_ota_total_size = ota_size;
     
     // 检查是否已有 OTA 任务在运行
     if (s_ota_task_handle != NULL) {
