@@ -96,18 +96,38 @@ void human_presence_callback(const radar_human_data_t *data)
 void human_movement_callback(const radar_human_data_t *data)
 {
     // ESP_LOGI("HUMAN", "体动参数: %d", data->movement_param);
+    // 体动参数可用于更新图表曲线
+    if (ui_RadarInfoChart != NULL && lvgl_port_lock(0)) {
+        lv_chart_series_t *series = lv_chart_get_series_next(ui_RadarInfoChart, NULL);
+        if (series != NULL) {
+            lv_chart_set_next_value(ui_RadarInfoChart, series, data->movement_param);
+        }
+        lvgl_port_unlock();
+    }
 }
 
 // 呼吸监测数据回调函数
 void respiratory_data_callback(const radar_respiratory_data_t *data)
 {
     // ESP_LOGI("RESPIRATORY", "呼吸: %d 次/min", data->respiratory_value);
+    if (ui_RadarInfoBreathingX != NULL && lvgl_port_lock(0)) {
+        char text[16];
+        snprintf(text, sizeof(text), "%d", data->respiratory_value);
+        lv_label_set_text(ui_RadarInfoBreathingX, text);
+        lvgl_port_unlock();
+    }
 }
 
 // 心率监测数据回调函数
 void heart_rate_data_callback(const radar_heart_rate_data_t *data)
 {
     // ESP_LOGI("HEART_RATE", "心率: %d 次/min", data->heart_rate_value);
+    if (ui_RadarInfoHeartX != NULL && lvgl_port_lock(0)) {
+        char text[16];
+        snprintf(text, sizeof(text), "%d", data->heart_rate_value);
+        lv_label_set_text(ui_RadarInfoHeartX, text);
+        lvgl_port_unlock();
+    }
 }
 
 #include "audio_recorder.h"
@@ -227,16 +247,20 @@ extern "C" void app_main()
     print_mem_info();
     my_rtc_init();
     my_radar_init();
+    my_radar_set_human_presence_callback(human_presence_callback);
+    my_radar_set_human_movement_callback(human_movement_callback);
+    my_radar_set_respiratory_callback(respiratory_data_callback);
+    my_radar_set_heart_rate_callback(heart_rate_data_callback);
 
     gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
-    // board_handle = audio_board_init();
-    // audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
+    board_handle = audio_board_init();
+    audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
     
-    // vTaskDelay(100 / portTICK_PERIOD_MS);
-    // gpio_set_level(PA_ENABLE_GPIO, 0); // Enable PA
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    gpio_set_level(PA_ENABLE_GPIO, 0); // Enable PA
 
     print_mem_info();
 
