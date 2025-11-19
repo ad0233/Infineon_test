@@ -51,7 +51,7 @@ extern "C" {
 #include "screens/ui_OTA.h"
 #include "screens/ui_sleepData.h"
 #include "screens/ui_ReminderTomorrow.h"
-
+#include "screens/ui_RadarInfo.h"
 ///////////////////// VARIABLES ////////////////////
 
 extern lv_anim_t * Imagezoom_Animation(lv_obj_t * TargetObject, int delay);

@@ -29,6 +29,7 @@ screens/ui_MianYesPerson.c
 screens/ui_MorningAnimation.c
 screens/ui_BluetoothMusic.c
 screens/ui_OTA.c
+screens/ui_RadarInfo.c
 screens/ui_sleepData.c
 screens/ui_ReminderTomorrow.c
 

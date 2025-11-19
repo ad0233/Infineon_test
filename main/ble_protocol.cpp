@@ -71,7 +71,7 @@ static void ble_parse_task(void *arg)
                     
                 if (out_len > 0) {
                     ESP_LOGI(TAG, "Parsed packet, len %d", out_len);
-                    ESP_LOG_BUFFER_HEXDUMP(TAG, out_buf, out_len, ESP_LOG_INFO);
+                    // ESP_LOG_BUFFER_HEXDUMP(TAG, out_buf, out_len, ESP_LOG_INFO);
                     
                     // 解析命令
                     cmd_parse(out_buf, out_len);
