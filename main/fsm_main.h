@@ -89,6 +89,10 @@ void fsm_main_in_light(void *arg);
 void fsm_light_next_item(void *arg);
 void fsm_main_in_set_time(void *arg);
 
+void fsm_main_in_boya_data(void *arg);
+void fsm_main_in_GoodMorning_demo(void *arg); 
+void fsm_main_in_reminder_tomorrow(void *arg);
+
 enum fsm_main_event_enum {
     F_MAIN_E_INIT,              // 初始化事件
     F_MAIN_E_ANIM_PLAY_SUC,     //播放结束
@@ -110,7 +114,7 @@ enum fsm_main_event_enum {
     F_MAIN_E_BTN_CLICKED,       // 点击事件
     F_MAIN_E_BTN_L_CLICKED,     // 长按事件
     F_MAIN_E_KNOB_CW,           // 旋钮事件
-    F_MAIN_E_TIME,              // 等待事件（必须在 TIMEOUT 之前，保证值 < 255）
+    F_MAIN_E_TIME,              // 等待事件
     F_MAIN_E_TIMEOUT = 255,     // 超时事件 特殊事件，不能改值，库内部要求，fsm_timeout_trig函数触发该事件
 };
 void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg);

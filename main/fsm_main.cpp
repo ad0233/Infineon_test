@@ -8,7 +8,7 @@
 #include "esp_lvgl_port.h"
 #include "my_ui_behavior.h"
 
-static const char *TAG = "fsm_main";
+    static const char *TAG = "fsm_main";
 
 
 enum fsm_main_state_enum {
@@ -19,6 +19,7 @@ enum fsm_main_state_enum {
     F_MAIN_S_CLOCK_BACK,        //时种页面人回来过度（大蝴蝶）
     // 找人
     F_MAIN_S_FINDPERSONC_ANIM,  // 找人动画
+    F_MAIN_S_MEMU_FINDPERSONC_ANIM,//后续的找人动画
     F_MAIN_S_FINDPERSON,        // 雷达找人检测
     F_MAIN_S_FINDSUC,           // 找人成功
     F_MAIN_S_FINDFAIL,          // 找人失败
@@ -31,12 +32,13 @@ enum fsm_main_state_enum {
     F_MAIN_S_WIFI_CONN_SUC,     // wifi连接成功
     F_MAIN_S_WIFI_CONN_FAIL,    //  wifi连接失败
     F_MAIN_S_WIFI_OFFLINE,      //wifi离线状态（wifi云）
+    F_MAIN_S_MEMU_WIFI_SUC,     //菜单 wifi连接成功
+    F_MAIN_S_MEMU_WIFI_FAILE,   // 菜单 wifi连接失败
     // RTC配置
     F_MAIN_S_RTC_DETECT,         // RTC配置检测
     F_MAIN_S_RTC_DETECT_CLK,     // RTC时间
     //菜单
     F_MAIN_S_MENU,               //菜单
-
 
     F_MAIN_S_MENU_SLEEP_MODE,   //睡眠模式页面
     F_MAIN_S_MENU_ALARM,        //有闹钟页面
@@ -46,9 +48,10 @@ enum fsm_main_state_enum {
     F_MAIN_S_MENU_BRIGHTNESS,      //亮度页面
     F_MAIN_S_MENU_SET_TIME,        //设置时间页面
 
-
-
-
+    //数据页面
+    F_MAIN_S_BOYA_DATA,         //睡眠数据
+    F_MAIN_S_GoodMorning_DEMO,  //早报demo
+    F_MAIN_S_REMINDER,          //明天提醒
 };
 
 // 状态名称获取
@@ -174,10 +177,7 @@ static struct StateTable fsm_user_table[] = {
     //找人动画结束
     {nullptr             ,0            ,F_MAIN_E_ANIM_PLAY_SUC     ,F_MAIN_S_FINDSUC_ANIM   ,F_MAIN_S_FINDSUC           ,0  ,false    ,    fsm_main_lidar_find_suc }, //成功找人动画结束
     {nullptr             ,0            ,F_MAIN_E_ANIM_PLAY_SUC     ,F_MAIN_S_FINDFAIL_ANIM  ,F_MAIN_S_FINDFAIL          ,0  ,false    ,    fsm_main_lidar_find_fail },//找不人动画结束
-    {nullptr             ,0            ,F_MAIN_E_DEV_MOVE          ,F_MAIN_S_FINDFAIL       ,F_MAIN_S_FINDPERSON        ,0  ,false    ,     fsm_main_lidar_find_playing},//移动设备重新找人
-    // //找人---网络
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED        , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_DETECT     ,0    ,false        , nullptr},  //找人成功跳转检测wifi
-    // { nullptr           ,0            ,F_MAIN_E_BTN_CLICKED       , F_MAIN_S_FINDFAIL         , F_MAIN_S_WIFI_DETECT    ,0    ,false         ,nullptr },  //找人失败跳转检测wifi
+    {nullptr             ,0            ,F_MAIN_E_DEV_MOVE          ,F_MAIN_S_FINDFAIL       ,F_MAIN_S_FINDPERSON        ,0  ,false    ,     fsm_main_lidar_find_playing},//移动设备重新找人 //移动设备也没弄  
 
     { fm_has_w_c_state           ,FM_W_N_CFG   ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_FINDSUC     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         ,fsm_main_wifi_guide },  //未配置去二维码
     { fm_has_w_c_state           ,FM_W_CONN    ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_FINDSUC     , F_MAIN_S_WIFI_CONN         ,0   ,false          ,fsm_main_wifi_connecting },  //连接中
@@ -189,15 +189,15 @@ static struct StateTable fsm_user_table[] = {
     { fm_has_w_c_state           ,FM_W_CONN    ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_FINDFAIL     , F_MAIN_S_WIFI_CONN         ,0   ,false          ,fsm_main_wifi_connecting },     //连接中
     { fm_has_w_c_state           ,FM_W_SUC     ,F_MAIN_E_BTN_CLICKED      , F_MAIN_S_FINDFAIL     , F_MAIN_S_CLOCK             ,0    ,false          , fsm_main_to_clock},          //连接成功去主页面
     { fm_has_w_c_state           ,FM_W_FAI     ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_FINDFAIL     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         , fsm_main_wifi_guide},           //连接失败去二维码
-    // //连接状态判断  -- wifi弄好才能弄这个  不是状态位置改变不了
-    // { nullptr           ,0           ,F_MAIN_E_WIFI_C_SUC      , F_MAIN_S_WIFI_CONN         , F_MAIN_S_WIFI_CONN_SUC    ,0    ,false         , fsm_main_wifi_conn_suc}, //连接中---连接成功
-    //  { nullptr           ,0         ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_WIFI_CONN_SUC       , F_MAIN_S_CLOCK            ,0    ,false         ,fsm_main_to_clock }, //连接成功-----时钟
-    // { nullptr           ,0           ,F_MAIN_E_WIFI_C_FAIL     , F_MAIN_S_WIFI_CONN         , F_MAIN_S_WIFI_GUIDE       ,0    ,false         , fsm_main_wifi_guide}, //连接失败去二维码
+    //连接状态判断 
+    { fm_has_w_c_state           ,FM_W_SUC      ,F_MAIN_E_WIFI_C_SUC      , F_MAIN_S_WIFI_CONN         , F_MAIN_S_WIFI_CONN_SUC    ,0    ,false         , fsm_main_wifi_conn_suc}, //连接中---连接成功
+    { fm_has_w_c_state           ,FM_W_FAI     ,F_MAIN_E_WIFI_C_FAIL     , F_MAIN_S_WIFI_CONN         , F_MAIN_S_WIFI_GUIDE       ,0    ,false         , fsm_main_wifi_guide}, //连接中----去二维码
+    {nullptr                     ,0             ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_WIFI_CONN_SUC       , F_MAIN_S_CLOCK            ,0    ,false         ,fsm_main_to_clock }, //连接成功-----时钟
     //二维码
     { nullptr           ,0                  ,F_MAIN_E_WIFI_CMD_TRIG   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_WIFI_CONN        ,0    ,false          , fsm_main_wifi_connecting},   //二维码去连接中
     //rtc
-    { fm_has_rtc_state   ,FM_RTC_EXIST       ,F_MAIN_E_BTN_L_CLICKED    , F_MAIN_S_WIFI_GUIDE         , F_MAIN_S_CLOCK   ,0    ,false        ,fsm_main_to_clock },//二维码去 rtc 有主页面
-    { fm_has_rtc_state   ,FM_RTC_NO_EXIST   ,F_MAIN_E_BTN_L_CLICKED   , F_MAIN_S_WIFI_GUIDE         , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false        , fsm_main_set_time},//二维码去 rtc 无配置时间
+    { fm_has_rtc_state   ,FM_RTC_EXIST       ,F_MAIN_E_BTN_L_CLICKED    , F_MAIN_S_WIFI_GUIDE         , F_MAIN_S_CLOCK   ,0    ,false        ,fsm_main_to_clock },//二维码去 ---rtc 有主页面
+    { fm_has_rtc_state   ,FM_RTC_NO_EXIST   ,F_MAIN_E_BTN_L_CLICKED   , F_MAIN_S_WIFI_GUIDE         , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false        , fsm_main_set_time},//二维码去 ---rtc 无配置时间
     { nullptr           ,0                  ,F_MAIN_E_KNOB_CW         , F_MAIN_S_RTC_DETECT_CLK   , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false           ,fsm_main_rtc_adjust_time },//rtc修改时间
     { nullptr           ,0                  ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_RTC_DETECT_CLK   , F_MAIN_S_CLOCK             ,0    ,false          , fsm_main_rtc_save_and_exit},//rtc保存时间并去主页面
     //主页面
@@ -208,11 +208,11 @@ static struct StateTable fsm_user_table[] = {
     //菜单
     { nullptr          ,0        ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU             , F_MAIN_S_MENU       ,0    ,false              , fsm_menu_next_item},//菜单选择
     //wifi 设置
-    { fm_has_memu_state           ,FM_MEMU_WIFI_SC              ,F_MAIN_E_BTN_CLICKED           , F_MAIN_S_MENU             , F_MAIN_S_WIFI_CONN_SUC        ,0    ,false        , fsm_main_in_wifi_sc},//菜单---有wifi 根据wifi检测判断
-    { fm_has_memu_state           ,FM_MEMU_WIFI_FA              ,F_MAIN_E_BTN_CLICKED           , F_MAIN_S_MENU             , F_MAIN_S_WIFI_OFFLINE         ,0    ,false        , fsm_main_in_wifi_fa},//菜单---无wifi
-    { nullptr                     ,0                            ,F_MAIN_E_BTN_L_CLICKED       , F_MAIN_S_WIFI_CONN_SUC        , F_MAIN_S_WIFI_OFFLINE       ,0    ,false          , fsm_main_in_wifi_fa},//手动关闭wifi
-    { nullptr                     ,0                            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_WIFI_CONN_SUC       , F_MAIN_S_MENU             ,0    ,false          , fsm_main_in_memu},//有wifi 短按退回菜单
-    { nullptr                    ,0                             ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_WIFI_OFFLINE        , F_MAIN_S_MENU                ,0    ,false          , fsm_main_in_memu},//无wifi 短按退回菜单 
+    { fm_has_memu_state           ,FM_MEMU_WIFI_SC              ,F_MAIN_E_BTN_CLICKED           , F_MAIN_S_MENU             , F_MAIN_S_MEMU_WIFI_SUC        ,0    ,false        , fsm_main_in_wifi_sc},//菜单---有wifi 根据wifi检测判断
+    { fm_has_memu_state           ,FM_MEMU_WIFI_FA              ,F_MAIN_E_BTN_CLICKED           , F_MAIN_S_MENU             , F_MAIN_S_MEMU_WIFI_FAILE       ,0    ,false        , fsm_main_in_wifi_fa},//菜单---无wifi
+    { nullptr                     ,0                            ,F_MAIN_E_BTN_L_CLICKED       , F_MAIN_S_MEMU_WIFI_SUC        , F_MAIN_S_MEMU_WIFI_FAILE       ,0    ,false          , fsm_main_in_wifi_fa},//手动关闭wifi
+    { nullptr                     ,0                            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MEMU_WIFI_SUC       , F_MAIN_S_MENU                ,0    ,false          , fsm_main_in_memu},//有wifi 短按退回菜单
+    { nullptr                    ,0                             ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MEMU_WIFI_FAILE        , F_MAIN_S_MENU                ,0    ,false          , fsm_main_in_memu},//无wifi 短按退回菜单 
     //唤醒模式
     { fm_has_memu_state           ,FM_MEMU_WAKE_MOD            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_SLEEP_MODE     ,0    ,false    , fsm_main_in_wake_mode},//菜单选择唤醒模式
     { nullptr                     ,0                           ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_SLEEP_MODE   , F_MAIN_S_MENU_SLEEP_MODE     ,0    ,false    , fsm_wake_mode_next_item},//唤醒模式的二级菜单切换
@@ -226,20 +226,41 @@ static struct StateTable fsm_user_table[] = {
     { nullptr             ,0                ,F_MAIN_E_BTN_CLICKED          , F_MAIN_S_MENU_ALARM             , F_MAIN_S_MENU     ,0      ,false       , fsm_main_in_memu},//闹钟--菜单
     { nullptr             ,0                ,F_MAIN_E_BTN_CLICKED          , F_MAIN_S_NO_MENU_ALARM          , F_MAIN_S_MENU     ,0      ,false       , fsm_main_in_memu},//无脑闹钟--菜单
     //UNWIND 
-    { fm_has_memu_state           ,FM_MEMU_UNWIND            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//菜单选择歌曲选择
-    { nullptr                     ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_unwind_next_item},//切换歌曲
-    { nullptr                     ,0                         ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU              ,0    ,false       , fsm_main_in_memu},//歌曲--菜单
+    { fm_has_memu_state    ,FM_MEMU_UNWIND            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//菜单选择歌曲选择
+    { nullptr              ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_unwind_next_item},//切换歌曲
+    { nullptr              ,0                         ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU              ,0    ,false       , fsm_main_in_memu},//歌曲--菜单
     //声音
-    { fm_has_memu_state           ,FM_MEMU_VOL            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_VOLUME       ,0    ,false         , fsm_main_in_volume},//菜单选择声音
-    { nullptr                     ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_VOLUME       , F_MAIN_S_MENU_VOLUME       ,0    ,false         , fsm_volume_next_item},//设置声音
-    { nullptr                     ,0                         ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_VOLUME       , F_MAIN_S_MENU              ,0    ,false         , fsm_main_in_memu},//声音--菜单
-
-    { fm_has_memu_state           ,FM_MEMU_SC_BR            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_BRIGHTNESS   ,0    ,false       , fsm_main_in_light},//菜单选择亮度
-    { nullptr                       ,0                      ,F_MAIN_E_KNOB_CW           , F_MAIN_S_MENU_BRIGHTNESS        , F_MAIN_S_MENU_BRIGHTNESS   ,0    ,false       , fsm_light_next_item},//设置亮度
-    { nullptr                       ,0                      ,F_MAIN_E_BTN_CLICKED        , F_MAIN_S_MENU_BRIGHTNESS    , F_MAIN_S_MENU                  ,0    ,false      , fsm_main_in_memu},//亮度--菜单
+    { fm_has_memu_state     ,FM_MEMU_VOL           ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU                 , F_MAIN_S_MENU_VOLUME       ,0    ,false         , fsm_main_in_volume},//菜单选择声音
+    { nullptr               ,0                     ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_VOLUME       , F_MAIN_S_MENU_VOLUME       ,0    ,false         , fsm_volume_next_item},//设置声音
+    { nullptr               ,0                      ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_VOLUME       , F_MAIN_S_MENU              ,0    ,false         , fsm_main_in_memu},//声音--菜单
+    //亮度
+    { fm_has_memu_state      ,FM_MEMU_SC_BR        ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_BRIGHTNESS   ,0    ,false       , fsm_main_in_light},//菜单选择亮度
+    { nullptr                 ,0                   ,F_MAIN_E_KNOB_CW           , F_MAIN_S_MENU_BRIGHTNESS     , F_MAIN_S_MENU_BRIGHTNESS   ,0    ,false       , fsm_light_next_item},//设置亮度
+    { nullptr                 ,0                    ,F_MAIN_E_BTN_CLICKED        , F_MAIN_S_MENU_BRIGHTNESS    , F_MAIN_S_MENU             ,0    ,false      , fsm_main_in_memu},//亮度--菜单
+    //设置时间
+    { fm_has_memu_state       ,FM_MEMU_SETTIME      ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU            , F_MAIN_S_RTC_DETECT_CLK     ,0    ,false     , fsm_main_set_time},//菜单选择设置时间  
+    //菜单返回主页面  
+    {nullptr                   ,0                   ,F_MAIN_E_TIME         , F_MAIN_S_MENU                  , F_MAIN_S_CLOCK                ,15    ,true     , fsm_main_to_clock},//菜单---主页面 
     
-    { fm_has_memu_state           ,FM_MEMU_SETTIME            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_SET_TIME     ,0    ,false     , fsm_main_in_set_time},//菜单选择设置时间  
-        
+    //主页面去
+    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_CLOCK                    ,F_MAIN_S_MEMU_FINDPERSONC_ANIM        ,0  ,false    ,  fsm_main_lidar_find_playing},//主页面--找人动画
+    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_MEMU_FINDPERSONC_ANIM    ,F_MAIN_S_BOYA_DATA               ,0  ,false    ,  fsm_main_in_boya_data},//找人动画--睡眠数据
+    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_BOYA_DATA                 ,F_MAIN_S_GoodMorning_DEMO     ,0  ,false    ,  fsm_main_in_GoodMorning_demo},//睡眠时间---早报dome
+    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_GoodMorning_DEMO          ,F_MAIN_S_REMINDER            ,0  ,false    ,  fsm_main_in_reminder_tomorrow},//早报dome---提醒 
+
+    //状态卡片  10s退回
+    {nullptr             ,0                     , F_MAIN_E_TIME    ,F_MAIN_S_BOYA_DATA              ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//睡眠数据--主页面 
+    {nullptr             ,0                     , F_MAIN_E_TIME    ,F_MAIN_S_GoodMorning_DEMO       ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//早报dome--主页面 
+    {nullptr             ,0                     ,  F_MAIN_E_TIME   ,F_MAIN_S_REMINDER               ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//提醒--主页面  
+
+
+    // //其他状态  所有页面只要到时间了都能进入   自动进入状态   0代表所有界面
+    // {nullptr             ,0                     ,0      ,0                   ,F_MAIN_S_CLOCK     ,10  ,true    ,  fsm_main_to_clock},//睡眠数据--主页面 
+    // {nullptr             ,0                     ,0      ,0                   ,F_MAIN_S_CLOCK     ,10  ,true    ,  fsm_main_to_clock},//早报dome--主页面 
+    // {nullptr             ,0                     ,0      ,0                   ,F_MAIN_S_CLOCK     ,10  ,true    ,  fsm_main_to_clock},//提醒--主页面  
+
+    
+
 };
 
 

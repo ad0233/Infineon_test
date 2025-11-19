@@ -18,7 +18,7 @@
 // ⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠
 // ⚠不能在这里的函数使用fsm_event_handle ⚠
 // ⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠
-
+/*------------------------------------------------------------------------------找人------------------------------------------------------------------------------------------*/
 // 静态变量：失败开始时间戳、保存的检测结果
 static uint32_t s_fail_start_time = 0;  // 失败状态开始的时间戳（ms）
 static uint8_t s_saved_state = FM_H_F_FAI;  // 保存的检测结果
@@ -75,17 +75,14 @@ uint8_t fm_has_h_fd_state(void) {
     // 返回保存的结果
     return s_saved_state;
 }
-
+/*------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 //网络
 uint8_t fm_has_w_c_state(void) {
-    // 硬编码用于测试页面流程
     // FM_W_N_CFG -> WIFI_GUIDE (二维码页面)
     // FM_W_CONN -> WIFI_CONN (连接中页面)
     // FM_W_SUC -> CLOCK (时钟页面)
     // FM_W_FAI -> WIFI_GUIDE (二维码页面)
-    
-    uint16_t i = WIFI_STATE_IDLE;  // 改为 IDLE，会走到 default 返回 FM_W_FAI，跳转到二维码页面
-    switch (i)
+    switch ( my_wifi_get_state())
     {
     case WIFI_STATE_CONNECTED:
         ESP_LOGI(TAG, "wifi is connected");
@@ -108,7 +105,7 @@ uint8_t fm_has_w_c_state(void) {
 }
 
 
-
+/*----------------------------------------------------------------------rtc-----------------------------------------------------------------------------------------------*/
 uint8_t fm_has_rtc_state(void) {
     // my_rtc_is_time_valid() 返回 bool 类型：true(1) 表示有效，false(0) 表示无效
     bool rtc_valid = my_rtc_is_time_valid();
@@ -121,7 +118,7 @@ uint8_t fm_has_rtc_state(void) {
         return FM_RTC_NO_EXIST;
     }
 }
-
+/*------------------------------------------------------------------菜单---------------------------------------------------------------------------------------------------*/
 //获取当前菜单索引
 static int getCurrentMenuIndex(void) {
     return my_ui_function_get_index();
@@ -187,135 +184,141 @@ uint8_t fm_has_memu_state(void){
     return ret;
 }
 
-/*------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------------rtc------------------------------------------------------------------------------------------*/
 
 // 静态变量：保存当前编辑的时间
 static uint8_t s_editing_hour = 0;
 static uint8_t s_editing_minute = 0;
 static bool s_editing_hour_mode = false;  // true=编辑小时, false=编辑分钟
-
+///设置时间，settime 和  rtc 一个页面  如果rtc设置过则用rtc的时间 没有则  7：30
 void fsm_main_set_time(void *arg) {
     ESP_LOGI(TAG, "to set time...");
-    
-    // RTC无效时才进入此函数，使用默认值
-    s_editing_hour = 7;
-    s_editing_minute = 30;
+
+    struct tm t;
+    bool valid = false;
+
+    // 检查 RTC 是否有效
+    if (my_rtc_get_time(&t, &valid) == 0 && valid) {
+        // RTC 已设置，使用 RTC 时间
+        s_editing_hour   = t.tm_hour;
+        s_editing_minute = t.tm_min;
+    } else {
+        // RTC 未设置，使用默认时间
+        s_editing_hour   = 7;
+        s_editing_minute = 30;
+    }
+
     s_editing_hour_mode = false;  // 默认先编辑分钟
-    
-    // 更新UI显示
+
+    // 更新 UI
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_SetTime);
-    
-    // 显示当前时间
+
     char hour_str[8];
     char min_str[8];
     snprintf(hour_str, sizeof(hour_str), "%02d", s_editing_hour);
     snprintf(min_str, sizeof(min_str), "%02d", s_editing_minute);
     lv_label_set_text(ui_SetTimeHour, hour_str);
     lv_label_set_text(ui_SetTimeMinute, min_str);
-    
+
     lvgl_port_unlock();
 }
 
-void fsm_main_rtc_adjust_time(void *arg) {
-    if (arg == nullptr) {
-        return;
-    }
-    
-    // 获取旋钮变化量，正数=右旋(增加)，负数=左旋(减少)
+
+void fsm_main_rtc_adjust_time(void *arg)
+{
+    if (!arg) return;
+
     int32_t diff = *(int32_t*)arg;
-    
+
+    lvgl_port_lock(0);
+
     if (s_editing_hour_mode) {
-        // 编辑小时
-        int new_hour = s_editing_hour + diff;
-        if (new_hour > 23) {
-            s_editing_hour = new_hour - 24;
-        } else if (new_hour < 0) {
-            s_editing_hour = new_hour + 24;
-        } else {
-            s_editing_hour = new_hour;
-        }
-        
-        // 更新UI显示
-        char hour_str[8];
+        // 小时：0~23，简单环绕
+        s_editing_hour = (s_editing_hour + diff + 24) % 24;
+
+        char hour_str[4];
         snprintf(hour_str, sizeof(hour_str), "%02d", s_editing_hour);
-        lvgl_port_lock(0);
         lv_label_set_text(ui_SetTimeHour, hour_str);
-        lvgl_port_unlock();
-        
-        ESP_LOGI(TAG, "Adjust hour: %d (diff: %" PRId32 ")", s_editing_hour, diff);
+
+        ESP_LOGI(TAG, "Hour updated: %d (diff=%ld)", s_editing_hour, diff);
+
     } else {
-        // 编辑分钟
-        int new_minute = s_editing_minute + diff;
-        if (new_minute > 59) {
-            s_editing_minute = new_minute - 60;
-            // 分钟进位，小时也要增加
-            s_editing_hour = (s_editing_hour + 1) % 24;
-        } else if (new_minute < 0) {
-            s_editing_minute = new_minute + 60;
-            // 分钟借位，小时也要减少
-            if (s_editing_hour == 0) {
-                s_editing_hour = 23;
-            } else {
-                s_editing_hour -= 1;
-            }
-        } else {
-            s_editing_minute = new_minute;
+        // 分钟：0~59
+        int new_min = s_editing_minute + diff;
+
+        // 处理分钟变动可能引起的小时改变：
+        if (new_min >= 60) {
+            s_editing_minute = new_min % 60;
+            s_editing_hour = (s_editing_hour + (new_min / 60)) % 24;
         }
-        
-        // 更新UI显示
-        char min_str[8];
-        char hour_str[8];
-        snprintf(min_str, sizeof(min_str), "%02d", s_editing_minute);
+        else if (new_min < 0) {
+            // 处理负数分钟，例如 -5 → 55，同时小时-1
+            int borrow = (abs(new_min) + 59) / 60; // 需要借多少小时
+            s_editing_minute = (new_min % 60 + 60) % 60;
+            s_editing_hour = (s_editing_hour - borrow + 24) % 24;
+        }
+        else {
+            s_editing_minute = new_min;
+        }
+
+        // 更新 UI
+        char hour_str[4], min_str[4];
         snprintf(hour_str, sizeof(hour_str), "%02d", s_editing_hour);
-        lvgl_port_lock(0);
+        snprintf(min_str,  sizeof(min_str), "%02d", s_editing_minute);
+        lv_label_set_text(ui_SetTimeHour, hour_str);
         lv_label_set_text(ui_SetTimeMinute, min_str);
-        lv_label_set_text(ui_SetTimeHour, hour_str);  // 如果进位/借位，小时也要更新
-        lvgl_port_unlock();
-        
-        ESP_LOGI(TAG, "Adjust minute: %d (diff: %" PRId32 ")", s_editing_minute, diff);
+
+        ESP_LOGI(TAG, "Minute updated: %d, Hour updated: %d (diff=%ld)", 
+                 s_editing_minute, s_editing_hour, diff);
     }
+
+    lvgl_port_unlock();
 }
 
-void fsm_main_rtc_save_and_exit(void *arg) {
-    // 尝试从RTC获取当前日期（即使时间无效，日期可能还有）
-    struct tm time;
+
+void fsm_main_rtc_save_and_exit(void *arg)
+{
+    ESP_LOGI(TAG, "Saving RTC time...");
+
+    struct tm t;
+    memset(&t, 0, sizeof(t));  // 确保所有字段初始化为 0
+
     bool valid = false;
-    if (my_rtc_get_time(&time, &valid) != 0) {
-        // 如果获取失败，使用默认日期
-        memset(&time, 0, sizeof(time));
-        time.tm_year = 124;  // 2024年（从1900年开始）
-        time.tm_mon = 0;     // 1月
-        time.tm_mday = 1;    // 1日
-        time.tm_wday = 1;    // 周一
-    }
-    // 只更新时间部分
-    time.tm_hour = s_editing_hour;
-    time.tm_min = s_editing_minute;
-    time.tm_sec = 0;     // 秒数清零
-    
-    // 使用 my_rtc_set_time 保存时间到RTC
-    if (my_rtc_set_time(&time) == 0) {
-        ESP_LOGI(TAG, "RTC time saved: %02d:%02d", s_editing_hour, s_editing_minute);
-    } else {
-        ESP_LOGE(TAG, "Failed to save RTC time");
+
+    //---- 1. 尝试从 RTC 获取当前日期 ----
+    if (my_rtc_get_time(&t, &valid) != 0) {
+        ESP_LOGW(TAG, "RTC read failed, using default date.");
+
+        t.tm_year = 124;  // 2024 = 1900 + 124
+        t.tm_mon  = 0;    // 1月
+        t.tm_mday = 1;    // 1号
+        t.tm_wday = 1;    // 周一
     }
 
-    // 返回主页面，会自动从RTC读取最新时间并更新显示
-    fsm_main_to_clock(arg);
+    //---- 2. 覆盖用户设置的时间 ----
+    t.tm_hour = s_editing_hour;
+    t.tm_min  = s_editing_minute;
+    t.tm_sec  = 0;
+
+    //---- 3. 写入 RTC ----
+    int ret = my_rtc_set_time(&t);
+
+    if (ret == 0) {
+        ESP_LOGI(TAG, "RTC saved successfully: %02d:%02d",
+                 s_editing_hour, s_editing_minute);
+    } else {
+        ESP_LOGE(TAG, "RTC save failed (err=%d)!", ret);
+    }
+
+    //---- 4. 返回主界面（它会再次读取 RTC）----
+    fsm_main_to_clock(nullptr);
 }
+
 
 
 void fsm_main_to_clock(void *arg) {
     ESP_LOGI(TAG, "to clock...");
-    
-    // 检查RTC是否已配置（使用 my_rtc_is_time_valid 判断）
-    if (!my_rtc_is_time_valid()) {
-        // RTC未配置，跳转到配置页面
-        ESP_LOGI(TAG, "RTC not configured, go to RTC setup page");
-        fsm_main_set_time(arg);
-        return;
-    }
     
     // RTC已配置，从RTC读取时间
     struct tm time;
@@ -410,7 +413,7 @@ void fsm_wake_mode_next_item(void *arg) {
     }
 }
 
-/*-----------------------------------------------------------------------------------设置时间-------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------------设置闹钟-------------------------------------------------------------------------------------*/
 // 静态变量：保存当前编辑的闹钟时间
 static uint8_t s_alarm_editing_hour = 8;
 static uint8_t s_alarm_editing_minute = 0;
@@ -799,6 +802,25 @@ void fsm_main_in_set_time(void *arg) {
     ESP_LOGI(TAG, "in set_time mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_SetTime);
+    lvgl_port_unlock();
+}
+
+void fsm_main_in_boya_data(void *arg) {
+    ESP_LOGI(TAG, "in set_time mode...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_sleepData);
+    lvgl_port_unlock();
+}
+void fsm_main_in_GoodMorning_demo(void *arg) {
+    ESP_LOGI(TAG, "in set_time mode...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_MorningAnimation);
+    lvgl_port_unlock();
+}
+void fsm_main_in_reminder_tomorrow(void *arg) {
+    ESP_LOGI(TAG, "in set_time mode...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_ReminderTomorrow);
     lvgl_port_unlock();
 }
 

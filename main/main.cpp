@@ -289,6 +289,13 @@ void encoder_test(void *arg)
             default:
                 break;
         }
+            wifi_state_t state = my_wifi_get_state(); 
+            if (state == WIFI_STATE_CONNECTED) {
+                fsm_main_event_trig(F_MAIN_E_WIFI_C_SUC, nullptr);
+            } else if (state == WIFI_STATE_FAILED ) {
+                fsm_main_event_trig(F_MAIN_E_WIFI_C_FAIL, nullptr);
+            }
+
     }
 }
 
