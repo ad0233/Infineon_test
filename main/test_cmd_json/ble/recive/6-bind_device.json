@@ -1,0 +1,6 @@
+{
+  "cmd": "set_binding_jwt",
+  "params": {
+    "binding_jwt": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}

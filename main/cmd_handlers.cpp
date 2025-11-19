@@ -7,6 +7,8 @@
 #include "fsm_main.h"
 #include "my_nvs.h"
 #include "my_ble.h"
+#include "ble_protocol.h"
+#include "cJSON.h"
 
 static const char *TAG = "cmd_handlers";
 
@@ -36,14 +38,55 @@ int cmd_handle_wifi_connect(cJSON *params) {
     ESP_LOGI(TAG, "WiFi connect: ssid=%s", ssid);
     
     esp_err_t ret = my_wifi_connect(ssid, password);
+    bool wifi_connected = false;
+    char ip_str[16] = "";
+    
     if (ret == ESP_OK) {
         my_wifi_save_credentials(ssid, password);
         ESP_LOGI(TAG, "WiFi connected and saved");
+        
+        // 等待连接完成并获取 IP
+        int wait_count = 0;
+        while (!my_wifi_is_connected() && wait_count < 50) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            wait_count++;
+        }
+        
+        if (my_wifi_is_connected()) {
+            wifi_connected = true;
+            if (my_wifi_get_ip(ip_str, sizeof(ip_str)) != ESP_OK) {
+                ip_str[0] = '\0';
+            }
+        }
     } else {
         ESP_LOGE(TAG, "WiFi connect failed: %s", esp_err_to_name(ret));
     }
     
     fsm_main_event_trig(F_MAIN_E_WIFI_CMD_TRIG, NULL);
+    
+    // 发送响应
+    cJSON *response = cJSON_CreateObject();
+    cJSON *data = cJSON_CreateObject();
+    if (!response || !data) {
+        ESP_LOGE(TAG, "Failed to create JSON objects for response");
+        if (response) cJSON_Delete(response);
+        if (data) cJSON_Delete(data);
+    } else {
+        cJSON_AddStringToObject(response, "type", "provision_result");
+        cJSON_AddStringToObject(data, "status", wifi_connected ? "success" : "failed");
+        cJSON_AddBoolToObject(data, "wifi_connected", wifi_connected);
+        if (wifi_connected && ip_str[0] != '\0') {
+            cJSON_AddStringToObject(data, "ip_address", ip_str);
+        }
+        cJSON_AddItemToObject(response, "data", data);
+        
+        char *json_str = cJSON_Print(response);
+        if (json_str) {
+            ble_send_response(json_str);
+            free(json_str);
+        }
+        cJSON_Delete(response);
+    }
     
     ESP_LOGI(TAG, "WiFi connect completed");
     return 0;
@@ -54,10 +97,32 @@ int cmd_handle_forget_wifi(cJSON *params) {
     ESP_LOGI(TAG, "Forget WiFi credentials");
     
     esp_err_t ret = my_wifi_clear_credentials();
-    if (ret == ESP_OK) {
+    bool success = (ret == ESP_OK);
+    
+    if (success) {
         ESP_LOGI(TAG, "WiFi credentials cleared");
     } else {
         ESP_LOGE(TAG, "Failed to clear WiFi credentials");
+    }
+    
+    // 发送响应
+    cJSON *response = cJSON_CreateObject();
+    cJSON *data = cJSON_CreateObject();
+    if (!response || !data) {
+        ESP_LOGE(TAG, "Failed to create JSON objects for response");
+        if (response) cJSON_Delete(response);
+        if (data) cJSON_Delete(data);
+    } else {
+        cJSON_AddStringToObject(response, "type", "forget_wifi_result");
+        cJSON_AddStringToObject(data, "status", success ? "success" : "failed");
+        cJSON_AddItemToObject(response, "data", data);
+        
+        char *json_str = cJSON_Print(response);
+        if (json_str) {
+            ble_send_response(json_str);
+            free(json_str);
+        }
+        cJSON_Delete(response);
     }
     
     ESP_LOGI(TAG, "WiFi forget completed");
@@ -228,7 +293,7 @@ static void test_conn_ota_task(void *arg) {
         esp_err_t ret = my_wifi_connect(params->ssid, params->password);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "WiFi connect failed: %s", esp_err_to_name(ret));
-            free(params);
+            heap_caps_free(params);
             vTaskDelete(NULL);
             return;
         }
@@ -245,7 +310,7 @@ static void test_conn_ota_task(void *arg) {
         ESP_LOGI(TAG, "OTA update started");
     }
     
-    free(params);
+    heap_caps_free(params);
     vTaskDelete(NULL);
 }
 
@@ -287,11 +352,78 @@ int cmd_handle_test_conn_ota(cJSON *params) {
     BaseType_t ret = xTaskCreate(test_conn_ota_task, "test_conn_ota", 1024 * 4, task_params, 5, NULL);
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create test_conn_ota task");
-        free(task_params);
+        heap_caps_free(task_params);
         return -1;
     }
     
     ESP_LOGI(TAG, "Test conn OTA task created");
+    
+    // 发送响应
+    cJSON *response = cJSON_CreateObject();
+    cJSON *data = cJSON_CreateObject();
+    if (!response || !data) {
+        ESP_LOGE(TAG, "Failed to create JSON objects for response");
+        if (response) cJSON_Delete(response);
+        if (data) cJSON_Delete(data);
+    } else {
+        cJSON_AddStringToObject(response, "type", "test_conn_ota_result");
+        cJSON_AddStringToObject(data, "status", "started");
+        cJSON_AddItemToObject(response, "data", data);
+        
+        char *json_str = cJSON_Print(response);
+        if (json_str) {
+            ble_send_response(json_str);
+            free(json_str);
+        }
+        cJSON_Delete(response);
+    }
+    
+    return 0;
+}
+
+// 处理设置绑定 JWT 命令
+int cmd_handle_set_binding_jwt(cJSON *params) {
+    if (!params) {
+        ESP_LOGE(TAG, "set_binding_jwt: params is NULL");
+        return -1;
+    }
+    
+    cJSON *binding_jwt_item = cJSON_GetObjectItem(params, "binding_jwt");
+    
+    if (!cJSON_IsString(binding_jwt_item)) {
+        ESP_LOGE(TAG, "set_binding_jwt: binding_jwt not found or invalid");
+        return -1;
+    }
+    
+    const char *binding_jwt = binding_jwt_item->valuestring;
+    
+    ESP_LOGI(TAG, "Set binding JWT (length: %d)", strlen(binding_jwt));
+    
+    // TODO: 保存 binding_jwt 到 NVS 或其他存储
+    // 目前只返回成功
+    bool success = true;
+    
+    // 发送响应
+    cJSON *response = cJSON_CreateObject();
+    cJSON *data = cJSON_CreateObject();
+    if (!response || !data) {
+        ESP_LOGE(TAG, "Failed to create JSON objects for response");
+        if (response) cJSON_Delete(response);
+        if (data) cJSON_Delete(data);
+    } else {
+        cJSON_AddStringToObject(response, "type", "set_binding_jwt");
+        cJSON_AddStringToObject(data, "status", success ? "success" : "failed");
+        cJSON_AddItemToObject(response, "data", data);
+        
+        char *json_str = cJSON_Print(response);
+        if (json_str) {
+            ble_send_response(json_str);
+            free(json_str);
+        }
+        cJSON_Delete(response);
+    }
+    
+    ESP_LOGI(TAG, "Set binding JWT completed");
     return 0;
 }
 

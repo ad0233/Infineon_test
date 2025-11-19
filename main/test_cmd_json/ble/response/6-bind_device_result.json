@@ -1,5 +1,5 @@
 {
-  "type": "iot_config_result",
+  "type": "set_binding_jwt",
   "data": {
     "status": "success"
   }

@@ -13,6 +13,14 @@ extern "C" {
  */
 int ble_protocol_init();
 
+/**
+ * @brief 发送 BLE 响应数据
+ * 
+ * @param json_str JSON 字符串
+ * @return 0 成功，-1 失败
+ */
+int ble_send_response(const char *json_str);
+
 #ifdef __cplusplus
 }
 #endif

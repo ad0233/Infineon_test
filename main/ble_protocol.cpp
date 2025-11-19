@@ -153,3 +153,49 @@ int ble_protocol_init()
     return 0;
 }
 
+int ble_send_response(const char *json_str)
+{
+    if (!json_str) {
+        ESP_LOGE(TAG, "ble_send_response: json_str is NULL");
+        return -1;
+    }
+    
+    size_t json_len = strlen(json_str);
+    if (json_len == 0) {
+        ESP_LOGE(TAG, "ble_send_response: json_str is empty");
+        return -1;
+    }
+    
+    // 分配发送缓冲区（使用 SPIRAM）
+    size_t send_buf_size = json_len + 1024;  // 预留打包空间
+    uint8_t *send_buf = (uint8_t *)heap_caps_malloc(send_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (send_buf == nullptr) {
+        ESP_LOGE(TAG, "Failed to allocate send buffer");
+        return -1;
+    }
+    
+    // 打包数据
+    int packed_len = rust_single_parse_pack(
+        (const uint8_t *)json_str,
+        json_len,
+        send_buf,
+        send_buf_size);
+    
+    if (packed_len > 0) {
+        // 发送数据
+        int ret = my_ble_send_data(send_buf, packed_len, 1000);
+        if (ret != 0) {
+            ESP_LOGE(TAG, "Failed to send BLE response");
+            heap_caps_free(send_buf);
+            return -1;
+        }
+    } else {
+        ESP_LOGE(TAG, "Failed to pack response data");
+        heap_caps_free(send_buf);
+        return -1;
+    }
+    
+    heap_caps_free(send_buf);
+    return 0;
+}
+

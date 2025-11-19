@@ -54,6 +54,14 @@ int cmd_handle_private_key_config(cJSON *data);
  */
 int cmd_handle_test_conn_ota(cJSON *params);
 
+/**
+ * @brief 处理设置绑定 JWT 命令
+ * 
+ * @param params JSON params 对象
+ * @return int 0成功，-1失败
+ */
+int cmd_handle_set_binding_jwt(cJSON *params);
+
 #ifdef __cplusplus
 }
 #endif
