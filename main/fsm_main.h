@@ -121,6 +121,9 @@ void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg);
 uint8_t fsm_main_get_current_state(void);
 const char* fsm_main_get_current_state_str(void);
 
+// 超时刷新函数（由主线程定时调用）
+void fsm_main_timeout_flush(void);
+
 #ifdef __cplusplus
 }
 #endif

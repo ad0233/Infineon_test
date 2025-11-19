@@ -265,6 +265,7 @@ static struct StateTable fsm_user_table[] = {
 
 
 static uint32_t timeout_ms_tick = 0;
+static fsm_handle_t s_fsm_handle = nullptr;
 
 static void fsm_set_timeout_s(uint16_t sec) {
     if (sec) {
@@ -277,30 +278,21 @@ static void fsm_set_timeout_s(uint16_t sec) {
     }
 }
 
-static void fsm_main_timeout_task(void* arg) {
-    ( void )arg;
-    fsm_handle_t fsm_handle = (fsm_handle_t)arg;
-    if (fsm_handle == nullptr) {
-        ESP_LOGE(TAG, "fsm_handle is nullptr");
-        vTaskDelete(nullptr);
+void fsm_main_timeout_flush(void) {
+    /**
+     * @brief 超时处理
+     * @details 由主线程定时调用，检查并触发超时事件
+     */
+    if (s_fsm_handle == nullptr) {
+        return;
     }
-    ESP_LOGI(TAG, "fsm_main_timeout_task started");
-    while (true) {
-        vTaskDelay(pdMS_TO_TICKS(100));
-        /**
-         * @brief 超时处理
-         * @details
-         */
-        if (timeout_ms_tick != 0 && timeout_ms_tick < esp_log_timestamp()) {
-            timeout_ms_tick = 0;
-            // ESP_LOGW("fsm_user", "timeout! now state : %s",
-            //          state_str[fsm_get_current_state(s_main_fsm_handle)]);
-            fsm_timeout_trig(fsm_handle);
-        }
+    if (timeout_ms_tick != 0 && timeout_ms_tick < esp_log_timestamp()) {
+        timeout_ms_tick = 0;
+        // ESP_LOGW("fsm_user", "timeout! now state : %s",
+        //          state_str[fsm_get_current_state(s_main_fsm_handle)]);
+        fsm_timeout_trig(s_fsm_handle);
     }
 }
-
-static fsm_handle_t s_fsm_handle = nullptr;
 int fsm_main_init(void) {
     if (s_fsm_handle != nullptr) {
         return 0;
@@ -315,7 +307,7 @@ int fsm_main_init(void) {
         return -1;
     }
 
-    my_thread_create(fsm_main_timeout_task, "fsm_main_timeout_task", 1024 * 4, s_fsm_handle, 5, nullptr);
+    // 不再创建独立线程，改为在主线程中调用 fsm_main_timeout_flush()
     return 0;
 }
 
