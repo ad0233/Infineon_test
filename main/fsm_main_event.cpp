@@ -32,15 +32,15 @@ static bool s_alarm_state_initialized = false;  // 状态是否已初始化
 uint8_t fm_has_h_fd_state(void) {
     radar_latest_data_t radar_data;
     if(my_radar_get_latest_data(&radar_data)) {
-        ESP_LOGI(TAG, "movement_param: %d", radar_data.movement_param);
-        // 挥挥手就识别成功了
-        if(radar_data.movement_param > 15) {
-            return FM_H_F_SUC;
-        }
-        // TODO: 心率检测更合理些,因为如果没人,就不会有心率更新,但是甲方要求体动判断先
-        // if(esp_log_timestamp() - radar_data.heart_rate_system_timestamp < 3) {
+        // ESP_LOGI(TAG, "movement_param: %d", radar_data.movement_param);
+        // // 挥挥手就识别成功了
+        // if(radar_data.movement_param > 15) {
         //     return FM_H_F_SUC;
         // }
+        // TODO: 心率检测更合理些,因为如果没人,就不会有心率更新,但是甲方要求体动判断先
+        if(esp_log_timestamp() - radar_data.heart_rate_system_timestamp < 3) {
+            return FM_H_F_SUC;
+        }
     }
 
     if(esp_log_timestamp() - s_fail_start_time > FIND_TIMEOUT_MS) {

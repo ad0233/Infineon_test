@@ -102,6 +102,7 @@ esp_err_t my_wifi_connect(const char *ssid, const char *password)
     ESP_ERROR_CHECK(esp_wifi_start());
     
     ESP_LOGI(TAG, "Connecting to SSID: %s", ssid);
+    s_retry_num = 0;
     
     return ESP_OK;
 }

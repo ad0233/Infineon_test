@@ -413,6 +413,7 @@ void encoder_test(void *arg)
         // 定时刷新BLE发送（每10ms）
         if ((current_tick - last_ble_flush) >= ble_flush_interval) {
             ble_send_flush();
+            ble_parse_flush();  // 同时处理BLE解析
             last_ble_flush = current_tick;
         }
         vTaskDelay(1);
