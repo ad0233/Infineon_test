@@ -9,6 +9,9 @@
 #include "my_lcd.h"
 #include "my_nvs.h"
 #include "my_ble.h"
+#include "my_utils.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -22,15 +25,28 @@ static bool is_online = false;
 
 // Unwind动物选择相关
 static unwind_animal_t current_unwind_animal = UNWIND_ANIMAL_CAT;  // 默认选择cat
+// WakeModeTest相关变量
+static int wakeModeTestIndex = 0;
+static bool isWakeModeTestAnimating = false; // 跟踪动画是否正在进行
 
-// 动物图片映射表
-static const lv_img_dsc_t* unwind_animal_images[UNWIND_ANIMAL_MAX] = {
-    &ui_img_cat_png,
-    &ui_img_fox_png,
-    &ui_img_hummingbird_png,
-    &ui_img_koi_png,
-    // &ui_img_swan_1_png
+// Unwind图片和标签信息结构体
+typedef struct {
+    const lv_img_dsc_t* image;  // 照片
+    const char* label;          // 标签
+} UnwindImageInfo;
+
+// 动物图片和标签映射表（按照枚举顺序：CAT, FOX, HUMMINGBIRD, KOI, SWAN）
+static const UnwindImageInfo unwind_animal_info[UNWIND_ANIMAL_MAX] = {
+    {&ui_img_cat_png, "Deep Rest"},           // CAT
+    {&ui_img_fox_png, "Cosmic Calm"},         // FOX
+    {&ui_img_hummingbird_png, "Nature Echo"}, // HUMMINGBIRD
+    {&ui_img_koi_png, "Zen Flow"},            // KOI
+    {&ui_img_swan_png, "Piano Drift"}         // SWAN
 };
+
+// 前向声明
+static void update_unwind_display(void);
+static void update_unwind_choose_animation(void);
 
 void my_ui_set_light(uint8_t val) {
     if (val > 100) val = 100;
@@ -258,7 +274,9 @@ void my_ui_in_funtion() {
 }
 
 void my_ui_function_menu_up() {
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(0)) {
+        return;  // 如果获取锁失败，直接返回
+    }
     uint32_t max = lv_roller_get_option_count(ui_MueuRoller);
     uint32_t cur = lv_roller_get_selected(ui_MueuRoller);
     if (cur == 0) {
@@ -271,7 +289,9 @@ void my_ui_function_menu_up() {
 }
 
 void my_ui_function_menu_down() {
-    lvgl_port_lock(0);
+    if (!lvgl_port_lock(0)) {
+        return;  // 如果获取锁失败，直接返回
+    }
     uint32_t max = lv_roller_get_option_count(ui_MueuRoller);
     uint32_t cur = lv_roller_get_selected(ui_MueuRoller);
     if (cur >= max - 1) {
@@ -369,9 +389,9 @@ void my_ui_volume_set(int val) {
     
     // 当音量为0时，更换 ui_VolumeImage 为静音图标
     if(val == 0) {
-        // lv_image_set_src(ui_VolumeImage, &ui_img_muted_png);
+        lv_image_set_src(ui_VolumeImage, &ui_img_volumeno_png);
     } else {
-        // lv_image_set_src(ui_VolumeImage, &ui_img_1416476185);
+        lv_image_set_src(ui_VolumeImage, &ui_img_volumeyes_png);
     }
     
     lvgl_port_unlock();
@@ -406,6 +426,9 @@ void my_ui_in_unwind() {
     lv_disp_load_scr(ui_UnwindSelet);
     current_page = PAGE_UNWIND;
     lvgl_port_unlock();
+    
+    // 显示当前选中的动物图片和标签
+    update_unwind_display();
 }
 
 void my_ui_unwind_select_mode(uint8_t mode) {
@@ -443,9 +466,10 @@ void my_ui_in_unwind_select(void) {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_UnwindSelet);
     current_page = PAGE_UNWIND_SELECT;
-    // 同步显示选中的动物图片
-    lv_image_set_src(ui_UnwindSeletImage, unwind_animal_images[current_unwind_animal]);
     lvgl_port_unlock();
+    
+    // 同步显示选中的动物图片和标签
+    update_unwind_display();
 }
 
 // 进入NoiseTime页面（时间设置）
@@ -458,6 +482,76 @@ void my_ui_in_noise_time(void) {
     lvgl_port_unlock();
 }
 
+// 更新unwind界面显示
+static void update_unwind_display(void) {
+    ESP_LOGI(TAG, "update_unwind_display, current_page: %d, animal: %d", current_page, current_unwind_animal);
+    
+    if (!lvgl_port_lock(0)) {
+        ESP_LOGW(TAG, "update_unwind_display: failed to lock lvgl");
+        return;
+    }
+    
+    // 直接检查当前屏幕是否是 UnwindSelet
+    lv_obj_t* current_screen = lv_disp_get_scr_act(NULL);
+    if (current_screen != ui_UnwindSelet) {
+        ESP_LOGW(TAG, "update_unwind_display: not in UnwindSelet screen");
+        lvgl_port_unlock();
+        return;
+    }
+    
+    // 停止圆弧动画
+    lv_anim_del(ui_UnwindSeletArc, NULL);
+    
+    // 重置圆弧值
+    lv_arc_set_value(ui_UnwindSeletArc, 0);
+    
+    // 更新图片和标签
+    if (current_unwind_animal < UNWIND_ANIMAL_MAX) {
+        ESP_LOGI(TAG, "update_unwind_display: setting image and label for animal %d", current_unwind_animal);
+        lv_image_set_src(ui_UnwindSeletImage, unwind_animal_info[current_unwind_animal].image);
+        lv_label_set_text(ui_UnwindSeletLabel, unwind_animal_info[current_unwind_animal].label);
+        lv_obj_invalidate(ui_UnwindSeletImage);
+        lv_obj_invalidate(ui_UnwindSeletLabel);
+        ESP_LOGI(TAG, "update_unwind_display: label set to '%s'", unwind_animal_info[current_unwind_animal].label);
+    } else {
+        ESP_LOGW(TAG, "update_unwind_display: invalid animal index %d", current_unwind_animal);
+    }
+    
+    lvgl_port_unlock();
+}
+
+// 创建圆弧动画
+static void update_unwind_choose_animation(void) {
+    ESP_LOGI(TAG, "update_unwind_choose_animation, current_page: %d", current_page);
+    
+    if (!lvgl_port_lock(0)) {
+        ESP_LOGW(TAG, "update_unwind_choose_animation: failed to lock lvgl");
+        return;
+    }
+    
+    // 直接检查当前屏幕是否是 UnwindSelet
+    lv_obj_t* current_screen = lv_disp_get_scr_act(NULL);
+    if (current_screen != ui_UnwindSelet) {
+        ESP_LOGW(TAG, "update_unwind_choose_animation: not in UnwindSelet screen");
+        lvgl_port_unlock();
+        return;
+    }
+    
+    ESP_LOGI(TAG, "update_unwind_choose_animation: starting arc animation");
+    
+    // 创建圆弧动画
+    lv_anim_t arcAnim;
+    lv_anim_init(&arcAnim);
+    lv_anim_set_var(&arcAnim, ui_UnwindSeletArc);
+    lv_anim_set_values(&arcAnim, 0, 360);
+    lv_anim_set_time(&arcAnim, 300);  // 300ms
+    lv_anim_set_exec_cb(&arcAnim, (lv_anim_exec_xcb_t)lv_arc_set_value);
+    lv_anim_set_path_cb(&arcAnim, lv_anim_path_ease_out);  // ease-out缓动函数
+    lv_anim_start(&arcAnim);
+    
+    lvgl_port_unlock();
+}
+
 // 设置当前选择的动物
 void my_ui_unwind_set_animal(unwind_animal_t animal) {
     if (animal >= UNWIND_ANIMAL_MAX) {
@@ -465,9 +559,11 @@ void my_ui_unwind_set_animal(unwind_animal_t animal) {
     }
     current_unwind_animal = animal;
     
-    lvgl_port_lock(0);
-    // lv_image_set_src(ui_UnwindOnImage, unwind_animal_images[animal]);
-    lvgl_port_unlock();
+    // 更新显示
+    update_unwind_display();
+    
+    // 播放选择动画
+    update_unwind_choose_animation();
 }
 
 // 获取当前选择的动物
@@ -477,13 +573,17 @@ unwind_animal_t my_ui_unwind_get_animal(void) {
 
 // 切换到下一个动物
 void my_ui_unwind_next_animal(void) {
+    ESP_LOGI(TAG, "my_ui_unwind_next_animal, current: %d", current_unwind_animal);
     unwind_animal_t next_animal = (unwind_animal_t)((current_unwind_animal + 1) % UNWIND_ANIMAL_MAX);
+    ESP_LOGI(TAG, "my_ui_unwind_next_animal, next: %d", next_animal);
     my_ui_unwind_set_animal(next_animal);
 }
 
 // 切换到上一个动物
 void my_ui_unwind_prev_animal(void) {
+    ESP_LOGI(TAG, "my_ui_unwind_prev_animal, current: %d", current_unwind_animal);
     unwind_animal_t prev_animal = (unwind_animal_t)((current_unwind_animal + UNWIND_ANIMAL_MAX - 1) % UNWIND_ANIMAL_MAX);
+    ESP_LOGI(TAG, "my_ui_unwind_prev_animal, prev: %d", prev_animal);
     my_ui_unwind_set_animal(prev_animal);
 }
 
@@ -691,7 +791,7 @@ void my_ui_wake_mode_set(wake_mode_t mode) {
     current_wake_mode = mode;
     
     lvgl_port_lock(0);
-
+    
     lvgl_port_unlock();
 }
 
@@ -717,6 +817,162 @@ void my_ui_wake_mode_prev(void) {
     wake_mode_t prev_mode = (wake_mode_t)((current_wake_mode + WAKE_MODE_MAX - 1) % WAKE_MODE_MAX);
     my_ui_wake_mode_set(prev_mode);
 }
+
+// 文本颜色渐变动画回调函数 - 使用百分比值进行插值
+static void text_color_anim_cb(void* var, int32_t v) {
+    lv_obj_t* obj = (lv_obj_t*)var;
+    
+    // 计算透明度百分比 (0-100)
+    uint8_t percent = (uint8_t)v;
+    
+    // 计算灰色值 (0x808080) 到白色 (0xFFFFFF) 的渐变
+    // 灰色分量: R=128, G=128, B=128
+    // 白色分量: R=255, G=255, B=255
+    uint8_t r = 128 + (127 * percent / 100);
+    uint8_t g = 128 + (127 * percent / 100);
+    uint8_t b = 128 + (127 * percent / 100);
+    
+    // 创建颜色并设置
+    lv_color_t color = lv_color_make(r, g, b);
+    lv_obj_set_style_text_color(obj, color, LV_PART_MAIN | LV_STATE_DEFAULT);
+}
+
+// 将文本渐变为白色（选中状态）
+static void animate_to_white(lv_obj_t* label) {
+    if (label == NULL) {
+        return;
+    }
+    lv_anim_t anim;
+    lv_anim_init(&anim);
+    lv_anim_set_var(&anim, label);
+    lv_anim_set_values(&anim, 0, 100);  // 从0%白色渐变到100%白色
+    lv_anim_set_time(&anim, 300);  // 动画持续300ms
+    lv_anim_set_exec_cb(&anim, text_color_anim_cb);
+    lv_anim_set_path_cb(&anim, lv_anim_path_ease_in_out);  // 缓入缓出效果
+    lv_anim_start(&anim);
+}
+
+// 将文本渐变为灰色（未选中状态）
+static void animate_to_gray(lv_obj_t* label) {
+    if (label == NULL) {
+        return;
+    }
+    lv_anim_t anim;
+    lv_anim_init(&anim);
+    lv_anim_set_var(&anim, label);
+    lv_anim_set_values(&anim, 100, 0);  // 从100%白色渐变到0%白色（灰色）
+    lv_anim_set_time(&anim, 300);  // 动画持续300ms
+    lv_anim_set_exec_cb(&anim, text_color_anim_cb);
+    lv_anim_set_path_cb(&anim, lv_anim_path_ease_in_out);  // 缓入缓出效果
+    lv_anim_start(&anim);
+}
+
+// 初始化WakeModeTest页面的文本颜色
+void initWakeModeTestTextColors(void) {
+    // 默认选中Classic项（index 0）
+    lv_obj_set_style_text_color(ui_WakeModeTestLabel1, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(ui_WakeModeTestLabel2, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(ui_WakeModeTestLabel3, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(ui_WakeModeTestLabel4, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+}
+
+// LVGL定时器回调：延迟重置动画标志
+static void wake_mode_anim_reset_timer_cb(lv_timer_t * timer) {
+    (void)timer;
+    // 重置动画标志
+    isWakeModeTestAnimating = false;
+    // 删除定时器
+    lv_timer_del(timer);
+}
+
+void wakeModeTestUP(void) {
+    // 检查当前是否可以向上移动（不是第一项且没有动画正在进行）
+    if (wakeModeTestIndex <= 0 || isWakeModeTestAnimating) {
+        return;
+    }
+    
+    // 先更新索引（在锁外，避免长时间持有锁）
+    wakeModeTestIndex--;
+    
+    // 设置动画进行标志
+    isWakeModeTestAnimating = true;
+    
+    // 使用lvgl_port_lock保护所有LVGL操作，但尽量缩短锁的持有时间
+    if (!lvgl_port_lock(0)) {
+        // 如果获取锁失败，恢复索引并重置标志
+        wakeModeTestIndex++;
+        isWakeModeTestAnimating = false;
+        return;
+    }
+    
+    // 在WakeModeTest页面，左旋操作向上移动80像素点
+    memuDown_Animation(ui_WakeModeTestContainer2, 0);
+    memuDown_Animation(ui_WakeModeTestContainer3, 0);
+    
+    // 更新文本颜色：使用渐变动画实现逐渐选中的感觉
+    if (wakeModeTestIndex == 0) {
+        // 选中Classic项：Classic文本渐变为白色，Smart文本渐变为灰色
+        animate_to_white(ui_WakeModeTestLabel1);
+        animate_to_white(ui_WakeModeTestLabel2);
+        animate_to_gray(ui_WakeModeTestLabel3);
+        animate_to_gray(ui_WakeModeTestLabel4);
+    }
+    
+    lvgl_port_unlock();
+    
+    // 使用LVGL定时器延迟重置动画标志（300ms后，与动画时长一致）
+    // LVGL定时器在LVGL线程中执行，不需要额外锁保护
+    lv_timer_t * timer = lv_timer_create(wake_mode_anim_reset_timer_cb, 300, NULL);
+    if (timer == NULL) {
+        // 如果创建定时器失败，直接重置标志
+        isWakeModeTestAnimating = false;
+    }
+}
+
+void wakeModeTestDown(void) {
+    // 检查当前是否可以向下移动（不是最后一项且没有动画正在进行）
+    if (wakeModeTestIndex >= 1 || isWakeModeTestAnimating) { // 0和1两个索引值
+        return;
+    }
+    
+    // 先更新索引（在锁外，避免长时间持有锁）
+    wakeModeTestIndex++;
+    
+    // 设置动画进行标志
+    isWakeModeTestAnimating = true;
+    
+    // 使用lvgl_port_lock保护所有LVGL操作，但尽量缩短锁的持有时间
+    if (!lvgl_port_lock(0)) {
+        // 如果获取锁失败，恢复索引并重置标志
+        wakeModeTestIndex--;
+        isWakeModeTestAnimating = false;
+        return;
+    }
+    
+    // 在WakeModeTest页面，右旋操作向下移动80像素点
+    memuUp_Animation(ui_WakeModeTestContainer2, 0);
+    memuUp_Animation(ui_WakeModeTestContainer3, 0);
+    
+    // 更新文本颜色：使用渐变动画实现逐渐选中的感觉
+    if (wakeModeTestIndex == 1) {
+        // 选中Smart项：Classic文本渐变为灰色，Smart文本渐变为白色
+        animate_to_gray(ui_WakeModeTestLabel1);
+        animate_to_gray(ui_WakeModeTestLabel2);
+        animate_to_white(ui_WakeModeTestLabel3);
+        animate_to_white(ui_WakeModeTestLabel4);
+    }
+    
+    lvgl_port_unlock();
+    
+    // 使用LVGL定时器延迟重置动画标志（300ms后，与动画时长一致）
+    // LVGL定时器在LVGL线程中执行，不需要额外锁保护
+    lv_timer_t * timer = lv_timer_create(wake_mode_anim_reset_timer_cb, 300, NULL);
+    if (timer == NULL) {
+        // 如果创建定时器失败，直接重置标志
+        isWakeModeTestAnimating = false;
+    }
+}
+
 
 // 当前亮度档位
 static uint8_t current_light_duty = 20;  // 默认20%

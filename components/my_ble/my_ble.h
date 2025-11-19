@@ -17,6 +17,7 @@ typedef void (*ble_data_recv_callback_t)(const uint8_t *data, uint16_t len, void
 void my_ble_init(const char *device_name);
 void my_ble_register_recv_callback(ble_data_recv_callback_t callback, void *context);
 int my_ble_send_data(const uint8_t *data, uint16_t len, uint32_t timeout_ms);
+void ble_send_flush(void);
 
 /**
  * @brief 获取蓝牙 MAC 地址（单例模式，返回静态字符串）

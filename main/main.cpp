@@ -53,6 +53,8 @@
 
 #include "fsm_main.h"
 #include "my_h264.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 // 时间调整函数 - 根据编码器变化调整时间
 static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
@@ -168,9 +170,9 @@ extern "C" void app_main()
         my_lcd_draw_rgb565(reinterpret_cast<const uint16_t *>(rgb565_buf), rgb565_buf_len / 2);
     }, NULL, [](void *context) {
         ESP_LOGI(TAG, "my_h264_playback_done, current state: %s", fsm_main_get_current_state_str());
-        // lvgl_port_resume();
-        // my_lvgl_force_refresh();
-        // print_mem_info();
+        lvgl_port_resume();
+        my_lvgl_force_refresh();
+        print_mem_info();
         ESP_LOGI(TAG, "Triggering F_MAIN_E_ANIM_PLAY_SUC event");
         fsm_main_event_trig(F_MAIN_E_ANIM_PLAY_SUC, nullptr);
         ESP_LOGI(TAG, "After trigger, current state: %s", fsm_main_get_current_state_str());
@@ -319,28 +321,64 @@ void encoder_test(void *arg)
     //clear
     while(xQueueReceive(event_queue, &e, 1) == pdTRUE) {}
 
+    // 定时刷新相关变量
+    TickType_t last_radar_flush = 0;
+    TickType_t last_fsm_flush = 0;
+    TickType_t last_ble_flush = 0;
+    const TickType_t radar_flush_interval = pdMS_TO_TICKS(100);  // 100ms
+    const TickType_t fsm_flush_interval = pdMS_TO_TICKS(100);    // 100ms
+    const TickType_t ble_flush_interval = pdMS_TO_TICKS(10);      // 10ms
+
     while (1)
     {
-        if(xQueueReceive(event_queue, &e, 10) == pdFALSE) {
-            continue;
+        TickType_t current_tick = xTaskGetTickCount();
+        
+        // 处理编码器事件
+        if(xQueueReceive(event_queue, &e, 0) == pdTRUE) {
+            switch (e.type)
+            {
+                case RE_ET_BTN_CLICKED:
+                    fsm_main_event_trig(F_MAIN_E_BTN_CLICKED, nullptr);
+                    ESP_LOGI(TAG, "RE_ET_BTN_CLICKED");
+                    break;
+                case RE_ET_BTN_LONG_PRESSED:
+                    fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, nullptr);
+                    ESP_LOGI(TAG, "F_MAIN_E_BTN_L_CLICKED");
+                    break;
+                case RE_ET_CHANGED:
+                    // 传递旋钮变化量，正数=右旋(增加)，负数=左旋(减少)
+                    ESP_LOGI(TAG, "RE_ET_CHANGED, diff: %" PRId32 ", current state: %s", e.diff, fsm_main_get_current_state_str());
+                    fsm_main_event_trig(F_MAIN_E_KNOB_CW, (void *)(&e.diff));
+                    break; 
+                default:
+                    break;
+            }
         }
-        switch (e.type)
-        {
-            case RE_ET_BTN_CLICKED:
-                fsm_main_event_trig(F_MAIN_E_BTN_CLICKED, nullptr);
-                break;
-            case RE_ET_BTN_LONG_PRESSED:
-                fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, nullptr);
-                break;
-            // case RE_ET_CHANGED:
-            // if (e.diff > 0)
-            // {
-                
-            // }
-            // // fsm_main_event_trig(F_MAIN_E_TURN, (void *)(&e.diff));
-            //     break; 
-            default:
-                break;
+        
+        // 定时刷新雷达数据（每100ms）
+        if ((current_tick - last_radar_flush) >= radar_flush_interval) {
+            my_radar_flush();
+            last_radar_flush = current_tick;
+        }
+        
+        // 定时刷新FSM超时（每100ms）
+        if ((current_tick - last_fsm_flush) >= fsm_flush_interval) {
+            fsm_main_timeout_flush();
+            last_fsm_flush = current_tick;
+        }
+        
+        // 定时刷新BLE发送（每10ms）
+        if ((current_tick - last_ble_flush) >= ble_flush_interval) {
+            ble_send_flush();
+            last_ble_flush = current_tick;
+        }
+        
+        // WiFi状态检查（每10ms，保持原有频率）
+        wifi_state_t state = my_wifi_get_state(); 
+        if (state == WIFI_STATE_CONNECTED) {
+            fsm_main_event_trig(F_MAIN_E_WIFI_C_SUC, nullptr);
+        } else if (state == WIFI_STATE_FAILED ) {
+            fsm_main_event_trig(F_MAIN_E_WIFI_C_FAIL, nullptr);
         }
     }
 }

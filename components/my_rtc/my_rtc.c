@@ -9,7 +9,7 @@
 #include <freertos/task.h>
 #include <stdio.h>
 
-i2c_bus_handle_t my_rtc_i2c = NULL;
+i2c_bus_handle_t my_rtc_i2c = NULL; 
 static const char *TAG = "my_rtc";
 
 static int i2c_init()
@@ -75,7 +75,12 @@ int my_rtc_get_time(struct tm *time, bool *valid) {
 }
 
 int my_rtc_set_time(struct tm *time) {
-    return pcf8563_set_time(my_rtc_i2c, time);
+    int ret = pcf8563_set_time(my_rtc_i2c, time);
+    if (ret == 0) {
+        // 设置时间成功，清除VL位，标记为有效
+        s_valid = true;
+    }
+    return ret;
 }
 
 bool my_rtc_is_time_valid() {

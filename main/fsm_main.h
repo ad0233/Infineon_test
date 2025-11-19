@@ -16,14 +16,32 @@ enum fm_wifi_conn_state {
     FM_W_SUC,
     FM_W_FAI,
 };
+enum fm_rtc_conn_state {
+    FM_RTC_EXIST,
+    FM_RTC_NO_EXIST,
+};
 
 enum fm_human_find_conn_state {
     FM_H_F_SUC,
     FM_H_F_FAI,
     FM_H_F_TOUT,
 };
+
+enum fsm_clock_need_cfg {
+    FM_MEMU_WIFI_SC,
+    FM_MEMU_WIFI_FA,
+    FM_MEMU_WAKE_MOD,
+    FM_MEMU_ALARM_SC,
+    FM_MEMU_ALARM_FA,
+    FM_MEMU_UNWIND,
+    FM_MEMU_VOL,
+    FM_MEMU_SC_BR,
+    FM_MEMU_SETTIME,
+};
 uint8_t fm_has_h_fd_state(void); //雷达找人检测
 uint8_t fm_has_w_c_state(void);//wifi检测
+uint8_t fm_has_rtc_state(void); //RTC检测
+uint8_t fm_has_memu_state(void); //菜单状态检测
 uint8_t fsm_clock_need_cfg(void);
 //开机
 void fsm_main_uninit_playing(void *arg);
@@ -50,7 +68,30 @@ void fsm_main_wifi_forget(void *arg);
 void fsm_main_in_offline(void *arg);
 
 void fsm_main_to_clock(void *arg);
-void fsm_main_menu_turn(void *arg);
+void fsm_main_set_time(void *arg);
+void fsm_main_rtc_adjust_time(void *arg);
+void fsm_main_rtc_save_and_exit(void *arg);
+void fsm_wake_mode_next_item(void *arg);
+
+void fsm_main_in_memu(void *arg);
+void fsm_menu_next_item(void *arg);
+void fsm_main_in_wifi_sc(void *arg);
+void fsm_main_in_wifi_fa(void *arg);
+void fsm_main_in_wake_mode(void *arg);
+void fsm_main_in_alarm(void *arg);
+void fsm_set_alarm_item(void *arg);
+void fsm_main_in_no_alarm(void *arg);
+void fsm_main_in_unwind(void *arg);
+void fsm_unwind_next_item(void *arg);
+void fsm_main_in_volume(void *arg);
+void fsm_volume_next_item(void *arg);
+void fsm_main_in_light(void *arg);
+void fsm_light_next_item(void *arg);
+void fsm_main_in_set_time(void *arg);
+
+void fsm_main_in_boya_data(void *arg);
+void fsm_main_in_GoodMorning_demo(void *arg); 
+void fsm_main_in_reminder_tomorrow(void *arg);
 
 enum fsm_main_event_enum {
     F_MAIN_E_INIT,              // 初始化事件
@@ -73,12 +114,15 @@ enum fsm_main_event_enum {
     F_MAIN_E_BTN_CLICKED,       // 点击事件
     F_MAIN_E_BTN_L_CLICKED,     // 长按事件
     F_MAIN_E_KNOB_CW,           // 旋钮事件
-    F_MAIN_E_TIME,              // 等待事件（必须在 TIMEOUT 之前，保证值 < 255）
+    F_MAIN_E_TIME,              // 等待事件
     F_MAIN_E_TIMEOUT = 255,     // 超时事件 特殊事件，不能改值，库内部要求，fsm_timeout_trig函数触发该事件
 };
 void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg);
 uint8_t fsm_main_get_current_state(void);
 const char* fsm_main_get_current_state_str(void);
+
+// 超时刷新函数（由主线程定时调用）
+void fsm_main_timeout_flush(void);
 
 #ifdef __cplusplus
 }
