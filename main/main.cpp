@@ -187,7 +187,31 @@ extern "C" void app_main()
     }
     my_ble_init(NULL);  // 使用默认名称，或传入自定义名称
     my_wifi_init();
+    my_wifi_set_event_callback([](wifi_state_t state, void *context){
+        switch (state)
+        {
+        case WIFI_STATE_IDLE: {
+
+        }break;
+        case WIFI_STATE_CONNECTING: {
+
+        }break;
+        case WIFI_STATE_CONNECTED: {
+            fsm_main_event_trig(F_MAIN_E_WIFI_C_SUC, nullptr);
+        }break;
+        case WIFI_STATE_DISCONNECTED: {
+
+        }break;
+        case WIFI_STATE_FAILED: {
+            fsm_main_event_trig(F_MAIN_E_WIFI_C_FAIL, nullptr);
+        }break;
+        default:
+            break;
+        }
+    }, nullptr);
+    
     my_rtc_init();
+    my_radar_init();
 
     gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
@@ -200,8 +224,6 @@ extern "C" void app_main()
     gpio_set_level(PA_ENABLE_GPIO, 0); // Enable PA
 
     print_mem_info();
-
-    my_wifi_connect("C301", "1124861985");
 
     esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
     esp_netif_sntp_init(&config);
@@ -263,22 +285,31 @@ extern "C" void app_main()
         t_shadow_get_acc,
         t_shadow_get_rej,
     };
-    my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
+    //my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
     
     print_mem_info();
 
-    while(1) {
-        radar_latest_data_t data;
-        my_radar_get_latest_data(&data);
-        char *json_str = nullptr;
-        uint32_t utc_timestamp = get_utc_timestamp_s();
-        my_radar_data_to_json(&data, utc_timestamp, &json_str);
-        my_mqtt_publish(t_radar, json_str, strlen(json_str), 0, 0);
-        // ESP_LOGI("RADAR", "publish: %s", json_str);
-        free(json_str);
-        vTaskDelay(1000);
-    }
+    // while(1) {
+    //     radar_latest_data_t data;
+    //     my_radar_get_latest_data(&data);
+    //     char *json_str = nullptr;
+    //     uint32_t utc_timestamp = get_utc_timestamp_s();
+    //     my_radar_data_to_json(&data, utc_timestamp, &json_str);
+    //     my_mqtt_publish(t_radar, json_str, strlen(json_str), 0, 0);
+    //     // ESP_LOGI("RADAR", "publish: %s", json_str);
+    //     free(json_str);
+    //     vTaskDelay(1000);
+    // }
 
+    fsm_main_event_trig(F_MAIN_E_INIT, nullptr);
+    xTaskCreate(encoder_test, "encoder_test", 1024 * 6, nullptr, 10, nullptr);
+    my_radar_start();
+
+    print_mem_info();
+
+    my_wifi_connect("axiarz", "axiarz8888");
+
+    print_mem_info();
     return;
 }
 
@@ -325,9 +356,11 @@ void encoder_test(void *arg)
     TickType_t last_radar_flush = 0;
     TickType_t last_fsm_flush = 0;
     TickType_t last_ble_flush = 0;
+    TickType_t last_wifi_flush = 0;
     const TickType_t radar_flush_interval = pdMS_TO_TICKS(100);  // 100ms
     const TickType_t fsm_flush_interval = pdMS_TO_TICKS(100);    // 100ms
     const TickType_t ble_flush_interval = pdMS_TO_TICKS(10);      // 10ms
+    const TickType_t wifi_flush_interval = pdMS_TO_TICKS(100);      // 100ms
 
     while (1)
     {
@@ -360,6 +393,11 @@ void encoder_test(void *arg)
             my_radar_flush();
             last_radar_flush = current_tick;
         }
+        // //定时刷新wifi（每100ms）
+        // if ((current_tick - last_wifi_flush) >= wifi_flush_interval) {
+        //     my_wifi_flush();
+        //     last_wifi_flush = current_tick;
+        // }
         
         // 定时刷新FSM超时（每100ms）
         if ((current_tick - last_fsm_flush) >= fsm_flush_interval) {
@@ -372,14 +410,7 @@ void encoder_test(void *arg)
             ble_send_flush();
             last_ble_flush = current_tick;
         }
-        
-        // WiFi状态检查（每10ms，保持原有频率）
-        wifi_state_t state = my_wifi_get_state(); 
-        if (state == WIFI_STATE_CONNECTED) {
-            fsm_main_event_trig(F_MAIN_E_WIFI_C_SUC, nullptr);
-        } else if (state == WIFI_STATE_FAILED ) {
-            fsm_main_event_trig(F_MAIN_E_WIFI_C_FAIL, nullptr);
-        }
+        vTaskDelay(1);
     }
 }
 
