@@ -24,10 +24,20 @@ static int uart_num = UART_NUM_1;
 #define RXD_PIN (GPIO_NUM_12)
 
 // 全局变量
-static TaskHandle_t rx_task_handle = NULL;
 static bool radar_running = false;
 static bool radar_connected = false;
 static SemaphoreHandle_t data_mutex = NULL;
+
+// 帧解析状态结构体
+typedef struct {
+    uint8_t frame_buffer[256];
+    uint16_t frame_index;
+    bool header_found;
+    uint16_t expected_length;
+    uint32_t last_data_time;
+} frame_parse_state_t;
+
+static frame_parse_state_t parse_state = {0};
 
 // 回调函数
 static radar_human_callback_t human_presence_callback = NULL;
@@ -45,9 +55,11 @@ static radar_product_info_t cached_product_info = {0};
 static uint32_t movement_timestamp = 0;
 static uint32_t respiratory_timestamp = 0;
 static uint32_t heart_rate_timestamp = 0;
+static uint32_t movement_system_timestamp = 0;
+static uint32_t respiratory_system_timestamp = 0;
+static uint32_t heart_rate_system_timestamp = 0;
 
 // 内部函数声明
-static void rx_task(void *arg);
 static bool parse_packet(const uint8_t *data, uint16_t length);
 
 // ============================================================================
@@ -85,24 +97,22 @@ void r60abd1_init(void)
 
 void r60abd1_start(void)
 {
-    if (rx_task_handle != NULL) {
-        ESP_LOGW(TAG, "R60ABD1雷达接收任务已在运行");
+    if (radar_running) {
+        ESP_LOGW(TAG, "R60ABD1雷达已在运行");
         return;
     }
     
     radar_running = true;
-    xTaskCreate(rx_task, "r60abd1_rx_task", 4096, NULL, 5, &rx_task_handle);
-    ESP_LOGI(TAG, "R60ABD1雷达接收任务已启动");
+    // 重置帧解析状态
+    memset(&parse_state, 0, sizeof(parse_state));
+    
+    ESP_LOGI(TAG, "R60ABD1雷达已启动（flush模式）");
 }
 
 void r60abd1_stop(void)
 {
     radar_running = false;
-    if (rx_task_handle != NULL) {
-        vTaskDelete(rx_task_handle);
-        rx_task_handle = NULL;
-    }
-    ESP_LOGI(TAG, "R60ABD1雷达接收任务已停止");
+    ESP_LOGI(TAG, "R60ABD1雷达已停止");
 }
 
 void r60abd1_set_human_presence_callback(radar_human_callback_t callback)
@@ -185,11 +195,9 @@ bool r60abd1_get_latest_data(radar_latest_data_t *data)
         data->respiratory_timestamp = respiratory_timestamp;
         data->heart_rate_value = cached_heart_rate_data.heart_rate_value;
         data->heart_rate_timestamp = heart_rate_timestamp;
-        // 如果呼吸和心率数据有效（开关开启且值不为0），则认为数据有效
-        data->valid = (cached_respiratory_data.respiratory_switch && 
-                      cached_respiratory_data.respiratory_value > 0) ||
-                     (cached_heart_rate_data.heart_rate_switch && 
-                      cached_heart_rate_data.heart_rate_value > 0);
+        data->heart_rate_system_timestamp = heart_rate_system_timestamp;
+        data->respiratory_system_timestamp = respiratory_system_timestamp;
+        data->movement_system_timestamp = movement_system_timestamp;
         xSemaphoreGive(data_mutex);
         return true;
     }
@@ -284,83 +292,74 @@ bool r60abd1_set_heart_rate_switch(bool enable)
 // 内部实现
 // ============================================================================
 
-static void rx_task(void *arg)
+void r60abd1_flush(void)
 {
-    uint8_t data[RD_BUF_SIZE];
-    uint32_t last_data_time = 0;
-    uint8_t frame_buffer[256];
-    uint16_t frame_index = 0;
-    bool header_found = false;
-    uint16_t expected_length = 0;
-    
-    ESP_LOGI(TAG, "R60ABD1雷达接收任务开始运行");
-    
-    while (radar_running) {
-        int len = uart_read_bytes(uart_num, data, RD_BUF_SIZE, 100 / portTICK_PERIOD_MS);
-        
-        if (len > 0) {
-            last_data_time = esp_log_timestamp();
-            radar_connected = true;
-            
-            // 逐字节处理数据包
-            for (int i = 0; i < len; i++) {
-                uint8_t byte = data[i];
-                
-                if (!header_found) {
-                    // 查找帧头 0x53 0x59
-                    if (byte == RADAR_FRAME_HEADER_1) {
-                        frame_buffer[0] = byte;
-                        frame_index = 1;
-                        header_found = true;
-                    }
-                } else {
-                    if (frame_index < sizeof(frame_buffer)) {
-                        frame_buffer[frame_index++] = byte;
-                    }
-                    
-                    // 检查是否找到完整的帧头
-                    if (frame_index == 2) {
-                        if (frame_buffer[1] != RADAR_FRAME_HEADER_2) {
-                            // 帧头不匹配，重新开始
-                            header_found = false;
-                            frame_index = 0;
-                            continue;
-                        }
-                    }
-                    
-                    // 检查是否收集到长度信息
-                    if (frame_index == 6) {
-                        // 数据长度是大端序
-                        uint16_t data_len = (frame_buffer[4] << 8) | frame_buffer[5];
-                        // 总包长度 = 帧头(2) + 控制字(1) + 命令字(1) + 长度(2) + 数据(n) + 校验(1) + 帧尾(2)
-                        expected_length = 9 + data_len;
-                    }
-                    
-                    // 检查是否收集到完整的数据包
-                    if (frame_index >= 6 && frame_index >= expected_length) {
-                        // 解析数据包
-                        if (parse_packet(frame_buffer, frame_index)) {
-                            // 解析成功
-                        }
-                        
-                        // 重置状态
-                        header_found = false;
-                        frame_index = 0;
-                        expected_length = 0;
-                    }
-                }
-            }
-        } else {
-            // 检查连接状态
-            if (radar_connected && (esp_log_timestamp() - last_data_time > 2000)) {
-                radar_connected = false;
-                ESP_LOGW(TAG, "R60ABD1雷达连接丢失");
-            }
-        }
+    if (!radar_running) {
+        return;
     }
     
-    ESP_LOGI(TAG, "R60ABD1雷达接收任务结束");
-    vTaskDelete(NULL);
+    uint8_t data[RD_BUF_SIZE];
+    int len = uart_read_bytes(uart_num, data, RD_BUF_SIZE, 0);  // 非阻塞读取
+    
+    if (len > 0) {
+        parse_state.last_data_time = esp_log_timestamp();
+        radar_connected = true;
+        
+        // 逐字节处理数据包
+        for (int i = 0; i < len; i++) {
+            uint8_t byte = data[i];
+            
+            if (!parse_state.header_found) {
+                // 查找帧头 0x53 0x59
+                if (byte == RADAR_FRAME_HEADER_1) {
+                    parse_state.frame_buffer[0] = byte;
+                    parse_state.frame_index = 1;
+                    parse_state.header_found = true;
+                }
+            } else {
+                if (parse_state.frame_index < sizeof(parse_state.frame_buffer)) {
+                    parse_state.frame_buffer[parse_state.frame_index++] = byte;
+                }
+                
+                // 检查是否找到完整的帧头
+                if (parse_state.frame_index == 2) {
+                    if (parse_state.frame_buffer[1] != RADAR_FRAME_HEADER_2) {
+                        // 帧头不匹配，重新开始
+                        parse_state.header_found = false;
+                        parse_state.frame_index = 0;
+                        continue;
+                    }
+                }
+                
+                // 检查是否收集到长度信息
+                if (parse_state.frame_index == 6) {
+                    // 数据长度是大端序
+                    uint16_t data_len = (parse_state.frame_buffer[4] << 8) | parse_state.frame_buffer[5];
+                    // 总包长度 = 帧头(2) + 控制字(1) + 命令字(1) + 长度(2) + 数据(n) + 校验(1) + 帧尾(2)
+                    parse_state.expected_length = 9 + data_len;
+                }
+                
+                // 检查是否收集到完整的数据包
+                if (parse_state.frame_index >= 6 && parse_state.frame_index >= parse_state.expected_length) {
+                    // 解析数据包
+                    if (parse_packet(parse_state.frame_buffer, parse_state.frame_index)) {
+                        // 解析成功
+                    }
+                    
+                    // 重置状态
+                    parse_state.header_found = false;
+                    parse_state.frame_index = 0;
+                    parse_state.expected_length = 0;
+                }
+            }
+        }
+    } else {
+        // 检查连接状态
+        if (radar_connected && (esp_log_timestamp() - parse_state.last_data_time > 2000)) {
+            radar_connected = false;
+            ESP_LOGW(TAG, "R60ABD1雷达连接丢失");
+        }
+    }
 }
 
 static bool parse_packet(const uint8_t *data, uint16_t length)
@@ -419,6 +418,7 @@ static bool parse_packet(const uint8_t *data, uint16_t length)
                 if (xSemaphoreTake(data_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                     cached_human_data.movement_param = payload[0];
                     movement_timestamp = get_utc_timestamp_s();
+                    movement_system_timestamp = esp_log_timestamp();
                     xSemaphoreGive(data_mutex);
                     
                     if (human_movement_callback != NULL) {
@@ -465,6 +465,7 @@ static bool parse_packet(const uint8_t *data, uint16_t length)
                     if (data_len >= 1) {
                         cached_respiratory_data.respiratory_value = payload[0];
                         respiratory_timestamp = get_utc_timestamp_s();
+                        respiratory_system_timestamp = esp_log_timestamp();
                     }
                     break;
                 case RADAR_CMD_RESPIRATORY_WAVEFORM:
@@ -502,6 +503,7 @@ static bool parse_packet(const uint8_t *data, uint16_t length)
                     if (data_len >= 1) {
                         cached_heart_rate_data.heart_rate_value = payload[0];
                         heart_rate_timestamp = get_utc_timestamp_s();
+                        heart_rate_system_timestamp = esp_log_timestamp();
                     }
                     break;
                 case RADAR_CMD_HEART_RATE_WAVEFORM:

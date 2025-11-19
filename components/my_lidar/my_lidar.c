@@ -146,6 +146,15 @@ bool my_radar_get_latest_data(radar_latest_data_t *data)
 #endif
 }
 
+void my_radar_flush(void)
+{
+#ifdef USE_AIRTOUCH_RADAR
+    // 艾睿雷达使用线程模式，不需要 flush
+#else
+    r60abd1_flush();
+#endif
+}
+
 int my_radar_data_to_json(const radar_latest_data_t *data, uint32_t timestamp, char **json_str)
 {
     if (data == NULL || json_str == NULL) {

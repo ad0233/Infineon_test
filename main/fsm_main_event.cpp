@@ -12,6 +12,7 @@
 #include "my_rtc.h"
 #include "my_h264.h"
 #include "my_rtc.h"
+#include "my_lidar.h"
 
 #define TAG "fsm_main"
 
@@ -21,68 +22,45 @@
 /*------------------------------------------------------------------------------找人------------------------------------------------------------------------------------------*/
 // 静态变量：失败开始时间戳、保存的检测结果
 static uint32_t s_fail_start_time = 0;  // 失败状态开始的时间戳（ms）
-static uint8_t s_saved_state = FM_H_F_FAI;  // 保存的检测结果
-static bool s_state_valid = false;  // 检测结果是否有效
 #define FIND_TIMEOUT_MS 15000  // 15秒超时
 
 // 静态变量：闹钟开关状态
 static bool s_alarm_enabled = true;  // true=有闹钟, false=无闹钟
 static bool s_alarm_state_initialized = false;  // 状态是否已初始化
 
-// 执行一次检测并保存结果
-static void do_detection(void) {
-    // 使用ESP32硬件随机数生成器
-    int rand_val = esp_random() % 20;
-    ESP_LOGI(TAG, "I=%d", rand_val);
-    
-    uint32_t current_time = esp_log_timestamp();
-    
-    if (rand_val > 10) {
-        // 成功：清除失败时间戳
-        s_fail_start_time = 0;
-        s_saved_state = FM_H_F_SUC;
-        ESP_LOGI(TAG, "human_find is success");
-    } else {
-        // 失败：检查是否超时
-        if (s_fail_start_time == 0) {
-            // 第一次失败，记录开始时间
-            s_fail_start_time = current_time;
-            s_saved_state = FM_H_F_FAI;
-            ESP_LOGI(TAG, "human_find_failed, start timer");
-        } else {
-            // 检查是否超时
-            uint32_t elapsed = current_time - s_fail_start_time;
-            if (elapsed >= FIND_TIMEOUT_MS) {
-                // 超时
-                s_saved_state = FM_H_F_TOUT;
-                ESP_LOGI(TAG, "human_find_timeout after %" PRIu32 " ms", elapsed);
-            } else {
-                // 未超时，继续失败
-                s_saved_state = FM_H_F_FAI;
-                ESP_LOGI(TAG, "human_find_failed, elapsed: %" PRIu32 " ms", elapsed);
-            }
-        }
-    }
-    s_state_valid = true;
-}
-
 //找人
 uint8_t fm_has_h_fd_state(void) {
-    // 如果结果无效，执行一次检测
-    if (!s_state_valid) {
-        do_detection();
+    radar_latest_data_t radar_data;
+    if(my_radar_get_latest_data(&radar_data)) {
+        ESP_LOGI(TAG, "movement_param: %d", radar_data.movement_param);
+        // 挥挥手就识别成功了
+        if(radar_data.movement_param > 15) {
+            return FM_H_F_SUC;
+        }
+        // TODO: 心率检测更合理些,因为如果没人,就不会有心率更新,但是甲方要求体动判断先
+        // if(esp_log_timestamp() - radar_data.heart_rate_system_timestamp < 3) {
+        //     return FM_H_F_SUC;
+        // }
+        return FM_H_F_FAI;
     }
+
+    if(esp_log_timestamp() - s_fail_start_time > FIND_TIMEOUT_MS) {
+        return FM_H_F_TOUT;
+    }
+    
     // 返回保存的结果
-    return s_saved_state;
+    return FM_H_F_FAI;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 //网络
 uint8_t fm_has_w_c_state(void) {
-    // FM_W_N_CFG -> WIFI_GUIDE (二维码页面)
-    // FM_W_CONN -> WIFI_CONN (连接中页面)
-    // FM_W_SUC -> CLOCK (时钟页面)
-    // FM_W_FAI -> WIFI_GUIDE (二维码页面)
-    switch ( my_wifi_get_state())
+    // 没有配置
+    const struct device_config *cfg = my_nvs_get_config();
+    if(cfg->wifi_enable == false) {
+        ESP_LOGI(TAG, "wifi not configured");
+        return FM_W_N_CFG;
+    }
+    switch (my_wifi_get_state())
     {
     case WIFI_STATE_CONNECTED:
         ESP_LOGI(TAG, "wifi is connected");
@@ -97,11 +75,16 @@ uint8_t fm_has_w_c_state(void) {
         return FM_W_FAI;
         break;
     default:
-        ESP_LOGI(TAG, "wifi not configured (for testing)");
-        return FM_W_N_CFG;  // 返回未配置，跳转到二维码页面
+        ESP_LOGI(TAG, "wifi connection failed");
+        return FM_W_FAI;
         break;
     }
-    return FM_W_N_CFG;
+    return FM_W_FAI;
+}
+
+uint8_t fsm_has_wifi_config(void) {
+    const struct device_config *cfg = my_nvs_get_config();
+    return cfg->wifi_enable;
 }
 
 
@@ -144,7 +127,7 @@ uint8_t fm_has_memu_state(void){
     uint8_t ret = 0;
     switch(current_index) {
         case 0: // Wi-Fi
-            if(1){    //这里需要放入有无wifi的判断
+            if(my_wifi_get_state() == WIFI_STATE_CONNECTED){    //这里需要放入有无wifi的判断
                 ret = FM_MEMU_WIFI_SC;
             }
             else{
@@ -191,7 +174,7 @@ static uint8_t s_editing_hour = 0;
 static uint8_t s_editing_minute = 0;
 static bool s_editing_hour_mode = false;  // true=编辑小时, false=编辑分钟
 ///设置时间，settime 和  rtc 一个页面  如果rtc设置过则用rtc的时间 没有则  7：30
-void fsm_main_set_time(void *arg) {
+void fsm_main_set_time(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "to set time...");
 
     struct tm t;
@@ -225,7 +208,7 @@ void fsm_main_set_time(void *arg) {
 }
 
 
-void fsm_main_rtc_adjust_time(void *arg)
+void fsm_main_rtc_adjust_time(void *arg, uint8_t last_state, uint8_t next_state)
 {
     if (!arg) return;
 
@@ -277,7 +260,7 @@ void fsm_main_rtc_adjust_time(void *arg)
 }
 
 
-void fsm_main_rtc_save_and_exit(void *arg)
+void fsm_main_rtc_save_and_exit(void *arg, uint8_t last_state, uint8_t next_state)
 {
     ESP_LOGI(TAG, "Saving RTC time...");
 
@@ -312,12 +295,12 @@ void fsm_main_rtc_save_and_exit(void *arg)
     }
 
     //---- 4. 返回主界面（它会再次读取 RTC）----
-    fsm_main_to_clock(nullptr);
+    fsm_main_to_clock(nullptr, last_state, next_state);
 }
 
 
 
-void fsm_main_to_clock(void *arg) {
+void fsm_main_to_clock(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "to clock...");
     
     // RTC已配置，从RTC读取时间
@@ -351,7 +334,7 @@ void fsm_main_to_clock(void *arg) {
 /*----------------------------------------------------------------------------菜单的切换----------------------------------------------------------------------------------------*/
 
 
-void fsm_menu_next_item(void *arg) {
+void fsm_menu_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
     if (arg == nullptr) {
         return;
     }
@@ -393,7 +376,7 @@ void fsm_menu_next_item(void *arg) {
 
 /*-------------------------------------------------------------------------------------唤醒的切换------------------------------------------------------------------------------*/
 
-void fsm_wake_mode_next_item(void *arg) {
+void fsm_wake_mode_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
     if (arg == nullptr) {
         return;
     }
@@ -419,7 +402,7 @@ static uint8_t s_alarm_editing_hour = 8;
 static uint8_t s_alarm_editing_minute = 0;
 static bool s_alarm_editing_hour_mode = false;  // true=编辑小时, false=编辑分钟
 
-void fsm_set_alarm_item(void *arg) {
+void fsm_set_alarm_item(void *arg, uint8_t last_state, uint8_t next_state) {
     if (arg == nullptr) {
         return;
     }
@@ -500,7 +483,7 @@ void fsm_set_alarm_item(void *arg) {
 }
 
 /*----------------------------------------------------------------------------------unwind-------------------------------------------------------------------------------------*/
-void fsm_unwind_next_item(void *arg) {
+void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
     if (arg == nullptr) {
         ESP_LOGW(TAG, "fsm_unwind_next_item: arg is nullptr");
         return;
@@ -526,7 +509,7 @@ void fsm_unwind_next_item(void *arg) {
 }
 
 /*----------------------------------------------------------------------------------volume-------------------------------------------------------------------------------------*/
-void fsm_volume_next_item(void *arg) {
+void fsm_volume_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
     if (arg == nullptr) {
         ESP_LOGW(TAG, "fsm_volume_next_item: arg is nullptr");
         return;
@@ -558,7 +541,7 @@ void fsm_volume_next_item(void *arg) {
 }
 
 /*----------------------------------------------------------------------------------light-------------------------------------------------------------------------------------*/
-void fsm_light_next_item(void *arg) {
+void fsm_light_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
     if (arg == nullptr) {
         ESP_LOGW(TAG, "fsm_light_next_item: arg is nullptr");
         return;
@@ -588,93 +571,95 @@ uint8_t fsm_clock_need_cfg(void) {
     return my_rtc_is_time_valid();
 }
 
-void fsm_main_lidar_clock_update(void *arg) {
+void fsm_main_lidar_clock_update(void *arg, uint8_t last_state, uint8_t next_state) {
     // ESP_LOGI(TAG, "lidar update - clock");
     
 }
 
 //开机动画
-void fsm_main_uninit_playing(void *arg){
+void fsm_main_uninit_playing(void *arg, uint8_t last_state, uint8_t next_state){
     lvgl_port_stop();
     my_h264_start(MY_H264_ANIM_BRAND_MOTION2,100);
 
     
 }
 //找人动画前
-void fsm_main_lidar_find_boot(void *arg){
+void fsm_main_lidar_find_boot(void *arg, uint8_t last_state, uint8_t next_state){
     lvgl_port_stop();
     my_h264_start(MY_H264_ANIM_GO_UP,100);
 }
 
 
 //找人动画
-void fsm_main_lidar_find_playing(void *arg){
+void fsm_main_lidar_find_playing(void *arg, uint8_t last_state, uint8_t next_state){
     // 重置失败时间戳，开始新的检测周期
-    s_fail_start_time = 0;
-    s_state_valid = false;  // 标记检测结果无效，下次调用时会重新检测
     
     lvgl_port_stop();
     my_h264_start(MY_H264_ANIM_PROCESSING,100);
+
+    if(last_state == F_MAIN_S_UNINIT_PLAYING || last_state == F_MAIN_S_FINDFAIL) {
+        s_fail_start_time = esp_log_timestamp();
+    }
 }
 //找到人动画
-void fsm_main_find_someone(void *arg){
+void fsm_main_find_someone(void *arg, uint8_t last_state, uint8_t next_state){
     lvgl_port_stop();
     my_h264_start(MY_H264_ANIM_HUMAN_RECOGNIZED,100);
 }
 //没找到人动画
-void fsm_main_no_find_someone(void *arg){
+void fsm_main_no_find_someone(void *arg, uint8_t last_state, uint8_t next_state){
     lvgl_port_stop();
     my_h264_start(MY_H264_ANIM_FAIL2,100);
 }
 
-void fsm_main_lidar_find(void *arg) {
+void fsm_main_lidar_find(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "find person...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_Detection);
     lvgl_port_unlock();
 }
 
-void fsm_main_lidar_find_suc(void *arg) {
+void fsm_main_lidar_find_suc(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "find suc");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_DetectionY);
     lvgl_port_unlock();
 }
 
-void fsm_main_lidar_find_fail(void *arg) {
+void fsm_main_lidar_find_fail(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "find fail, restart finding");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_DetectionN1);
     lvgl_port_unlock();
 }
 
-void fsm_main_wifi_guide(void *arg) {
+void fsm_main_wifi_guide(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "wifi guide...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_NetworkBoot);
     lvgl_port_unlock();
 }
 
-void fsm_main_wifi_connecting(void *arg) {
+void fsm_main_wifi_connecting(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "wifi connecting...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_Connecting);
     lvgl_port_unlock();
 }
 
-void fsm_main_wifi_conn_suc(void *arg) {
+void fsm_main_wifi_conn_suc(void *arg, uint8_t last_state, uint8_t next_state) {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_ConnectingSuccess);
     lvgl_port_unlock();
 }
 
-void fsm_main_wifi_conn_fail(void *arg) {
+void fsm_main_wifi_conn_fail(void *arg, uint8_t last_state, uint8_t next_state) {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_ConnectingFailed);
     lvgl_port_unlock();
 }
 
-void fsm_main_wifi_reconn(void *arg) {
+void fsm_main_wifi_reconn(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "wifi reconnecting...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_Connecting);
@@ -682,21 +667,21 @@ void fsm_main_wifi_reconn(void *arg) {
     my_wifi_auto_connect();
 }
 
-void fsm_main_wifi_forget(void *arg) {
+void fsm_main_wifi_forget(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "wifi forget and guide...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_NetworkBoot);
     lvgl_port_unlock();
 }
 
-void fsm_main_in_offline(void *arg) {
+void fsm_main_in_offline(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in offline mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_OfflineMode);
     lvgl_port_unlock();
 }
 
-void fsm_main_in_memu(void *arg) {
+void fsm_main_in_memu(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in menu...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_Memu);
@@ -704,20 +689,20 @@ void fsm_main_in_memu(void *arg) {
 }
 //wifi
 
-void fsm_main_in_wifi_sc(void *arg) {
+void fsm_main_in_wifi_sc(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in wifi_sc mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_ConnectingSuccess);
     lvgl_port_unlock();
 }
-void fsm_main_in_wifi_fa(void *arg) {
+void fsm_main_in_wifi_fa(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in wifi_fa mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_OfflineMode);
     lvgl_port_unlock();
 }
 //wake mode
-void fsm_main_in_wake_mode(void *arg) {
+void fsm_main_in_wake_mode(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in wake_mode mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_WakeModeTest);
@@ -725,7 +710,7 @@ void fsm_main_in_wake_mode(void *arg) {
 }
 
 //alarm
-void fsm_main_in_alarm(void *arg) {
+void fsm_main_in_alarm(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in alarm mode...");
     
     // 设置闹钟状态为开启
@@ -759,7 +744,7 @@ void fsm_main_in_alarm(void *arg) {
         my_nvs_update_config(&new_cfg);
     }
 }
-void fsm_main_in_no_alarm(void *arg) {
+void fsm_main_in_no_alarm(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in no alarm mode...");
     
     // 设置闹钟状态为关闭
@@ -778,7 +763,7 @@ void fsm_main_in_no_alarm(void *arg) {
 }
 
 
-void fsm_main_in_unwind(void *arg) {
+void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in unwind mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_UnwindSelet);
@@ -786,38 +771,38 @@ void fsm_main_in_unwind(void *arg) {
 }
 
 
-void fsm_main_in_volume(void *arg) {
+void fsm_main_in_volume(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in_volume mode...");
     my_ui_in_volume();
 }
 
 
-void fsm_main_in_light(void *arg) {
+void fsm_main_in_light(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in light mode...");
     my_ui_in_light();
 }
 
 
-void fsm_main_in_set_time(void *arg) {
+void fsm_main_in_set_time(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in set_time mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_SetTime);
     lvgl_port_unlock();
 }
 
-void fsm_main_in_boya_data(void *arg) {
+void fsm_main_in_boya_data(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in set_time mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_sleepData);
     lvgl_port_unlock();
 }
-void fsm_main_in_GoodMorning_demo(void *arg) {
+void fsm_main_in_GoodMorning_demo(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in set_time mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_MorningAnimation);
     lvgl_port_unlock();
 }
-void fsm_main_in_reminder_tomorrow(void *arg) {
+void fsm_main_in_reminder_tomorrow(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in set_time mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_ReminderTomorrow);

@@ -8,51 +8,7 @@
 #include "esp_lvgl_port.h"
 #include "my_ui_behavior.h"
 
-    static const char *TAG = "fsm_main";
-
-
-enum fsm_main_state_enum {
-    F_MAIN_S_UNINIT,              // 未初始化
-    F_MAIN_S_UNINIT_PLAYING,       //开机动画
-    F_MAIN_S_CLOCK,              // 时钟页面 
-    F_MAIN_S_CLOCK_AWAY,        // 时钟页面人走
-    F_MAIN_S_CLOCK_BACK,        //时种页面人回来过度（大蝴蝶）
-    // 找人
-    F_MAIN_S_FINDPERSONC_ANIM,  // 找人动画
-    F_MAIN_S_MEMU_FINDPERSONC_ANIM,//后续的找人动画
-    F_MAIN_S_FINDPERSON,        // 雷达找人检测
-    F_MAIN_S_FINDSUC,           // 找人成功
-    F_MAIN_S_FINDFAIL,          // 找人失败
-    F_MAIN_S_FINDSUC_ANIM,      // 找人成功动画
-    F_MAIN_S_FINDFAIL_ANIM,     // 找人失败动画
-    // Wifi连接
-    F_MAIN_S_WIFI_DETECT,       //wifi检测
-    F_MAIN_S_WIFI_GUIDE,        // 二维码指引连接wifi
-    F_MAIN_S_WIFI_CONN,         // wifi连接中
-    F_MAIN_S_WIFI_CONN_SUC,     // wifi连接成功
-    F_MAIN_S_WIFI_CONN_FAIL,    //  wifi连接失败
-    F_MAIN_S_WIFI_OFFLINE,      //wifi离线状态（wifi云）
-    F_MAIN_S_MEMU_WIFI_SUC,     //菜单 wifi连接成功
-    F_MAIN_S_MEMU_WIFI_FAILE,   // 菜单 wifi连接失败
-    // RTC配置
-    F_MAIN_S_RTC_DETECT,         // RTC配置检测
-    F_MAIN_S_RTC_DETECT_CLK,     // RTC时间
-    //菜单
-    F_MAIN_S_MENU,               //菜单
-
-    F_MAIN_S_MENU_SLEEP_MODE,   //睡眠模式页面
-    F_MAIN_S_MENU_ALARM,        //有闹钟页面
-    F_MAIN_S_NO_MENU_ALARM,        //无闹钟页面
-    F_MAIN_S_MENU_UNWIND,        //选择歌曲页面
-    F_MAIN_S_MENU_VOLUME,        //声音页面
-    F_MAIN_S_MENU_BRIGHTNESS,      //亮度页面
-    F_MAIN_S_MENU_SET_TIME,        //设置时间页面
-
-    //数据页面
-    F_MAIN_S_BOYA_DATA,         //睡眠数据
-    F_MAIN_S_GoodMorning_DEMO,  //早报demo
-    F_MAIN_S_REMINDER,          //明天提醒
-};
+static const char *TAG = "fsm_main";
 
 // 状态名称获取
 static const char* fsm_state_to_str(uint8_t state) {
@@ -117,52 +73,6 @@ static const char* fsm_event_to_str(uint8_t event) {
     };
     return (event < sizeof(names)/sizeof(names[0]) && names[event]) ? names[event] : "UNKNOWN";
 }
-
-
-// static struct StateTable fsm_user_table[] = {
-//     //区分事件组变量       编号         到来的事件               当前的状态            下一个状态         超时  立即执行  将要要执行的函数
-//     { nullptr            ,0          ,F_MAIN_E_INIT          , F_MAIN_S_UNINIT         , F_MAIN_S_FINDPERSON     ,15   ,false   ,fsm_main_lidar_find },
-//     { nullptr            ,0          ,F_MAIN_E_LIDAR_UPDATE  , F_MAIN_S_CLOCK          , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_lidar_clock_update },
-//     // 找人 
-//     { nullptr            ,0          ,F_MAIN_E_DEV_MOVE      , F_MAIN_S_FINDFAIL       , F_MAIN_S_FINDPERSON     ,15   ,false   ,fsm_main_lidar_find      },
-//     { nullptr            ,0          ,F_MAIN_E_LIDAR_FIND    , F_MAIN_S_FINDPERSON     , F_MAIN_S_FINDSUC        ,5    ,false   ,fsm_main_lidar_find_suc  },
-//     { nullptr            ,0          ,F_MAIN_E_TIMEOUT       , F_MAIN_S_FINDPERSON     , F_MAIN_S_FINDFAIL       ,0    ,false   ,fsm_main_lidar_find_fail },
-//     // 网络相关
-//     { fm_has_w_c_state   ,FM_W_N_CFG ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDPERSON     , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_guide },
-//     { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDPERSON     , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
-//     { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDPERSON     , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_to_clock },
-//     { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_FINDPERSON     , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
-
-//     { fm_has_w_c_state   ,FM_W_N_CFG ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_guide },
-//     { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
-//     { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDSUC        , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_to_clock },
-//     { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDSUC        , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
-
-//     { fm_has_w_c_state   ,FM_W_N_CFG ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_guide },
-//     { fm_has_w_c_state   ,FM_W_CONN  ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
-//     { fm_has_w_c_state   ,FM_W_SUC   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_to_clock },
-//     { fm_has_w_c_state   ,FM_W_FAI   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL       , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
-//     //区分事件组变量       编号         到来的事件               当前的状态            下一个状态         超时  立即执行  将要要执行的函数
-//     // 指引连接wifi
-//     // wifi 连接 （时间判定）
-//     // { nullptr            ,0          ,F_MAIN_E_TIMEOUT       , F_MAIN_S_WIFI_CONN      , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
-//     // wifi 连接 （事件判定）
-//     { nullptr            ,0          ,F_MAIN_E_WIFI_CMD_TRIG , F_MAIN_S_WIFI_GUIDE     , F_MAIN_S_WIFI_CONN      ,0    ,false   ,fsm_main_wifi_connecting },
-//     { nullptr            ,0          ,F_MAIN_E_WIFI_C_SUC    , F_MAIN_S_WIFI_CONN      , F_MAIN_S_WIFI_CONN_SUC  ,0    ,false   ,fsm_main_wifi_conn_suc },
-//     { nullptr            ,0          ,F_MAIN_E_WIFI_C_FAIL   , F_MAIN_S_WIFI_CONN      , F_MAIN_S_WIFI_CONN_FAIL ,0    ,false   ,fsm_main_wifi_conn_fail },
-//     // 失败后处理
-//     { nullptr            ,0          ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_WIFI_CONN_FAIL , F_MAIN_S_WIFI_CONN      ,10   ,false   ,fsm_main_wifi_connecting },
-//     { nullptr            ,0          ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_WIFI_CONN_FAIL , F_MAIN_S_WIFI_GUIDE     ,0    ,false   ,fsm_main_wifi_forget },
-    
-//     { nullptr            ,0          ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_WIFI_CONN_SUC  , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_to_clock },
-//     // 离线模式
-//     { fsm_clock_need_cfg ,0          ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_WIFI_GUIDE     , F_MAIN_S_WIFI_OFFLINE   ,0    ,false   ,fsm_main_in_offline },
-//     { fsm_clock_need_cfg ,1          ,F_MAIN_E_BTN_L_CLICKED , F_MAIN_S_WIFI_GUIDE     , F_MAIN_S_WIFI_OFFLINE   ,0    ,false   ,fsm_main_in_offline },
-
-//     // ...
-    
-//     { nullptr            ,0          ,F_MAIN_E_TURN          , F_MAIN_S_CLOCK          , F_MAIN_S_CLOCK          ,0    ,false   ,fsm_main_menu_turn },
-// };
 
 static struct StateTable fsm_user_table[] = {
     //区分事件组变量       编号         到来的事件               当前的状态             下一个状态                超时  立即执行  将要要执行的函数
@@ -258,9 +168,6 @@ static struct StateTable fsm_user_table[] = {
     // {nullptr             ,0                     ,0      ,0                   ,F_MAIN_S_CLOCK     ,10  ,true    ,  fsm_main_to_clock},//睡眠数据--主页面 
     // {nullptr             ,0                     ,0      ,0                   ,F_MAIN_S_CLOCK     ,10  ,true    ,  fsm_main_to_clock},//早报dome--主页面 
     // {nullptr             ,0                     ,0      ,0                   ,F_MAIN_S_CLOCK     ,10  ,true    ,  fsm_main_to_clock},//提醒--主页面  
-
-    
-
 };
 
 
