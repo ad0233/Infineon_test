@@ -507,33 +507,33 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
 
 static StreamBufferHandle_t s_send_stream_buffer = NULL;
 
-static void send_thread(void *pvParameters)
+void ble_send_flush(void)
 {
-    StreamBufferHandle_t buffer = (StreamBufferHandle_t)pvParameters;
+    if (s_send_stream_buffer == NULL) {
+        return;
+    }
+    
     uint8_t data[20];
     
-    while (1) {
-        // 从 stream buffer 读取数据，最多等待 portMAX_DELAY
-        size_t received = xStreamBufferReceive(buffer, data, sizeof(data), portMAX_DELAY);
-        
-        if (received > 0) {
-            // 尝试向所有已连接的 profile 发送数据
-            for (int i = 0; i < PROFILE_NUM; i++) {
-                if (gl_profile_tab[i].conn_id != 0xFFFF && 
-                    gl_profile_tab[i].gatts_if != ESP_GATT_IF_NONE) {
-                    esp_err_t ret = esp_ble_gatts_send_indicate(
-                        gl_profile_tab[i].gatts_if,
-                        gl_profile_tab[i].conn_id,
-                        gl_profile_tab[i].char_handle,
-                        received,
-                        data,
-                        false  // notify，不需要确认
-                    );
-                    
-                    if (ret != ESP_OK) {
-                        ESP_LOGE(GATTS_TAG, "Send notify failed, profile %d, error: %s", i, esp_err_to_name(ret));
-                    }
-                    vTaskDelay(pdMS_TO_TICKS(10)); // 避免发送过快
+    // 非阻塞读取数据
+    size_t received = xStreamBufferReceive(s_send_stream_buffer, data, sizeof(data), 0);
+    
+    if (received > 0) {
+        // 尝试向所有已连接的 profile 发送数据
+        for (int i = 0; i < PROFILE_NUM; i++) {
+            if (gl_profile_tab[i].conn_id != 0xFFFF && 
+                gl_profile_tab[i].gatts_if != ESP_GATT_IF_NONE) {
+                esp_err_t ret = esp_ble_gatts_send_indicate(
+                    gl_profile_tab[i].gatts_if,
+                    gl_profile_tab[i].conn_id,
+                    gl_profile_tab[i].char_handle,
+                    received,
+                    data,
+                    false  // notify，不需要确认
+                );
+                
+                if (ret != ESP_OK) {
+                    ESP_LOGE(GATTS_TAG, "Send notify failed, profile %d, error: %s", i, esp_err_to_name(ret));
                 }
             }
         }
@@ -673,8 +673,7 @@ void my_ble_init(const char *device_name)
         return;
     }
 
-    // 创建发送线程
-    my_thread_create(send_thread, "ble_send", 4096, s_send_stream_buffer, 10, NULL);
+    // 不再创建独立线程，改为在主线程中调用 ble_send_flush()
     return;
 }
 

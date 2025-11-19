@@ -12,7 +12,7 @@ struct StateTable {
     uint8_t next_state;          // 下一个状态
     uint16_t timeout_s;          // 0为无超时 , 0xffff(65535)为不刷新超时
     bool just_do_it;             // 立马执行
-    void (*act_fun)(void *arg);  // 函数指针
+    void (*act_fun)(void *arg, uint8_t last_state, uint8_t next_state);  // 函数指针
 };
 
 typedef struct fsmImpl* fsm_handle_t;

@@ -152,6 +152,8 @@ wake_mode_t my_ui_wake_mode_get(void);
 void my_ui_wake_mode_next(void);
 void my_ui_wake_mode_prev(void);
 void my_ui_wake_mode_save_current(void);
+void wakeModeTestUP(void);
+void wakeModeTestDown(void);
 
 // 亮度调节相关函数
 void my_ui_in_light(void);

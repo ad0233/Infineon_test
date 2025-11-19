@@ -90,7 +90,7 @@ static void inline fsmStateTransfer(fsm_handle_t handle, uint8_t state) {
 /*事件处理*/
 int fsm_event_handle(fsm_handle_t handle, uint8_t event,void *arg) {
     struct StateTable* pActTable = handle->stateTable;
-    void (*act_fun)() = NULL;  //函数指针初始化为空
+    void (*act_fun)(void *arg, uint8_t last_state, uint8_t next_state) = NULL;  //函数指针初始化为空
     uint8_t next_state;
     uint8_t cur_state = handle->cur_state;
     uint8_t maxNum = handle->item_num;
@@ -125,7 +125,7 @@ int fsm_event_handle(fsm_handle_t handle, uint8_t event,void *arg) {
             fsmStateTransfer(handle, next_state);
             /*动作执行*/
             if (act_fun) {
-                act_fun(arg);
+                act_fun(arg, cur_state, next_state);
             }
             handle->set_timeout_s(timeout_s);
             return 0;
@@ -138,7 +138,7 @@ int fsm_event_handle(fsm_handle_t handle, uint8_t event,void *arg) {
             fsmStateTransfer(handle, next_state);
             /*动作执行*/
             if (act_fun) {
-                act_fun(arg);
+                act_fun(arg, cur_state, next_state);
             }
             handle->set_timeout_s(timeout_s);
             sem_lock = 0;

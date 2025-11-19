@@ -85,6 +85,9 @@ void r60abd1_start(void);
 // 停止R60ABD1雷达
 void r60abd1_stop(void);
 
+// 刷新函数（由主线程定时调用）
+void r60abd1_flush(void);
+
 // 发送命令
 bool r60abd1_send_command(uint8_t control, uint8_t command, const uint8_t *data, uint16_t length);
 

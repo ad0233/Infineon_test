@@ -54,12 +54,14 @@ typedef struct {
 // 最近监测数据汇总结构
 typedef struct {
     uint8_t movement_param;      // 体动参数 (0-100)
-    uint32_t movement_timestamp; // 体动数据更新时间戳 (ms)
+    uint32_t movement_timestamp; // 体动数据更新时间戳 (s)
     uint8_t respiratory_value;   // 呼吸数值 (0-35, 次/分)
-    uint32_t respiratory_timestamp; // 呼吸数据更新时间戳 (ms)
+    uint32_t respiratory_timestamp; // 呼吸数据更新时间戳 (s)
     uint8_t heart_rate_value;    // 心率数值 (60-120, 次/分)
-    uint32_t heart_rate_timestamp; // 心率数据更新时间戳 (ms)
-    bool valid;                  // 数据是否有效
+    uint32_t heart_rate_timestamp; // 心率数据更新时间戳 (s)
+    uint32_t heart_rate_system_timestamp;   // 心率系统时间戳 (s)
+    uint32_t respiratory_system_timestamp;   // 呼吸系统时间戳 (s)
+    uint32_t movement_system_timestamp;   // 体动系统时间戳 (s)
 } radar_latest_data_t;
 
 // ============================================================================
@@ -109,6 +111,9 @@ bool my_radar_get_latest_data(radar_latest_data_t *data);
 // 返回 JSON 字符串长度，失败返回 -1
 // 注意：调用者需要释放返回的字符串（使用 free）
 int my_radar_data_to_json(const radar_latest_data_t *data, uint32_t timestamp, char **json_str);
+
+// 刷新函数（由主线程定时调用，仅R60ABD1雷达需要）
+void my_radar_flush(void);
 
 // ============================================================================
 // 特定雷达功能（仅当使用对应雷达时可用）
