@@ -174,6 +174,20 @@ void print_mem_info(void)
     // heap_caps_print_heap_info(MALLOC_CAP_INTERNAL);
     // heap_caps_print_heap_info(MALLOC_CAP_SPIRAM);
 }
+
+// 按固定模板由 thing_name 生成订阅主题
+static char t_req[128];
+static char t_resp[128];
+static char t_cmd[128];
+static char t_shadow_upd[160];
+static char t_shadow_upd_delta[200];
+static char t_shadow_upd_acc[200];
+static char t_shadow_upd_rej[200];
+static char t_shadow_get[160];
+static char t_shadow_get_acc[200];
+static char t_shadow_get_rej[200];
+static char t_radar[128];
+
 extern "C" void app_main()
 {
     ESP_ERROR_CHECK(nvs_flash_init());
@@ -300,19 +314,6 @@ extern "C" void app_main()
     // tzset();
     // localtime_r(&now, &timeinfo);
 
-    // 按固定模板由 thing_name 生成订阅主题
-    static char t_req[128];
-    static char t_resp[128];
-    static char t_cmd[128];
-    static char t_shadow_upd[160];
-    static char t_shadow_upd_delta[200];
-    static char t_shadow_upd_acc[200];
-    static char t_shadow_upd_rej[200];
-    static char t_shadow_get[160];
-    static char t_shadow_get_acc[200];
-    static char t_shadow_get_rej[200];
-    static char t_radar[128];
-
     snprintf(t_req, sizeof(t_req), "lunawake/%s/request", iot_config_view->thing_name);
     snprintf(t_resp, sizeof(t_resp), "lunawake/%s/response", iot_config_view->thing_name);
     snprintf(t_cmd, sizeof(t_cmd), "lunawake/%s/command", iot_config_view->thing_name);
@@ -338,7 +339,7 @@ extern "C" void app_main()
         t_shadow_get_acc,
         t_shadow_get_rej,
     };
-    //my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
+    my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
     
     print_mem_info();
 
@@ -404,11 +405,11 @@ void encoder_test(void *arg)
     TickType_t last_radar_flush = 0;
     TickType_t last_fsm_flush = 0;
     TickType_t last_ble_flush = 0;
-    TickType_t last_wifi_flush = 0;
+    TickType_t last_lidar_flush = 0;
     const TickType_t radar_flush_interval = pdMS_TO_TICKS(100);  // 100ms
     const TickType_t fsm_flush_interval = pdMS_TO_TICKS(100);    // 100ms
     const TickType_t ble_flush_interval = pdMS_TO_TICKS(10);      // 10ms
-    const TickType_t wifi_flush_interval = pdMS_TO_TICKS(100);      // 100ms
+    const TickType_t lidar_flush_interval = pdMS_TO_TICKS(1000);      // 1000ms
 
     while (1)
     {
@@ -441,11 +442,6 @@ void encoder_test(void *arg)
             my_radar_flush();
             last_radar_flush = current_tick;
         }
-        // //定时刷新wifi（每100ms）
-        // if ((current_tick - last_wifi_flush) >= wifi_flush_interval) {
-        //     my_wifi_flush();
-        //     last_wifi_flush = current_tick;
-        // }
         
         // 定时刷新FSM超时（每100ms）
         if ((current_tick - last_fsm_flush) >= fsm_flush_interval) {
@@ -458,6 +454,14 @@ void encoder_test(void *arg)
             ble_send_flush();
             ble_parse_flush();  // 同时处理BLE解析
             last_ble_flush = current_tick;
+        }
+
+        // 定时发送mqtt LIDAR数据（每1000ms）
+        if ((current_tick - last_lidar_flush) >= lidar_flush_interval) {
+            radar_latest_data_t data;
+            my_radar_get_latest_data(&data);
+            mqtt_publish_radar_data(&data, t_radar);
+            last_lidar_flush = current_tick;
         }
         vTaskDelay(1);
     }

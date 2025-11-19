@@ -15,9 +15,10 @@ from pathlib import Path
 
 FLASH_SEGMENTS = [
     ("bootloader", Path("bootloader") / "bootloader.bin", 0x0000),
-    ("partition-table", Path("partition_table") / "partition-table.bin", 0x8000),
-    ("ota-data-initial", Path("ota_data_initial.bin"), 0xE000),
-    ("app", Path("Lunawake.bin"), 0x10000),
+    ("partition-table", Path("partition_table") / "partition-table.bin", 0xC000),
+    ("ota-data-initial", Path("ota_data_initial.bin"), 0x1A000),
+    ("app", Path("Lunawake.bin"), 0x20000),
+    ("spiffs-data", Path("spiffs_data.bin"), 0xC20000),
 ]
 
 

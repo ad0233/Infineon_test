@@ -277,42 +277,6 @@ struct test_conn_ota_params {
     int ota_size;
 };
 
-// 测试连接并OTA更新任务
-static void test_conn_ota_task(void *arg) {
-    struct test_conn_ota_params *params = (struct test_conn_ota_params *)arg;
-    
-    ESP_LOGI(TAG, "Test conn OTA task: ssid=%s, url=%s", params->ssid, params->ota_url);
-    
-    // 等待一下，确保 WiFi 初始化完成
-    vTaskDelay(pdMS_TO_TICKS(100));
-    
-    if(my_wifi_is_connected()) {
-        ESP_LOGI(TAG, "WiFi already connected");
-    } else {
-        // 连接 WiFi
-        esp_err_t ret = my_wifi_connect(params->ssid, params->password);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "WiFi connect failed: %s", esp_err_to_name(ret));
-            heap_caps_free(params);
-            vTaskDelete(NULL);
-            return;
-        }
-        while(!my_wifi_is_connected()) {
-            vTaskDelay(pdMS_TO_TICKS(100));
-        }
-    }
-    
-    // 启动 OTA 更新
-    int ota_ret = my_ota_start(params->ota_url, params->ota_size);
-    if (ota_ret != 0) {
-        ESP_LOGE(TAG, "OTA start failed: %d", ota_ret);
-    } else {
-        ESP_LOGI(TAG, "OTA update started");
-    }
-    
-    heap_caps_free(params);
-    vTaskDelete(NULL);
-}
 
 // 处理测试连接并OTA更新命令
 int cmd_handle_test_conn_ota(cJSON *params) {
@@ -321,39 +285,27 @@ int cmd_handle_test_conn_ota(cJSON *params) {
         return -1;
     }
     
-    cJSON *ssid_item = cJSON_GetObjectItem(params, "ssid");
-    cJSON *password_item = cJSON_GetObjectItem(params, "password");
     cJSON *ota_url_item = cJSON_GetObjectItem(params, "ota_url");
     cJSON *ota_size_item = cJSON_GetObjectItem(params, "ota_size");
     
-    if (!cJSON_IsString(ssid_item) || !cJSON_IsString(ota_url_item)) {
-        ESP_LOGE(TAG, "test_conn_ota: missing required fields (ssid or ota_url)");
+    if (!cJSON_IsString(ota_url_item)) {
+        ESP_LOGE(TAG, "test_conn_ota: missing required fields (ota_url)");
         return -1;
     }
     
-    const char *ssid = ssid_item->valuestring;
-    const char *password = cJSON_IsString(password_item) ? password_item->valuestring : "";
     const char *ota_url = ota_url_item->valuestring;
     int ota_size = cJSON_IsNumber(ota_size_item) ? ota_size_item->valueint : 0;
     
-    // 分配参数并创建任务
-    struct test_conn_ota_params *task_params = (struct test_conn_ota_params *)heap_caps_malloc(sizeof(struct test_conn_ota_params), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!task_params) {
-        ESP_LOGE(TAG, "Failed to allocate memory for test_conn_ota params");
-        return -1;
+    if(my_wifi_is_connected()) {
+        ESP_LOGI(TAG, "WiFi already connected");
     }
     
-    snprintf(task_params->ssid, sizeof(task_params->ssid), "%s", ssid);
-    snprintf(task_params->password, sizeof(task_params->password), "%s", password);
-    snprintf(task_params->ota_url, sizeof(task_params->ota_url), "%s", ota_url);
-    task_params->ota_size = ota_size;
-    
-    // 在独立任务中执行
-    BaseType_t ret = xTaskCreate(test_conn_ota_task, "test_conn_ota", 1024 * 4, task_params, 5, NULL);
-    if (ret != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create test_conn_ota task");
-        heap_caps_free(task_params);
-        return -1;
+    // 启动 OTA 更新
+    int ota_ret = my_ota_start(ota_url, ota_size);
+    if (ota_ret != 0) {
+        ESP_LOGE(TAG, "OTA start failed: %d", ota_ret);
+    } else {
+        ESP_LOGI(TAG, "OTA update started");
     }
     
     ESP_LOGI(TAG, "Test conn OTA task created");
