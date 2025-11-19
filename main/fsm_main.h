@@ -90,6 +90,7 @@ void fsm_light_next_item(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_in_set_time(void *arg, uint8_t last_state, uint8_t next_state);
 
 void fsm_main_in_boya_data(void *arg, uint8_t last_state, uint8_t next_state);
+void fsm_main_in_radarinfo(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_in_GoodMorning_demo(void *arg, uint8_t last_state, uint8_t next_state); 
 void fsm_main_in_reminder_tomorrow(void *arg, uint8_t last_state, uint8_t next_state);
 
@@ -157,6 +158,7 @@ enum fsm_main_state_enum {
 
     //数据页面
     F_MAIN_S_BOYA_DATA,         //睡眠数据
+    F_MAIN_S_RadarInfo,         //雷达数据
     F_MAIN_S_GoodMorning_DEMO,  //早报demo
     F_MAIN_S_REMINDER,          //明天提醒
 };

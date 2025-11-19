@@ -173,6 +173,7 @@ void ui_init(void)
     ui_OTA_screen_init();
     ui_sleepData_screen_init();
     ui_ReminderTomorrow_screen_init();
+    ui_RadarInfo_screen_init();
     ui____initial_actions0 = lv_obj_create(NULL);
     lv_disp_load_scr(ui_Boot);
 }
@@ -209,6 +210,7 @@ void ui_destroy(void)
     ui_OTA_screen_destroy();
     ui_sleepData_screen_destroy();
     ui_ReminderTomorrow_screen_destroy();
+    ui_RadarInfo_screen_destroy();
 }
 
 void ui_relocalize(void)
@@ -243,4 +245,5 @@ void ui_relocalize(void)
     ui_OTA_screen_relocalize();
     ui_sleepData_screen_relocalize();
     ui_ReminderTomorrow_screen_relocalize();
+    ui_RadarInfo_screen_relocalize();
 }

@@ -791,19 +791,25 @@ void fsm_main_in_set_time(void *arg, uint8_t last_state, uint8_t next_state) {
 }
 
 void fsm_main_in_boya_data(void *arg, uint8_t last_state, uint8_t next_state) {
-    ESP_LOGI(TAG, "in set_time mode...");
+    ESP_LOGI(TAG, "in boya_data mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_sleepData);
     lvgl_port_unlock();
 }
+void fsm_main_in_radarinfo(void *arg, uint8_t last_state, uint8_t next_state) {
+    ESP_LOGI(TAG, "inradarinfo mode...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_RadarInfo);
+    lvgl_port_unlock();
+}
 void fsm_main_in_GoodMorning_demo(void *arg, uint8_t last_state, uint8_t next_state) {
-    ESP_LOGI(TAG, "in set_time mode...");
+    ESP_LOGI(TAG, "in GoodMorning_deme mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_MorningAnimation);
     lvgl_port_unlock();
 }
 void fsm_main_in_reminder_tomorrow(void *arg, uint8_t last_state, uint8_t next_state) {
-    ESP_LOGI(TAG, "in set_time mode...");
+    ESP_LOGI(TAG, "inreminder_tomorrow mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_ReminderTomorrow);
     lvgl_port_unlock();
