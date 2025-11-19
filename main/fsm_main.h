@@ -116,6 +116,8 @@ enum fsm_main_event_enum {
 
     // TODO:这个事件要弄一下
     F_MAIN_E_OTA_UPDATE, //OTA更新事件 
+    F_MAIN_E_BOYA_DATA_UPDATE, //睡眠数据更新事件 
+    F_MAIN_E_RadarInfo_UPDATE , //雷达数据更新事件 
 
     F_MAIN_E_BTN_CLICKED,       // 点击事件
     F_MAIN_E_BTN_L_CLICKED,     // 长按事件

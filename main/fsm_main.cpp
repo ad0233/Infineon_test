@@ -155,17 +155,20 @@ static struct StateTable fsm_user_table[] = {
     //主页面去
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_CLOCK                    ,F_MAIN_S_MEMU_FINDPERSONC_ANIM    ,0  ,false    ,  fsm_main_lidar_find_playing},//主页面--找人动画
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_MEMU_FINDPERSONC_ANIM    ,F_MAIN_S_BOYA_DATA               ,10  ,true    ,  fsm_main_in_boya_data},//找人动画--睡眠数据
-    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_BOYA_DATA                   ,F_MAIN_S_RadarInfo               ,10  ,true    ,  fsm_main_in_radarinfo},//找人动画--睡眠数据
+    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_BOYA_DATA                   ,F_MAIN_S_RadarInfo               ,10  ,true    ,  fsm_main_in_radarinfo},//找人动画--雷达数据
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_RadarInfo                 ,F_MAIN_S_GoodMorning_DEMO     ,10  ,true    ,  fsm_main_in_GoodMorning_demo},//睡眠时间---早报dome
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_GoodMorning_DEMO          ,F_MAIN_S_REMINDER            ,10  ,true    ,  fsm_main_in_reminder_tomorrow},//早报dome---提醒 
-
     //状态卡片  10s退回
     {nullptr             ,0                     , F_MAIN_E_TIMEOUT    ,F_MAIN_S_BOYA_DATA              ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//睡眠数据--主页面
-    {nullptr             ,0                     , F_MAIN_E_TIMEOUT    ,F_MAIN_S_RadarInfo              ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//睡眠数据--主页面 
+    {nullptr             ,0                     , F_MAIN_E_TIMEOUT    ,F_MAIN_S_RadarInfo              ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//雷达数据--主页面 
     {nullptr             ,0                     , F_MAIN_E_TIMEOUT    ,F_MAIN_S_GoodMorning_DEMO       ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//早报dome--主页面 
     {nullptr             ,0                     , F_MAIN_E_TIMEOUT   ,F_MAIN_S_REMINDER               ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//提醒--主页面  
-    // //其他状态 
-    //TODO://ota  更新行为
+     //TODO:状态卡片的给更新事件   睡眠数据的更新函数/雷达数据的更新函数要添加
+    {nullptr             ,0                     , F_MAIN_E_BOYA_DATA_UPDATE    ,F_MAIN_S_BOYA_DATA              ,F_MAIN_S_BOYA_DATA     ,0  ,false    ,  nullptr},//睡眠数据的更新函数
+    {nullptr             ,0                     , F_MAIN_E_RadarInfo_UPDATE    ,F_MAIN_S_RadarInfo              ,F_MAIN_S_RadarInfo     ,0  ,false    ,  nullptr},//雷达数据的更新函数
+
+    // 其他状态 
+    //TODO:ota  更新行为
     {nullptr             ,0                     ,0      ,F_MAIN_S_UNINIT_PLAYING                   ,F_MAIN_S_OTA     ,0  ,false    ,    fsm_main_in_OTA},//ota
     {nullptr             ,0                     ,0      ,F_MAIN_S_FINDSUC_ANIM                   ,F_MAIN_S_OTA     ,0  ,false    ,      fsm_main_in_OTA},//ota
     {nullptr             ,0                     ,0      ,F_MAIN_S_FINDFAIL_ANIM                   ,F_MAIN_S_OTA     ,0  ,false    ,     fsm_main_in_OTA},//ota
