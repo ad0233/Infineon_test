@@ -216,13 +216,16 @@ extern "C" void app_main()
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
         my_lcd_draw_rgb565(reinterpret_cast<const uint16_t *>(rgb565_buf), rgb565_buf_len / 2);
     }, NULL, [](void *context) {
-        ESP_LOGI(TAG, "my_h264_playback_done, current state: %s", fsm_main_get_current_state_str());
+        uint8_t current_state = fsm_main_get_current_state();
+        ESP_LOGI(TAG, "my_h264_playback_done, current state: %s (state_id=%d, expected=%d)", 
+                 fsm_main_get_current_state_str(), current_state, F_MAIN_S_MENU_UNWIND_PLAYING);
         lvgl_port_resume();
         my_lvgl_force_refresh();
         print_mem_info();
         ESP_LOGI(TAG, "Triggering F_MAIN_E_ANIM_PLAY_SUC event");
         fsm_main_event_trig(F_MAIN_E_ANIM_PLAY_SUC, nullptr);
-        ESP_LOGI(TAG, "After trigger, current state: %s", fsm_main_get_current_state_str());
+        ESP_LOGI(TAG, "After trigger, current state: %s (state_id=%d)", 
+                 fsm_main_get_current_state_str(), fsm_main_get_current_state());
     }, nullptr);
     my_h264_set_fps(24);
 
@@ -251,43 +254,6 @@ extern "C" void app_main()
         }break;
         case WIFI_STATE_CONNECTED: {
             fsm_main_event_trig(F_MAIN_E_WIFI_C_SUC, nullptr);
-            
-            // WiFi连接成功后，等待NTP同步并写入RTC
-            xTaskCreate([](void *arg) {
-                ESP_LOGI(TAG, "Waiting for NTP sync...");
-                
-                // 等待NTP同步，最多重试5次
-                int retry = 0;
-                const int retry_count = 10;
-                esp_err_t ret = ESP_ERR_TIMEOUT;
-                
-                while (ret == ESP_ERR_TIMEOUT && retry < retry_count) {
-                    ret = esp_netif_sntp_sync_wait(3000 / portTICK_PERIOD_MS);
-                    if (ret == ESP_ERR_TIMEOUT) {
-                        ESP_LOGI(TAG, "Waiting for NTP sync... (%d/%d)", retry + 1, retry_count);
-                        retry++;
-                    }
-                }
-                
-                if (ret == ESP_OK) {
-                    ESP_LOGI(TAG, "NTP sync successful, syncing to RTC...");
-                    
-                    // 设置时区为中国标准时间
-                    setenv("TZ", "CST-8", 1);
-                    tzset();
-                    
-                    // 同步到RTC
-                    if (my_rtc_sync_from_ntp() == ESP_OK) {
-                        ESP_LOGI(TAG, "RTC synced from NTP successfully");
-                    } else {
-                        ESP_LOGE(TAG, "Failed to sync RTC from NTP");
-                    }
-                } else {
-                    ESP_LOGW(TAG, "NTP sync timeout after %d retries", retry_count);
-                }
-                
-                vTaskDelete(NULL);
-            }, "ntp_sync_task", 4096, nullptr, 5, nullptr);
         }break;
         case WIFI_STATE_DISCONNECTED: {
 
@@ -423,6 +389,8 @@ static rotary_encoder_t re;
 
 static void alarm_set_tips();
 
+// 雷达检测使能标志位已移至 fsm_main.cpp，通过 fsm_main_get_radar_detect_enabled() 访问
+
 void encoder_test(void *arg)
 {
     // Create event queue for rotary encoders
@@ -456,6 +424,9 @@ void encoder_test(void *arg)
     const TickType_t ble_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t lidar_flush_interval = pdMS_TO_TICKS(1000);      // 1000ms
     const TickType_t ota_flush_interval = pdMS_TO_TICKS(10);      // 10ms
+    
+    // 雷达检测状态（用于避免重复触发）
+    static bool last_radar_found = false;
 
     while (1)
     {
@@ -486,6 +457,41 @@ void encoder_test(void *arg)
         // 定时刷新雷达数据（每100ms）
         if ((current_tick - last_radar_flush) >= radar_flush_interval) {
             my_radar_flush();
+            
+            // 只在 MENU_UNWIND 状态且雷达检测使能时检查雷达并触发事件
+            uint8_t current_state = fsm_main_get_current_state();
+            if(current_state == F_MAIN_S_MENU_UNWIND && fsm_main_get_radar_detect_enabled()) {
+                // 检查雷达是否找到人，如果找到则触发事件
+                radar_latest_data_t radar_data;
+                if(my_radar_get_latest_data(&radar_data)) {
+                    bool current_radar_found = false;
+                    // 挥挥手就识别成功了
+                    if(radar_data.movement_param > 8) {
+                        current_radar_found = true;
+                    }
+                    // 心率检测
+                    if(esp_log_timestamp() - radar_data.heart_rate_system_timestamp < 5) {
+                        current_radar_found = true;
+                    }
+                    
+                    // 如果从没找到变为找到，再次确认状态后触发事件
+                    if(current_radar_found && !last_radar_found) {
+                        // 再次确认当前状态，避免状态在检测和触发之间发生变化
+                        uint8_t verify_state = fsm_main_get_current_state();
+                        if(verify_state == F_MAIN_S_MENU_UNWIND && fsm_main_get_radar_detect_enabled()) {
+                            fsm_main_event_trig(F_MAIN_E_LIDAR_FIND, nullptr);
+                            ESP_LOGI(TAG, "Radar found person, triggering F_MAIN_E_LIDAR_FIND event");
+                        } else {
+                            ESP_LOGW(TAG, "State changed during radar detection, state=%d, enabled=%d", verify_state, fsm_main_get_radar_detect_enabled());
+                        }
+                    }
+                    last_radar_found = current_radar_found;
+                }
+            } else {
+                // 不在 MENU_UNWIND 状态或雷达检测被禁用时，重置雷达检测状态
+                last_radar_found = false;
+            }
+            
             last_radar_flush = current_tick;
         }
         

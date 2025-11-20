@@ -490,9 +490,24 @@ _exit_open:
 esp_err_t audio_tone_play(const char *uri)
 {
     ESP_RETURN_ON_FALSE(s_audio_player != NULL, ESP_FAIL, TAG, "audio tone not initialized");
+    
+    // 检查是否有未完全结束的音频，如果有则先完全停止（非阻塞方式）
     if (s_audio_player->player_state == PIPE_STATE_RUNNING) {
-        return ESP_FAIL;
+        ESP_LOGW(TAG, "Audio is still running, stopping first...");
+        audio_pipeline_stop(s_audio_player->pipeline);
+        
+        // 非阻塞等待：只等待很短时间（10ms），然后强制终止
+        // 这样可以避免长时间阻塞，让LCD刷新能够及时处理
+        vTaskDelay(pdMS_TO_TICKS(10));
+        
+        // 直接终止管道，不等待完全停止（非阻塞）
+        audio_pipeline_terminate(s_audio_player->pipeline);
+        audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
+        audio_pipeline_reset_elements(s_audio_player->pipeline);
+        s_audio_player->player_state = PIPE_STATE_IDLE;
+        ESP_LOGI(TAG, "Previous audio stopped (non-blocking)");
     }
+    
     ESP_LOGI(TAG, "audio_tone_play: %s", uri);
     
     audio_element_set_uri(s_audio_player->spiffs_stream, uri);

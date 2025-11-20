@@ -53,6 +53,7 @@ void fsm_main_find_someone(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_no_find_someone(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_enter_findperson(void *arg, uint8_t last_state, uint8_t next_state);
 
+
 void fsm_main_lidar_clock_update(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_lidar_find(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_lidar_find_suc(void *arg, uint8_t last_state, uint8_t next_state);
@@ -93,6 +94,10 @@ void fsm_main_in_boya_data(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_in_radarinfo(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_in_GoodMorning_demo(void *arg, uint8_t last_state, uint8_t next_state); 
 void fsm_main_in_reminder_tomorrow(void *arg, uint8_t last_state, uint8_t next_state);
+
+
+void fsm_main_memu_cat_playing(void *arg, uint8_t last_state, uint8_t next_state);//猫猫动画
+
 
 void fsm_main_in_OTA(void *arg, uint8_t last_state, uint8_t next_state);
 
@@ -158,6 +163,7 @@ enum fsm_main_state_enum {
     F_MAIN_S_MENU_ALARM,        //有闹钟页面
     F_MAIN_S_NO_MENU_ALARM,        //无闹钟页面
     F_MAIN_S_MENU_UNWIND,        //选择歌曲页面
+    F_MAIN_S_MENU_UNWIND_PLAYING, //选择歌曲动画
     F_MAIN_S_MENU_VOLUME,        //声音页面
     F_MAIN_S_MENU_BRIGHTNESS,      //亮度页面
     F_MAIN_S_MENU_SET_TIME,        //设置时间页面
@@ -174,6 +180,10 @@ enum fsm_main_state_enum {
 void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg);
 uint8_t fsm_main_get_current_state(void);
 const char* fsm_main_get_current_state_str(void);
+
+// 雷达检测使能控制函数
+void fsm_main_set_radar_detect_enabled(bool enabled);
+bool fsm_main_get_radar_detect_enabled(void);
 
 // 超时刷新函数（由主线程定时调用）
 void fsm_main_timeout_flush(void);

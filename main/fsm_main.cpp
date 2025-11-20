@@ -40,6 +40,7 @@ static const char* fsm_state_to_str(uint8_t state) {
         "MENU_VOLUME",               // F_MAIN_S_MENU_VOLUME (24)
         "MENU_BRIGHTNESS",           // F_MAIN_S_MENU_BRIGHTNESS (25)
         "MENU_SET_TIME",             // F_MAIN_S_MENU_SET_TIME (26)
+        "MENU_UNWIND_PLAYING",       // F_MAIN_S_MENU_UNWIND_PLAYING (27)
     };
     if (state < sizeof(names)/sizeof(names[0]) && names[state]) {
         return names[state];
@@ -105,7 +106,7 @@ static struct StateTable fsm_user_table[] = {
     {nullptr                     ,0             ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_WIFI_CONN_SUC       , F_MAIN_S_CLOCK            ,0    ,false         ,fsm_main_to_clock }, //连接成功-----时钟
     //二维码
     { nullptr           ,0                  ,F_MAIN_E_WIFI_CMD_TRIG   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_WIFI_CONN        ,0    ,false          , fsm_main_wifi_connecting},   //二维码去连接中
-    //rtc
+    //rtcF_MAIN_E_LIDAR_FIND
     { fm_has_rtc_state   ,FM_RTC_EXIST       ,F_MAIN_E_BTN_L_CLICKED    , F_MAIN_S_WIFI_GUIDE         , F_MAIN_S_CLOCK   ,0    ,false        ,fsm_main_to_clock },//二维码去 ---rtc 有主页面
     { fm_has_rtc_state   ,FM_RTC_NO_EXIST   ,F_MAIN_E_BTN_L_CLICKED   , F_MAIN_S_WIFI_GUIDE         , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false        , fsm_main_set_time},//二维码去 ---rtc 无配置时间
     { nullptr           ,0                  ,F_MAIN_E_KNOB_CW         , F_MAIN_S_RTC_DETECT_CLK   , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false           ,fsm_main_rtc_adjust_time },//rtc修改时间
@@ -138,6 +139,8 @@ static struct StateTable fsm_user_table[] = {
     //UNWIND 
     { fm_has_memu_state    ,FM_MEMU_UNWIND            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//菜单选择歌曲选择
     { nullptr              ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_unwind_next_item},//切换歌曲
+    { fm_has_h_fd_state     ,FM_H_F_SUC               ,F_MAIN_E_LIDAR_FIND           , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
+    { nullptr              ,0                         ,F_MAIN_E_ANIM_PLAY_SUC     , F_MAIN_S_MENU_UNWIND_PLAYING  , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//动画---歌曲切换
     { nullptr              ,0                         ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU              ,15    ,true       , fsm_main_in_memu},//歌曲--菜单
     //声音
     { fm_has_memu_state     ,FM_MEMU_VOL           ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU                 , F_MAIN_S_MENU_VOLUME       ,0    ,false         , fsm_main_in_volume},//菜单选择声音
@@ -165,6 +168,7 @@ static struct StateTable fsm_user_table[] = {
     // {nullptr             ,0                     , F_MAIN_E_TIMEOUT    ,F_MAIN_S_RadarInfo              ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//雷达数据--主页面 
     // {nullptr             ,0                     , F_MAIN_E_TIMEOUT    ,F_MAIN_S_GoodMorning_DEMO       ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//早报dome--主页面 
     // {nullptr             ,0                     , F_MAIN_E_TIMEOUT   ,F_MAIN_S_REMINDER               ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//提醒--主页面  
+    
      //TODO:状态卡片的给更新事件   睡眠数据的更新函数/雷达数据的更新函数要添加
     {nullptr             ,0                     , F_MAIN_E_BOYA_DATA_UPDATE    ,F_MAIN_S_BOYA_DATA              ,F_MAIN_S_BOYA_DATA     ,0  ,false    ,  nullptr},//睡眠数据的更新函数
     {nullptr             ,0                     , F_MAIN_E_RadarInfo_UPDATE    ,F_MAIN_S_RadarInfo              ,F_MAIN_S_RadarInfo     ,0  ,false    ,  nullptr},//雷达数据的更新函数
@@ -250,16 +254,20 @@ int fsm_main_init(void) {
 }
 
 void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg) {
-    auto last_state = fsm_main_get_current_state_str();
+    auto last_state_str = fsm_main_get_current_state_str();
+    auto last_state_id = fsm_main_get_current_state();
     auto err = fsm_event_handle(s_fsm_handle, event, arg);
     switch (err)
     {
     case 0:
-        ESP_LOGI(TAG, "fsm_main_event_trig %s,%s -> %s", fsm_event_to_str(event), last_state, fsm_main_get_current_state_str());
+        ESP_LOGI(TAG, "fsm_main_event_trig %s,%s(id=%d) -> %s(id=%d)", 
+                 fsm_event_to_str(event), last_state_str, last_state_id, 
+                 fsm_main_get_current_state_str(), fsm_main_get_current_state());
         break;
     case -1:
         // 找不到分支
-        // ESP_LOGW(TAG, "fsm_main_event_trig %s,%s -> no match (err=-1)", fsm_event_to_str(event), last_state);
+        ESP_LOGW(TAG, "fsm_main_event_trig %s,%s(id=%d) -> no match (err=-1)", 
+                 fsm_event_to_str(event), last_state_str, last_state_id);
         break;
     case -2:
         ESP_LOGW(TAG, "fsm_main_event_trig sem trig");
@@ -276,4 +284,16 @@ uint8_t fsm_main_get_current_state(void) {
 
 const char* fsm_main_get_current_state_str(void) {
     return fsm_state_to_str(fsm_get_current_state(s_fsm_handle));
+}
+
+// 雷达检测使能标志位
+static bool s_radar_detect_enabled = true;
+
+void fsm_main_set_radar_detect_enabled(bool enabled) {
+    s_radar_detect_enabled = enabled;
+    ESP_LOGI(TAG, "radar_detect_enabled set to %d", enabled);
+}
+
+bool fsm_main_get_radar_detect_enabled(void) {
+    return s_radar_detect_enabled;
 }

@@ -17,6 +17,7 @@
 #include "my_h264.h"
 #include "my_rtc.h"
 #include "my_lidar.h"
+#include "my_lcd.h"
 
 #define TAG "fsm_main"
 
@@ -38,7 +39,7 @@ uint8_t fm_has_h_fd_state(void) {
     if(my_radar_get_latest_data(&radar_data)) {
         ESP_LOGI(TAG, "movement_param: %d", radar_data.movement_param);
         // 挥挥手就识别成功了
-        if(radar_data.movement_param > 15) {
+        if(radar_data.movement_param >15) {
             return FM_H_F_SUC;
         }
         // TODO: 心率检测更合理些,因为如果没人,就不会有心率更新,但是甲方要求体动判断先
@@ -502,10 +503,14 @@ void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
         // 向下切换（下一个菜单项）
         ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_next_animal()");
         my_ui_unwind_next_animal();
+        audio_tone_stop();
+        audio_tone_play("spiffs://spiffs/water-fountain.mp3");
     } else if (diff < 0) {
         // 向上切换（上一个菜单项）
         ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_prev_animal()");
         my_ui_unwind_prev_animal();
+        audio_tone_stop();
+        audio_tone_play("spiffs://spiffs/water-fountain.mp3");
     } else {
         ESP_LOGI(TAG, "fsm_unwind_next_item: diff is 0, no action");
     }
@@ -618,6 +623,61 @@ void fsm_main_no_find_someone(void *arg, uint8_t last_state, uint8_t next_state)
     my_h264_start(MY_H264_ANIM_FAIL2,100);
 }
 
+//音乐动画
+void fsm_main_memu_cat_playing(void *arg, uint8_t last_state, uint8_t next_state){
+    ESP_LOGI(TAG, "fsm_main_memu_cat_playing: last_state=%d (%s), next_state=%d (%s)", 
+             last_state, fsm_main_get_current_state_str(), 
+             next_state, (next_state == F_MAIN_S_MENU_UNWIND_PLAYING) ? "MENU_UNWIND_PLAYING" : "OTHER");
+    
+    // 进入动画时，禁用雷达检测
+    fsm_main_set_radar_detect_enabled(false);
+    // 获取当前选中的动物
+    unwind_animal_t current_animal = my_ui_unwind_get_animal();
+    my_h264_animation_t anim_to_play = MY_H264_ANIM_CAT;  // 默认使用CAT动画
+    
+    // 根据选中的动物选择对应的动画
+    switch (current_animal)
+    {
+    case UNWIND_ANIMAL_CAT:
+        anim_to_play = MY_H264_ANIM_CAT;
+        ESP_LOGI(TAG, "Playing CAT animation");
+        break;
+    
+    case UNWIND_ANIMAL_FOX:
+        // TODO: 添加FOX动画后使用 MY_H264_ANIM_FOX
+        anim_to_play = MY_H264_ANIM_CAT;  // 暂时使用CAT动画
+        ESP_LOGI(TAG, "Playing FOX animation (using CAT for now)");
+        break;
+    
+    case UNWIND_ANIMAL_HUMMINGBIRD:
+        // TODO: 添加HUMMINGBIRD动画后使用 MY_H264_ANIM_HUMMINGBIRD
+        anim_to_play = MY_H264_ANIM_CAT;  // 暂时使用CAT动画
+        ESP_LOGI(TAG, "Playing HUMMINGBIRD animation (using CAT for now)");
+        break;
+    
+    case UNWIND_ANIMAL_KOI:
+        // TODO: 添加KOI动画后使用 MY_H264_ANIM_KOI
+        anim_to_play = MY_H264_ANIM_CAT;  // 暂时使用CAT动画
+        ESP_LOGI(TAG, "Playing KOI animation (using CAT for now)");
+        break;
+    
+    case UNWIND_ANIMAL_SWAN:
+        // TODO: 添加SWAN动画后使用 MY_H264_ANIM_SWAN
+        anim_to_play = MY_H264_ANIM_CAT;  // 暂时使用CAT动画
+        ESP_LOGI(TAG, "Playing SWAN animation (using CAT for now)");
+        break;
+    
+    default:
+        anim_to_play = MY_H264_ANIM_CAT;
+        ESP_LOGW(TAG, "Unknown animal type, using CAT animation");
+        break;
+    }
+    
+    lvgl_port_stop();
+    my_h264_start(anim_to_play, 100);
+    // 动画播放完成后，done_callback 会检查状态并直接加载页面
+}
+
 void fsm_main_lidar_find(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "find person...");
     lvgl_port_lock(0);
@@ -689,6 +749,10 @@ void fsm_main_in_offline(void *arg, uint8_t last_state, uint8_t next_state) {
 
 void fsm_main_in_memu(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in menu...");
+    
+    // 回到主菜单时，启用雷达检测
+    fsm_main_set_radar_detect_enabled(true);
+    
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_Memu);
     lvgl_port_unlock();
@@ -770,12 +834,16 @@ void fsm_main_in_no_alarm(void *arg, uint8_t last_state, uint8_t next_state) {
 
 
 void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
+    ESP_LOGI(TAG, "fsm_main_in_unwind: last_state=%d, next_state=%d", last_state, next_state);
     ESP_LOGI(TAG, "in unwind mode...");
+    
+    if(last_state == F_MAIN_S_MENU) {
+        fsm_main_set_radar_detect_enabled(true);
+    }
+    
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_UnwindSelet);
     lvgl_port_unlock();
-    audio_tone_stop();
-    audio_tone_play("spiffs://spiffs/water-fountain.mp3");
 }
 
 
