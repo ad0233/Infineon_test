@@ -12,6 +12,7 @@
 #include "esp_secure_cert_read.h"
 #include "esp_crt_bundle.h"
 #include "my_mqtt.h"
+#include "my_nvs.h"
 
 static const char *TAG = "mqtts_example";
 
@@ -93,20 +94,38 @@ static void mqtt_app_start(const char *broker_uri, const char *client_id,
     // 主题
     my_mqtt_load_topics(topics, topic_count);
 
-    // DS 与证书
-    esp_ds_data_ctx_t *ds_data = esp_secure_cert_get_ds_ctx();
-    if (ds_data == NULL) {
-        ESP_LOGE(TAG, "Error in reading DS data from NVS");
-        vTaskDelete(NULL);
+    char *device_cert_nvs = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    char *private_key = heap_caps_malloc(4096, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if(device_cert_nvs == NULL || private_key == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for device certificate and private key");
+        return;
     }
-    char *device_cert = NULL;
-    uint32_t len = 0;
-    if (esp_secure_cert_get_device_cert(&device_cert, &len) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to obtain the device certificate");
-        vTaskDelete(NULL);
-    }
+    memset(device_cert_nvs, 0, 4096);
+    memset(private_key, 0, 4096);
 
-    const esp_mqtt_client_config_t mqtt_cfg = {
+    esp_ds_data_ctx_t *ds_data = NULL;
+    char *device_cert = NULL;
+    // 如果能从 nvs 获取到密钥, 就不进行 DS 解密机制
+    if(my_nvs_read_iot_config_key(IOT_CONFIG_KEY_DEVICE_CERT, device_cert_nvs, 4096) &&
+       my_nvs_read_iot_config_key(IOT_CONFIG_KEY_PRIVATE_KEY, private_key, 4096)) {
+        ESP_LOGI(TAG, "Using NVS stored device certificate and private key");
+    } else {
+        ds_data = esp_secure_cert_get_ds_ctx();
+        if (ds_data == NULL) {
+            ESP_LOGE(TAG, "Error in reading DS data from NVS");
+            return;
+        }
+        uint32_t len = 0;
+        if (esp_secure_cert_get_device_cert(&device_cert, &len) != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to obtain the device certificate");
+            return;
+        }
+        ESP_LOGI(TAG, "Using DS decryption mechanism");
+    }
+    // DS 与证书
+
+
+    esp_mqtt_client_config_t mqtt_cfg = {
         .broker = {
             .address.uri = broker_uri,
             .verification.crt_bundle_attach = esp_crt_bundle_attach,
@@ -114,9 +133,9 @@ static void mqtt_app_start(const char *broker_uri, const char *client_id,
         .credentials = {
             .client_id = client_id,
             .authentication = {
-                .certificate = (const char *)device_cert,
+                .certificate = NULL,
                 .key = NULL,
-                .ds_data = (void *)ds_data,
+                .ds_data = NULL,
             },
         },
         .session = {
@@ -124,6 +143,15 @@ static void mqtt_app_start(const char *broker_uri, const char *client_id,
             .keepalive = 60,
         },
     };
+    if(ds_data == NULL) {
+        // 使用 nvs 密钥
+        mqtt_cfg.credentials.authentication.certificate = device_cert_nvs;
+        mqtt_cfg.credentials.authentication.key = private_key;
+        mqtt_cfg.credentials.authentication.ds_data = NULL;
+    } else {
+        mqtt_cfg.credentials.authentication.certificate = (const char *)device_cert;
+        mqtt_cfg.credentials.authentication.ds_data = (void*)ds_data;
+    }
 
     ESP_LOGI(TAG, "broker_uri: %s", broker_uri);
     if (client_id && client_id[0] != '\0') {
