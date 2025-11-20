@@ -169,6 +169,30 @@ struct iot_config_view {
  */
 const struct iot_config_view *my_nvs_get_iot_config_view(void);
 
+/**
+ * @brief IoT 配置密钥类型枚举
+ */
+typedef enum {
+    IOT_CONFIG_KEY_CA_CERT = 0,      ///< CA 证书
+    IOT_CONFIG_KEY_DEVICE_CERT,      ///< 设备证书
+    IOT_CONFIG_KEY_PRIVATE_KEY,      ///< 私钥
+    IOT_CONFIG_KEY_MAX
+} iot_config_key_type_t;
+
+/**
+ * @brief 从 iot_config 分区读取证书密钥
+ * @param[in] key_type 密钥类型枚举
+ * @param[out] out_buffer 存放密钥内容的缓冲区
+ * @param[in] buffer_size 缓冲区大小
+ * @return true 表示读取成功
+ */
+bool my_nvs_read_iot_config_key(iot_config_key_type_t key_type, char *out_buffer, size_t buffer_size);
+
+/**
+ * @brief 打印 iot_config 分区中的所有密钥（用于调试）
+ */
+void my_nvs_print_iot_config_keys(void);
+
 #ifdef __cplusplus
 }
 #endif

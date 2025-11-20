@@ -1,11 +1,11 @@
 #include "my_nvs.h"
 
-
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include "nvs_flash.h"
 #include "nvs.h"
+#include "esp_log.h"
 
 #define NVS_NAMESPACE "devcfg"
 #define NVS_KEY "config"
@@ -422,5 +422,78 @@ static bool load_iot_view_once(void) {
 const struct iot_config_view *my_nvs_get_iot_config_view(void) {
     if (!load_iot_view_once()) return NULL;
     return &s_iot_view;
+}
+
+bool my_nvs_read_iot_config_key(iot_config_key_type_t key_type, char *out_buffer, size_t buffer_size) {
+    if (!out_buffer || buffer_size == 0 || key_type >= IOT_CONFIG_KEY_MAX) {
+        return false;
+    }
+
+    // 将枚举转换为字符串键名
+    const char *key_names[] = {
+        "ca_cert",
+        "device_cert",
+        "private_key"
+    };
+    const char *key_name = key_names[key_type];
+
+    esp_err_t err = nvs_flash_init_partition(IOT_CFG_PARTITION_NAME);
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        nvs_flash_erase_partition(IOT_CFG_PARTITION_NAME);
+        err = nvs_flash_init_partition(IOT_CFG_PARTITION_NAME);
+    }
+    if (err != ESP_OK) return false;
+
+    nvs_handle_t handle;
+    err = nvs_open_from_partition(IOT_CFG_PARTITION_NAME, IOT_CFG_NAMESPACE, NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        return false;
+    }
+
+    size_t required = 0;
+    err = nvs_get_str(handle, key_name, NULL, &required);
+    if (err == ESP_OK) {
+        if (required > buffer_size) {
+            err = ESP_ERR_NVS_INVALID_LENGTH;
+        } else {
+            err = nvs_get_str(handle, key_name, out_buffer, &required);
+        }
+    }
+
+    nvs_close(handle);
+    return err == ESP_OK;
+}
+
+void my_nvs_print_iot_config_keys(void) {
+    const iot_config_key_type_t key_types[] = {
+        IOT_CONFIG_KEY_CA_CERT,
+        IOT_CONFIG_KEY_DEVICE_CERT,
+        IOT_CONFIG_KEY_PRIVATE_KEY
+    };
+    const char *key_labels[] = {"CA Certificate", "Device Certificate", "Private Key"};
+    const char *key_names[] = {"ca_cert", "device_cert", "private_key"};
+    
+    ESP_LOGI("NVS", "========== IoT Config Keys ==========");
+    
+    for (int i = 0; i < 3; i++) {
+        char buffer[4096] = {0};
+        if (my_nvs_read_iot_config_key(key_types[i], buffer, sizeof(buffer))) {
+            size_t len = strlen(buffer);
+            ESP_LOGI("NVS", "%s (%s):", key_labels[i], key_names[i]);
+            if (len > 200) {
+                // 如果内容太长，只打印前200个字符和后50个字符
+                char preview[300];
+                snprintf(preview, sizeof(preview), "%.200s...%s", buffer, buffer + len - 50);
+                ESP_LOGI("NVS", "  Length: %zu bytes", len);
+                ESP_LOGI("NVS", "  Preview: %s", preview);
+            } else {
+                ESP_LOGI("NVS", "  %s", buffer);
+            }
+        } else {
+            ESP_LOGW("NVS", "%s (%s): Not found", key_labels[i], key_names[i]);
+        }
+    }
+    
+    ESP_LOGI("NVS", "=====================================");
 }
 
