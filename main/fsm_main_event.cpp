@@ -837,6 +837,9 @@ void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "fsm_main_in_unwind: last_state=%d, next_state=%d", last_state, next_state);
     ESP_LOGI(TAG, "in unwind mode...");
     
+    if(last_state == F_MAIN_S_MENU_UNWIND_PLAYING) {
+        my_ui_unwind_set_animal(UNWIND_ANIMAL_CAT);
+    }
     if(last_state == F_MAIN_S_MENU) {
         fsm_main_set_radar_detect_enabled(true);
     }
