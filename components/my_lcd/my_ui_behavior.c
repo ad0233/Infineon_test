@@ -1026,6 +1026,7 @@ void my_ui_light_set(uint8_t duty) {
     if (image_index < 9) {
         lv_image_set_src(ui_LightImage, light_images[image_index]);
     }
+    bsp_lcd_bl_set(duty);
     
     lvgl_port_unlock();
 }
@@ -1040,7 +1041,7 @@ void my_ui_light_next(void) {
     if (current_light_duty < 100) {
         my_ui_light_set(current_light_duty + 10);
     } else {
-        my_ui_light_set(20);  // 循环回到最低档
+        my_ui_light_set(100);  
     }
 }
 
@@ -1049,7 +1050,7 @@ void my_ui_light_prev(void) {
     if (current_light_duty > 20) {
         my_ui_light_set(current_light_duty - 10);
     } else {
-        my_ui_light_set(100);  // 循环回到最高档
+        my_ui_light_set(20);  
     }
 }
 

@@ -165,7 +165,7 @@ void bsp_lcd_init(void)
     
     esp_lcd_panel_disp_on_off(panel_handle, true);
 }
-
+//FIXME: LCD的亮度bug  20-30 突然变亮  30-100 肉眼无变化
 void bsp_lcd_bl_set(int brightness_percent)
 {
     if (brightness_percent > 100) {
