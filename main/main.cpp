@@ -30,6 +30,7 @@
 #include "periph_spiffs.h"
 #include "periph_sdcard.h"
 #include "audio_mem.h"
+#include "portmacro.h"
 #include "pwm_control.h"
 #include "board.h"
 
@@ -412,10 +413,12 @@ void encoder_test(void *arg)
     TickType_t last_fsm_flush = 0;
     TickType_t last_ble_flush = 0;
     TickType_t last_lidar_flush = 0;
+    TickType_t last_ota_flush = 0;
     const TickType_t radar_flush_interval = pdMS_TO_TICKS(100);  // 100ms
     const TickType_t fsm_flush_interval = pdMS_TO_TICKS(100);    // 100ms
     const TickType_t ble_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t lidar_flush_interval = pdMS_TO_TICKS(1000);      // 1000ms
+    const TickType_t ota_flush_interval = pdMS_TO_TICKS(10);      // 10ms
 
     while (1)
     {
@@ -468,6 +471,12 @@ void encoder_test(void *arg)
             my_radar_get_latest_data(&data);
             mqtt_publish_radar_data(&data, t_radar);
             last_lidar_flush = current_tick;
+        }
+
+        // 定时刷新OTA（每10ms）
+        if ((current_tick - last_ota_flush) >= ota_flush_interval) {
+            my_ota_flush_v1();
+            last_ota_flush = current_tick;
         }
         vTaskDelay(1);
     }

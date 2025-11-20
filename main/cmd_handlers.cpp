@@ -301,7 +301,7 @@ int cmd_handle_test_conn_ota(cJSON *params) {
     }
     
     // 启动 OTA 更新
-    int ota_ret = my_ota_start(ota_url, ota_size);
+    int ota_ret = my_ota_begin_v1(ota_url, ota_size);
     if (ota_ret != 0) {
         ESP_LOGE(TAG, "OTA start failed: %d", ota_ret);
     } else {

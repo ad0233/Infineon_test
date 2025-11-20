@@ -32,9 +32,6 @@
 
 static const char *TAG = "pre_encrypted_ota_example";
 
-// OTA 任务句柄（确保同时只有一个 OTA 任务）
-static TaskHandle_t s_ota_task_handle = NULL;
-
 // 进度回调函数指针
 static ota_progress_callback_t s_progress_cb = NULL;
 static void *s_progress_user_ctx = NULL;
@@ -104,25 +101,25 @@ static esp_err_t _decrypt_cb(decrypt_cb_arg_t *args, void *user_ctx)
     return ESP_OK;
 }
 
-void pre_encrypted_ota_task(void *pvParameter)
+
+void my_ota_register_progress_callback(ota_progress_callback_t progress_cb, void *user_ctx)
 {
-    char *url = (char *)pvParameter;
-    ESP_LOGI(TAG, "Starting Pre Encrypted OTA example");
-    ESP_LOGI(TAG, "OTA URL: %s", url ? url : "NULL");
-    
+    s_progress_cb = progress_cb;
+    s_progress_user_ctx = user_ctx;
+}
+
+static uint32_t start_time = 0;
+static esp_https_ota_handle_t https_ota_handle = NULL;
+static esp_decrypt_handle_t decrypt_handle;
+int my_ota_begin_v1(const char *url, int ota_size) {
     if (url == NULL) {
         ESP_LOGE(TAG, "OTA URL is NULL");
-        s_ota_task_handle = NULL;
-        vTaskDelete(NULL);
-        return;
+        return-1;
     }
-    
-    // 清理退出前清除任务句柄和释放 URL 内存
-    #define OTA_TASK_EXIT() do { \
-        free(url); \
-        s_ota_task_handle = NULL; \
-        vTaskDelete(NULL); \
-    } while(0)
+    if(https_ota_handle != NULL) {
+        ESP_LOGE(TAG, "https_ota_handle is not NULL");
+        return-1;
+    }
 
     esp_http_client_config_t config = {
         .url = url,
@@ -134,10 +131,10 @@ void pre_encrypted_ota_task(void *pvParameter)
     esp_decrypt_cfg_t cfg = {0};
     cfg.rsa_priv_key = rsa_private_pem_start;
     cfg.rsa_priv_key_len = rsa_private_pem_end - rsa_private_pem_start;
-    esp_decrypt_handle_t decrypt_handle = esp_encrypted_img_decrypt_start(&cfg);
+    decrypt_handle = esp_encrypted_img_decrypt_start(&cfg);
     if (!decrypt_handle) {
         ESP_LOGE(TAG, "OTA upgrade failed");
-        OTA_TASK_EXIT();
+        return-1;
     }
 
     esp_https_ota_config_t ota_config = {
@@ -147,105 +144,59 @@ void pre_encrypted_ota_task(void *pvParameter)
         .enc_img_header_size = esp_encrypted_img_get_header_size(),
     };
 
-    esp_https_ota_handle_t https_ota_handle = NULL;
     esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
-        OTA_TASK_EXIT();
+        ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed %d", err);
+        return-1;
     }
+    start_time = esp_timer_get_time();
 
-    uint32_t start_time = esp_timer_get_time();
-    while (1) {
-        err = esp_https_ota_perform(https_ota_handle);
-        if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
-            break;
-        }
-        // 调用进度回调
-        if (s_progress_cb != NULL) {
-            int bytes_read = esp_https_ota_get_image_len_read(https_ota_handle);
-            s_progress_cb(bytes_read, s_ota_total_size, s_progress_user_ctx);
-        }
-        // 每 5 秒打印一次日志
-        if (esp_timer_get_time() - start_time > 5000) {
-            ESP_LOGI(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
-            start_time = esp_timer_get_time();
-        }
-    }
-    ESP_LOGI(TAG, "esp_https_ota_get_image_len_read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
-    ESP_LOGI(TAG, "esp_https_ota_is_complete_data_received: %d", esp_https_ota_is_complete_data_received(https_ota_handle));
-
-    if (!esp_https_ota_is_complete_data_received(https_ota_handle)) {
-        // the OTA image was not completely received and user can customise the response to this situation.
-        ESP_LOGE(TAG, "Complete data was not received.");
-    } else {
-        err = esp_encrypted_img_decrypt_end(decrypt_handle);
-        if (err != ESP_OK) {
-            goto ota_end;
-        }
-        esp_err_t ota_finish_err = esp_https_ota_finish(https_ota_handle);
-        if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
-            ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            esp_restart();
-        } else {
-            if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED) {
-                ESP_LOGE(TAG, "Image validation failed, image is corrupted");
-            }
-            ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
-            OTA_TASK_EXIT();
-        }
-    }
-
-ota_end:
-    esp_https_ota_abort(https_ota_handle);
-    esp_encrypted_img_decrypt_abort(decrypt_handle);
-    ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed");
-    OTA_TASK_EXIT();
+    return 0;
 }
 
-void my_ota_register_progress_callback(ota_progress_callback_t progress_cb, void *user_ctx)
-{
-    s_progress_cb = progress_cb;
-    s_progress_user_ctx = user_ctx;
-}
-
-int my_ota_start(const char *url_ota_file, int ota_size)
-{
-    if (url_ota_file == NULL) {
-        ESP_LOGE(TAG, "OTA URL is NULL");
-        return -1;
+int my_ota_flush_v1() {
+    if(https_ota_handle == NULL) {
+        return-1;
     }
-    
-    // 保存 OTA 总大小
-    s_ota_total_size = ota_size;
-    
-    // 检查是否已有 OTA 任务在运行
-    if (s_ota_task_handle != NULL) {
-        // 验证任务是否仍然存在
-        eTaskState task_state = eTaskGetState(s_ota_task_handle);
-        if (task_state != eDeleted && task_state != eInvalid) {
-            ESP_LOGW(TAG, "OTA task is already running");
+    if (!decrypt_handle) {
+        ESP_LOGE(TAG, "decrypt_handle is NULL");
+        return-1;
+    }
+    esp_err_t err = esp_https_ota_perform(https_ota_handle);
+    if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
+        if (!esp_https_ota_is_complete_data_received(https_ota_handle)) {
+            // the OTA image was not completely received and user can customise the response to this situation.
+            ESP_LOGE(TAG, "Complete data was not received.");
             return -1;
+        } else {
+            err = esp_encrypted_img_decrypt_end(decrypt_handle);
+            if (err != ESP_OK) {
+                return err;
+            }
+            esp_err_t ota_finish_err = esp_https_ota_finish(https_ota_handle);
+            if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
+                ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
+                esp_restart();
+            } else {
+                if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED) {
+                    ESP_LOGE(TAG, "Image validation failed, image is corrupted");
+                }
+                ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
+                return err;
+            }
         }
-        // 任务已结束但句柄未清除，清除它
-        s_ota_task_handle = NULL;
+        return 0;
     }
-    
-    // 复制 URL 字符串，避免调用者释放后导致悬空指针
-    char *url_copy = strdup(url_ota_file);
-    if (url_copy == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate memory for URL");
-        return -1;
+    // 调用进度回调
+    if (s_progress_cb != NULL) {
+        int bytes_read = esp_https_ota_get_image_len_read(https_ota_handle);
+        s_progress_cb(bytes_read, s_ota_total_size, s_progress_user_ctx);
     }
-    
-    BaseType_t ret = xTaskCreate(&pre_encrypted_ota_task, "pre_encrypted_ota_task", 
-                                  1024 * 8, (void *)url_copy, 5, &s_ota_task_handle);
-    if (ret != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create OTA task");
-        free(url_copy);
-        s_ota_task_handle = NULL;
-        return -1;
+    // 每 5 秒打印一次日志
+    if (esp_timer_get_time() - start_time > 5000) {
+        ESP_LOGI(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
+        start_time = esp_timer_get_time();
     }
-    
     return 0;
 }

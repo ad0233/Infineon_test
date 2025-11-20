@@ -27,7 +27,10 @@ void my_ota_register_progress_callback(ota_progress_callback_t progress_cb, void
  * @param ota_size OTA 文件总大小（字节），用于计算百分比，0 表示未知
  * @return 0 成功，-1 失败
  */
-int my_ota_start(const char *url_ota_file, int ota_size);
+// int my_ota_start(const char *url_ota_file, int ota_size);
+
+int my_ota_begin_v1(const char *url, int ota_size);
+int my_ota_flush_v1();
 
 #ifdef __cplusplus
 }
