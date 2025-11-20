@@ -829,6 +829,12 @@ void fsm_main_in_OTA(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in ota mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_OTA);
+    size_t ota_progress = (size_t)arg;
+    char progress_str[10];
+    snprintf(progress_str, sizeof(progress_str), "%d%%", ota_progress);
+    lv_label_set_text(ui_OTALabel2, progress_str);
+    lv_slider_set_range(ui_OTASlider, 0, 100);
+    lv_slider_set_value(ui_OTASlider, ota_progress, LV_ANIM_OFF);
     lvgl_port_unlock();
 }
 

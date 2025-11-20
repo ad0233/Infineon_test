@@ -114,7 +114,6 @@ enum fsm_main_event_enum {
     F_MAIN_E_RTC_EXIST,        // RTC有（检测到RTC模块存在且正常）
     F_MAIN_E_RTC_NOT_EXIST,     // RTC无（未检测到RTC模块，或模块故障无法识别）
 
-    // TODO:这个事件要弄一下
     F_MAIN_E_OTA_UPDATE, //OTA更新事件 
     F_MAIN_E_BOYA_DATA_UPDATE, //睡眠数据更新事件 
     F_MAIN_E_RadarInfo_UPDATE , //雷达数据更新事件 
