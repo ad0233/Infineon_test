@@ -503,14 +503,10 @@ void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
         // 向下切换（下一个菜单项）
         ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_next_animal()");
         my_ui_unwind_next_animal();
-        audio_tone_stop();
-        audio_tone_play("spiffs://spiffs/water-fountain.mp3");
     } else if (diff < 0) {
         // 向上切换（上一个菜单项）
         ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_prev_animal()");
         my_ui_unwind_prev_animal();
-        audio_tone_stop();
-        audio_tone_play("spiffs://spiffs/water-fountain.mp3");
     } else {
         ESP_LOGI(TAG, "fsm_unwind_next_item: diff is 0, no action");
     }
@@ -847,6 +843,8 @@ void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_UnwindSelet);
     lvgl_port_unlock();
+    audio_tone_stop();
+    audio_tone_play("spiffs://spiffs/water-fountain.mp3");
 }
 
 

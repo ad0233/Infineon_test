@@ -137,7 +137,7 @@ static struct StateTable fsm_user_table[] = {
     { nullptr             ,0                ,F_MAIN_E_BTN_CLICKED          , F_MAIN_S_MENU_ALARM             , F_MAIN_S_MENU     ,15      ,true       , fsm_main_in_memu},//闹钟--菜单
     { nullptr             ,0                ,F_MAIN_E_BTN_CLICKED          , F_MAIN_S_NO_MENU_ALARM          , F_MAIN_S_MENU     ,15      ,true       , fsm_main_in_memu},//无脑闹钟--菜单
     //UNWIND 
-    { fm_has_memu_state    ,FM_MEMU_UNWIND            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//菜单选择歌曲选择
+    { fm_has_memu_state    ,FM_MEMU_UNWIND            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//菜单---歌曲选择
     { nullptr              ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_unwind_next_item},//切换歌曲
     { fm_has_h_fd_state     ,FM_H_F_SUC               ,F_MAIN_E_LIDAR_FIND           , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
     { nullptr              ,0                         ,F_MAIN_E_ANIM_PLAY_SUC     , F_MAIN_S_MENU_UNWIND_PLAYING  , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//动画---歌曲切换
