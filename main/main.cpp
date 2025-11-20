@@ -466,7 +466,7 @@ void encoder_test(void *arg)
                 if(my_radar_get_latest_data(&radar_data)) {
                     bool current_radar_found = false;
                     // 挥挥手就识别成功了
-                    if(radar_data.movement_param > 16) {
+                    if(radar_data.movement_param > 30) {
                         current_radar_found = true;
                     }
                     // 心率检测

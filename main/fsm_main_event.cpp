@@ -842,6 +842,9 @@ void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
     if(last_state == F_MAIN_S_MENU) {
         fsm_main_set_radar_detect_enabled(true);
     }
+    if(my_ui_unwind_get_animal() == UNWIND_ANIMAL_CAT) {
+        fsm_main_set_radar_detect_enabled(true);
+    }
     
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_UnwindSelet);
