@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <string>
 
+#include "esp_log_timestamp.h"
 #include "freertos/idf_additions.h"
 #include "nvs_flash.h"
 #include "esp_event.h"
@@ -362,10 +363,6 @@ extern "C" void app_main()
     my_radar_start();
 
     print_mem_info();
-
-    my_wifi_connect("axiarz", "axiarz8888");
-
-    print_mem_info();
     return;
 }
 
@@ -469,7 +466,9 @@ void encoder_test(void *arg)
         if ((current_tick - last_lidar_flush) >= lidar_flush_interval) {
             radar_latest_data_t data;
             my_radar_get_latest_data(&data);
-            mqtt_publish_radar_data(&data, t_radar);
+            if(esp_log_timestamp() - data.heart_rate_system_timestamp < 10 * 1000) {
+                mqtt_publish_radar_data(&data, t_radar);
+            }
             last_lidar_flush = current_tick;
         }
 
