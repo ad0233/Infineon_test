@@ -510,6 +510,9 @@ void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
     } else {
         ESP_LOGI(TAG, "fsm_unwind_next_item: diff is 0, no action");
     }
+    if(my_ui_unwind_get_animal() == UNWIND_ANIMAL_CAT) {
+        fsm_main_set_radar_detect_enabled(true);
+    }
 }
 
 /*----------------------------------------------------------------------------------volume-------------------------------------------------------------------------------------*/
