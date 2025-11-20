@@ -975,7 +975,7 @@ void wakeModeTestDown(void) {
 
 
 // 当前亮度档位
-static uint8_t current_light_duty = 20;  // 默认20%
+static uint8_t current_light_duty = 100;  // 默认100%
 
 
 // 亮度图片映射表（按顺序：20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%）

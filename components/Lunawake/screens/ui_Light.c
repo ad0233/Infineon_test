@@ -33,7 +33,7 @@ void ui_Light_screen_init(void)
     lv_obj_set_style_border_width(ui_LightContainer, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_LightImage = lv_image_create(ui_LightContainer);
-    lv_image_set_src(ui_LightImage, &ui_img_light20_png);
+    lv_image_set_src(ui_LightImage, &ui_img_light100_png);
     lv_obj_set_width(ui_LightImage, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_LightImage, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_LightImage, 0);
@@ -46,7 +46,7 @@ void ui_Light_screen_init(void)
     lv_obj_set_x(ui_LightLabel, 0);
     lv_obj_set_y(ui_LightLabel, 42);
     lv_obj_set_align(ui_LightLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_LightLabel, "Brightness: 20%");
+    lv_label_set_text(ui_LightLabel, "Brightness: 100%");
     lv_obj_set_style_text_color(ui_LightLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_LightLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_LightLabel, &ui_font_sfprodisplay24, LV_PART_MAIN | LV_STATE_DEFAULT);

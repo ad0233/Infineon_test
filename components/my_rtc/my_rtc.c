@@ -8,6 +8,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <stdio.h>
+#include <time.h>
+#include <sys/time.h>
 
 i2c_bus_handle_t my_rtc_i2c = NULL; 
 static const char *TAG = "my_rtc";
@@ -85,4 +87,33 @@ int my_rtc_set_time(struct tm *time) {
 
 bool my_rtc_is_time_valid() {
     return s_valid;
+}
+
+int my_rtc_sync_from_ntp(void) {
+    struct timeval tv;
+    struct tm timeinfo;
+    
+    // 获取系统时间（NTP同步后的时间）
+    if (gettimeofday(&tv, NULL) != 0) {
+        ESP_LOGE(TAG, "Failed to get system time");
+        return ESP_FAIL;
+    }
+    
+    // 转换为本地时间
+    time_t now = tv.tv_sec;
+    localtime_r(&now, &timeinfo);
+    
+    ESP_LOGI(TAG, "NTP time: %04d-%02d-%02d %02d:%02d:%02d",
+             timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+             timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    
+    // 写入RTC
+    int ret = my_rtc_set_time(&timeinfo);
+    if (ret == 0) {
+        ESP_LOGI(TAG, "RTC synced from NTP successfully");
+        return ESP_OK;
+    } else {
+        ESP_LOGE(TAG, "Failed to sync RTC from NTP (err=%d)", ret);
+        return ESP_FAIL;
+    }
 }

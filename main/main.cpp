@@ -251,6 +251,43 @@ extern "C" void app_main()
         }break;
         case WIFI_STATE_CONNECTED: {
             fsm_main_event_trig(F_MAIN_E_WIFI_C_SUC, nullptr);
+            
+            // WiFi连接成功后，等待NTP同步并写入RTC
+            xTaskCreate([](void *arg) {
+                ESP_LOGI(TAG, "Waiting for NTP sync...");
+                
+                // 等待NTP同步，最多重试5次
+                int retry = 0;
+                const int retry_count = 10;
+                esp_err_t ret = ESP_ERR_TIMEOUT;
+                
+                while (ret == ESP_ERR_TIMEOUT && retry < retry_count) {
+                    ret = esp_netif_sntp_sync_wait(3000 / portTICK_PERIOD_MS);
+                    if (ret == ESP_ERR_TIMEOUT) {
+                        ESP_LOGI(TAG, "Waiting for NTP sync... (%d/%d)", retry + 1, retry_count);
+                        retry++;
+                    }
+                }
+                
+                if (ret == ESP_OK) {
+                    ESP_LOGI(TAG, "NTP sync successful, syncing to RTC...");
+                    
+                    // 设置时区为中国标准时间
+                    setenv("TZ", "CST-8", 1);
+                    tzset();
+                    
+                    // 同步到RTC
+                    if (my_rtc_sync_from_ntp() == ESP_OK) {
+                        ESP_LOGI(TAG, "RTC synced from NTP successfully");
+                    } else {
+                        ESP_LOGE(TAG, "Failed to sync RTC from NTP");
+                    }
+                } else {
+                    ESP_LOGW(TAG, "NTP sync timeout after %d retries", retry_count);
+                }
+                
+                vTaskDelete(NULL);
+            }, "ntp_sync_task", 4096, nullptr, 5, nullptr);
         }break;
         case WIFI_STATE_DISCONNECTED: {
 
