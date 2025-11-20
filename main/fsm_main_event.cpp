@@ -305,11 +305,6 @@ void fsm_main_rtc_save_and_exit(void *arg, uint8_t last_state, uint8_t next_stat
 
 void fsm_main_to_clock(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "to clock...");
-    static bool play = false;
-    if(!play) {
-        audio_tone_play("spiffs://spiffs/water-fountain.mp3");
-        play = true;
-    }
     
     // RTC已配置，从RTC读取时间
     struct tm time;
@@ -779,6 +774,8 @@ void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_UnwindSelet);
     lvgl_port_unlock();
+    audio_tone_stop();
+    audio_tone_play("spiffs://spiffs/water-fountain.mp3");
 }
 
 
