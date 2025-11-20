@@ -7,6 +7,8 @@
 #include "ui.h"
 
 #include "board.h"
+#include "audio_recorder.h"
+#include "audio_processor.h"
 
 #include "my_ui_behavior.h"
 #include "my_nvs.h"
@@ -303,6 +305,11 @@ void fsm_main_rtc_save_and_exit(void *arg, uint8_t last_state, uint8_t next_stat
 
 void fsm_main_to_clock(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "to clock...");
+    static bool play = false;
+    if(!play) {
+        audio_tone_play("spiffs://spiffs/water-fountain.mp3");
+        play = true;
+    }
     
     // RTC已配置，从RTC读取时间
     struct tm time;

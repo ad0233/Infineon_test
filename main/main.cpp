@@ -299,8 +299,6 @@ extern "C" void app_main()
     void tone_play_callback(audio_element_status_t evt);
     audio_tone_init(tone_play_callback);
 
-    audio_tone_play("spiffs://spiffs/water-fountain.mp3");
-
     // // wait for time to be set
     // int retry = 0;
     // const int retry_count = 5;
