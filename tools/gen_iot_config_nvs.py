@@ -17,7 +17,8 @@ def resolve_generator(idf_path: Path) -> Path:
     return script
 
 
-def write_csv(json_text: str, csv_path: Path) -> None:
+def write_csv(json_text: str, csv_path: Path, key1: tuple[str, str] | None = None, 
+              key2: tuple[str, str] | None = None, key3: tuple[str, str] | None = None) -> None:
     # 使用 csv.writer 正确转义，避免 f-string 内部转义带来的语法问题
     with csv_path.open("w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
@@ -25,6 +26,10 @@ def write_csv(json_text: str, csv_path: Path) -> None:
         w.writerow(["iot_config", "namespace", "", ""]) 
         # 将 JSON 文本作为字符串写入，编码类型为 string
         w.writerow(["json", "string", "string", json_text])
+        # 写入三个独立的密钥字段
+        for key_name, key_value in [key1, key2, key3]:
+            if key_name and key_value:
+                w.writerow([key_name, "string", "string", key_value])
 
 
 def parse_partition_table_csv(csv_path: Path) -> dict:
@@ -130,7 +135,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="将 iot_config.json 转换为 NVS 分区镜像 (iot_config 分区专用) 并可选自动烧录"
     )
-    parser.add_argument("json", type=Path, help="iot_config.json 路径")
+    parser.add_argument("json", type=Path, help="iot_config.json 路径或包含该文件的目录")
     parser.add_argument(
         "-o", "--output", type=Path, default=Path("build/iot_config_nvs.bin"),
         help="输出 NVS bin 路径 (默认: build/iot_config_nvs.bin)"
@@ -162,13 +167,36 @@ def main():
     parser.add_argument(
         "--pt-offset", help="分区表偏移（与 --from-device 搭配，可不填，自动尝试 0x8000/0xC000）"
     )
+    parser.add_argument(
+        "--key1-name", default="ca_cert", help="第一个独立密钥字段的名称（默认: ca_cert）"
+    )
+    parser.add_argument(
+        "--key1-value", help="第一个独立密钥字段的值（未指定时自动从 JSON 文件所在目录读取）"
+    )
+    parser.add_argument(
+        "--key2-name", default="device_cert", help="第二个独立密钥字段的名称（默认: device_cert）"
+    )
+    parser.add_argument(
+        "--key2-value", help="第二个独立密钥字段的值（未指定时自动从 JSON 文件所在目录读取）"
+    )
+    parser.add_argument(
+        "--key3-name", default="private_key", help="第三个独立密钥字段的名称（默认: private_key）"
+    )
+    parser.add_argument(
+        "--key3-value", help="第三个独立密钥字段的值（未指定时自动从 JSON 文件所在目录读取）"
+    )
 
     args = parser.parse_args()
 
     project_root = Path.cwd()
 
-    if not args.json.exists():
-        print(f"输入 JSON 不存在: {args.json}", file=sys.stderr)
+    # 如果传入的是目录，自动查找 iot_config.json
+    json_path = args.json
+    if json_path.is_dir():
+        json_path = json_path / "iot_config.json"
+    
+    if not json_path.exists():
+        print(f"输入 JSON 不存在: {json_path}", file=sys.stderr)
         return 1
 
     idf_path = args.idf_path or os.environ.get("IDF_PATH")
@@ -179,7 +207,12 @@ def main():
 
     generator = resolve_generator(idf_path)
 
-    json_text = json.dumps(json.loads(args.json.read_text(encoding="utf-8")), separators=(",", ":"), ensure_ascii=False)
+    # 读取并解析 JSON
+    json_data = json.loads(json_path.read_text(encoding="utf-8"))
+    json_text = json.dumps(json_data, separators=(",", ":"), ensure_ascii=False)
+    
+    # 获取 JSON 文件所在目录
+    json_dir = json_path.parent.resolve()
 
     if args.csv:
         csv_path = args.csv.resolve()
@@ -188,36 +221,68 @@ def main():
         tmp.close()
         csv_path = Path(tmp.name)
 
+    # 自动从 JSON 文件所在目录读取证书文件
+    def get_key_value(key_name: str, key_value: str | None) -> tuple[str, str] | None:
+        if key_value:
+            return (key_name, key_value)
+        # 如果未指定值，尝试从 JSON 的 certificates 字段自动读取
+        if "certificates" in json_data:
+            certs = json_data["certificates"]
+            if key_name in certs:
+                cert_file = json_dir / certs[key_name]
+                if cert_file.exists():
+                    return (key_name, cert_file.read_text(encoding="utf-8"))
+                elif f"{key_name}_content" in certs:
+                    return (key_name, certs[f"{key_name}_content"])
+        return None
+    
+    key1 = get_key_value(args.key1_name, args.key1_value)
+    key2 = get_key_value(args.key2_name, args.key2_value)
+    key3 = get_key_value(args.key3_name, args.key3_value)
+
+    # 解析偏移量（用于文件名和烧录）
+    offset = args.offset or ""
+    if not offset and args.from_device and args.port:
+        offset = resolve_iot_config_offset_from_device(args.port, args.pt_offset)
+    if not offset:
+        offset = resolve_iot_config_offset(project_root, idf_path)
+    
+    # 如果未指定输出文件名或使用默认值，在文件名中包含偏移量
+    output_path = args.output
+    if output_path == Path("build/iot_config_nvs.bin") or not args.output:
+        if offset:
+            # 移除 0x 前缀用于文件名
+            offset_str = offset.replace("0x", "").lower()
+            output_path = Path("build") / f"iot_config_nvs_{offset_str}.bin"
+        else:
+            output_path = Path("build/iot_config_nvs.bin")
+    else:
+        output_path = args.output
+
     try:
-        write_csv(json_text, csv_path)
-        args.output.parent.mkdir(parents=True, exist_ok=True)
+        write_csv(json_text, csv_path, key1, key2, key3)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         cmd = [
             sys.executable,
             str(generator),
             "generate",
             str(csv_path),
-            str(args.output.resolve()),
+            str(output_path.resolve()),
             args.size,
         ]
         run_cmd(cmd)
-        print(f"已生成: {args.output.resolve()}")
+        print(f"已生成: {output_path.resolve()}")
 
         if args.flash:
             if not args.port:
                 print("--flash 需要指定 --port", file=sys.stderr)
                 return 2
-            # 解析偏移：优先 --offset ；否则 --from-device；否则 build/输出解析
-            offset = args.offset or ""
-            if not offset and args.from_device:
-                offset = resolve_iot_config_offset_from_device(args.port, args.pt_offset)
-            if not offset:
-                offset = resolve_iot_config_offset(project_root, idf_path)
             if not offset:
                 print("无法解析 iot_config 偏移，请检查分区表或通过 --offset 指定（如 0x15000）", file=sys.stderr)
                 return 3
             print(f"烧录到 iot_config 分区, offset={offset}, port={args.port}")
             run_cmd([
-                "esptool.py", "--port", args.port, "write_flash", offset, str(args.output.resolve())
+                "esptool.py", "--port", args.port, "write_flash", offset, str(output_path.resolve())
             ])
             print("烧录完成")
     finally:
