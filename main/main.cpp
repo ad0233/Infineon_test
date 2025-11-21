@@ -558,7 +558,8 @@ void encoder_test(void *arg)
             radar_latest_data_t data;
             my_radar_get_latest_data(&data);
             if(esp_log_timestamp() - data.heart_rate_system_timestamp < 10 * 1000) {
-                mqtt_publish_radar_data(&data, t_radar);
+                protocol_publish_radar_data(PROTOCOL_TYPE_MQTT, &data, t_radar);
+                protocol_publish_radar_data(PROTOCOL_TYPE_BLE, &data, nullptr);
             }
             last_lidar_flush = current_tick;
         }
