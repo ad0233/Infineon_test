@@ -90,10 +90,10 @@ static struct StateTable fsm_user_table[] = {
     {nullptr             ,0            ,F_MAIN_E_ANIM_PLAY_SUC     ,F_MAIN_S_FINDFAIL_ANIM  ,F_MAIN_S_FINDFAIL          ,0  ,false    ,    fsm_main_lidar_find_fail },//找不人动画结束
     {nullptr             ,0            ,F_MAIN_E_DEV_MOVE          ,F_MAIN_S_FINDFAIL       ,F_MAIN_S_FINDPERSON        ,0  ,false    ,     fsm_main_lidar_find_playing},//移动设备重新找人 //移动设备也没弄  
 
-    { fm_has_w_c_state           ,FM_W_N_CFG   ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_FINDSUC     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         ,fsm_main_wifi_guide },  //未配置去二维码
-    { fm_has_w_c_state           ,FM_W_CONN    ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_FINDSUC     , F_MAIN_S_WIFI_CONN         ,0   ,false          ,fsm_main_wifi_connecting },  //连接中
-    { fm_has_w_c_state           ,FM_W_SUC     ,F_MAIN_E_BTN_CLICKED      , F_MAIN_S_FINDSUC     , F_MAIN_S_CLOCK             ,0    ,false          , fsm_main_to_clock},    //连接成功去主页面
-    { fm_has_w_c_state           ,FM_W_FAI     ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_FINDSUC     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         , fsm_main_wifi_guide},        //连接失败去二维码
+    // { fm_has_w_c_state           ,FM_W_N_CFG   ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_FINDSUC     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         ,fsm_main_wifi_guide },  //未配置去二维码
+    // { fm_has_w_c_state           ,FM_W_CONN    ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_FINDSUC     , F_MAIN_S_WIFI_CONN         ,0   ,false          ,fsm_main_wifi_connecting },  //连接中
+    // { fm_has_w_c_state           ,FM_W_SUC     ,F_MAIN_E_BTN_CLICKED      , F_MAIN_S_FINDSUC     , F_MAIN_S_CLOCK             ,0    ,false          , fsm_main_to_clock},    //连接成功去主页面
+    // { fm_has_w_c_state           ,FM_W_FAI     ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_FINDSUC     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         , fsm_main_wifi_guide},        //连接失败去二维码
 
     
     { fm_has_w_c_state           ,FM_W_N_CFG   ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_FINDFAIL     , F_MAIN_S_WIFI_GUIDE        ,0    ,false         ,fsm_main_wifi_guide },           //未配置去二维码
@@ -107,8 +107,12 @@ static struct StateTable fsm_user_table[] = {
     //二维码
     { nullptr           ,0                  ,F_MAIN_E_WIFI_CMD_TRIG   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_WIFI_CONN        ,0    ,false          , fsm_main_wifi_connecting},   //二维码去连接中
     //rtcF_MAIN_E_LIDAR_FIND
-    { fm_has_rtc_state   ,FM_RTC_EXIST       ,F_MAIN_E_BTN_L_CLICKED    , F_MAIN_S_WIFI_GUIDE         , F_MAIN_S_CLOCK   ,0    ,false        ,fsm_main_to_clock },//二维码去 ---rtc 有主页面
-    { fm_has_rtc_state   ,FM_RTC_NO_EXIST   ,F_MAIN_E_BTN_L_CLICKED   , F_MAIN_S_WIFI_GUIDE         , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false        , fsm_main_set_time},//二维码去 ---rtc 无配置时间
+    { fm_has_rtc_state   ,FM_RTC_EXIST       ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_FINDSUC         , F_MAIN_S_CLOCK   ,0    ,false        ,fsm_main_to_clock },//二维码去 ---rtc 有主页面
+    { fm_has_rtc_state   ,FM_RTC_NO_EXIST   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDSUC         , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false        , fsm_main_set_time},//二维码去 ---rtc 无配置时间
+
+    { fm_has_rtc_state   ,FM_RTC_EXIST       ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_FINDFAIL         , F_MAIN_S_CLOCK   ,0    ,false        ,fsm_main_to_clock },//二维码去 ---rtc 有主页面
+    { fm_has_rtc_state   ,FM_RTC_NO_EXIST   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDFAIL         , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false        , fsm_main_set_time},//二维码去 ---rtc 无配置时间
+
     { nullptr           ,0                  ,F_MAIN_E_KNOB_CW         , F_MAIN_S_RTC_DETECT_CLK   , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false           ,fsm_main_rtc_adjust_time },//rtc修改时间
     { nullptr           ,0                  ,F_MAIN_E_BTN_CLICKED     , F_MAIN_S_RTC_DETECT_CLK   , F_MAIN_S_CLOCK             ,0    ,false          , fsm_main_rtc_save_and_exit},//rtc保存时间并去主页面
     //TODO:主页面
