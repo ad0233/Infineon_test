@@ -187,27 +187,8 @@ void my_ui_clock_set_now_time(uint8_t hour, uint8_t min) {
     // 设置分钟显示 (ui_MainMinute)
     snprintf(min_str, sizeof(min_str), "%02d", min);
     lv_label_set_text(ui_MainMinute, min_str);
-    
-    // 根据24小时制时间设置太阳或月亮图标
-    // 0 = 太阳 (06:00-17:59), 1 = 月亮 (18:00-05:59)
-    uint8_t emoji_type;
-    if(hour >= 6 && hour < 18) {
-        emoji_type = 0;  // 白天显示太阳
-    } else {
-        emoji_type = 1;  // 夜晚显示月亮
-    }
 
-    if(!is_online) {
-        emoji_type = 2;
-    }
-    
     lvgl_port_unlock();
-    
-    // 在解锁后设置图标，避免死锁
-    my_ui_clock_set_emoji(emoji_type);
-    
-    // 调试日志
-    // ESP_LOGI("CLOCK", "时钟显示 - 24小时制: %02d:%02d, 图标: %d", hour, min, emoji_type);
 }
 
 void my_ui_clock_set_tips(const char* tips) {

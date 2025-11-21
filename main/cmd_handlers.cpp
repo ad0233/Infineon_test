@@ -1,6 +1,8 @@
 #include "cmd_handlers.h"
 #include "esp_log.h"
 #include <string.h>
+#include <time.h>
+#include <sys/time.h>
 
 #include "my_wifi.h"
 #include "my_ota.h"
@@ -9,6 +11,8 @@
 #include "my_ble.h"
 #include "ble_protocol.h"
 #include "cJSON.h"
+#include "my_rtc.h"
+#include "my_ui_behavior.h"
 
 static const char *TAG = "cmd_handlers";
 
@@ -376,6 +380,117 @@ int cmd_handle_set_binding_jwt(cJSON *params) {
     }
     
     ESP_LOGI(TAG, "Set binding JWT completed");
+    return 0;
+}
+
+// 处理设置时间命令
+int cmd_handle_test_set_time(cJSON *params) {
+    if (!params) {
+        ESP_LOGE(TAG, "test_set_time: params is NULL");
+        return -1;
+    }
+    
+    cJSON *timestamp_item = cJSON_GetObjectItem(params, "timestamp");
+    cJSON *timezone_item = cJSON_GetObjectItem(params, "timezone");
+    
+    if (!cJSON_IsNumber(timestamp_item)) {
+        ESP_LOGE(TAG, "test_set_time: timestamp not found or invalid");
+        return -1;
+    }
+    
+    time_t timestamp = (time_t)timestamp_item->valueint;
+    const char *timezone = cJSON_IsString(timezone_item) ? timezone_item->valuestring : "CST-8";
+    
+    ESP_LOGI(TAG, "Set time: timestamp=%lld, timezone=%s", timestamp, timezone);
+    
+    // 设置时区
+    setenv("TZ", timezone, 1);
+    tzset();
+    
+    // 设置系统时间
+    struct timeval tv;
+    tv.tv_sec = timestamp;
+    tv.tv_usec = 0;
+    if (settimeofday(&tv, NULL) != 0) {
+        ESP_LOGE(TAG, "Failed to set system time");
+        
+        // 发送失败响应
+        cJSON *response = cJSON_CreateObject();
+        cJSON *data = cJSON_CreateObject();
+        if (response && data) {
+            cJSON_AddStringToObject(response, "type", "test_set_time_result");
+            cJSON_AddStringToObject(data, "status", "failed");
+            cJSON_AddStringToObject(data, "error", "settimeofday failed");
+            cJSON_AddItemToObject(response, "data", data);
+            
+            char *json_str = cJSON_Print(response);
+            if (json_str) {
+                ble_send_response(json_str);
+                free(json_str);
+            }
+            cJSON_Delete(response);
+        }
+        return -1;
+    }
+    
+    // 转换为本地时间并写入RTC
+    struct tm timeinfo;
+    localtime_r(&timestamp, &timeinfo);
+    
+    int rtc_ret = my_rtc_set_time(&timeinfo);
+    if (rtc_ret != 0) {
+        ESP_LOGE(TAG, "Failed to set RTC time (err=%d)", rtc_ret);
+        
+        // 发送部分成功响应（系统时间已设置，但RTC失败）
+        cJSON *response = cJSON_CreateObject();
+        cJSON *data = cJSON_CreateObject();
+        if (response && data) {
+            cJSON_AddStringToObject(response, "type", "test_set_time_result");
+            cJSON_AddStringToObject(data, "status", "partial");
+            cJSON_AddStringToObject(data, "error", "RTC write failed");
+            cJSON_AddItemToObject(response, "data", data);
+            
+            char *json_str = cJSON_Print(response);
+            if (json_str) {
+                ble_send_response(json_str);
+                free(json_str);
+            }
+            cJSON_Delete(response);
+        }
+        return -1;
+    }
+    
+    ESP_LOGI(TAG, "Time set successfully: %04d-%02d-%02d %02d:%02d:%02d",
+             timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+             timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    
+    // 如果当前在时钟页面，更新LVGL显示
+    if (my_ui_get_current_page() == PAGE_CLOCK) {
+        my_ui_clock_set_now_time(timeinfo.tm_hour, timeinfo.tm_min);
+        ESP_LOGI(TAG, "LVGL clock display updated");
+    }
+    
+    // 发送成功响应
+    cJSON *response = cJSON_CreateObject();
+    cJSON *data = cJSON_CreateObject();
+    if (!response || !data) {
+        ESP_LOGE(TAG, "Failed to create JSON objects for response");
+        if (response) cJSON_Delete(response);
+        if (data) cJSON_Delete(data);
+    } else {
+        cJSON_AddStringToObject(response, "type", "test_set_time_result");
+        cJSON_AddStringToObject(data, "status", "success");
+        cJSON_AddItemToObject(response, "data", data);
+        
+        char *json_str = cJSON_Print(response);
+        if (json_str) {
+            ble_send_response(json_str);
+            free(json_str);
+        }
+        cJSON_Delete(response);
+    }
+    
+    ESP_LOGI(TAG, "Set time completed");
     return 0;
 }
 

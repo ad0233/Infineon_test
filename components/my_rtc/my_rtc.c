@@ -64,11 +64,34 @@ int my_rtc_init() {
 
     vTaskDelay(pdMS_TO_TICKS(500));
     esp_err_t r = pcf8563_get_time(my_rtc_i2c, &time, &s_valid);
-    if (r == ESP_OK)
+    if (r == ESP_OK) {
         printf("%04d-%02d-%02d %02d:%02d:%02d, %s\n", time.tm_year + 1900, time.tm_mon + 1,
                 time.tm_mday, time.tm_hour, time.tm_min, time.tm_sec, s_valid ? "VALID" : "NOT VALID");
-    else
+        
+        // 如果RTC时间有效，设置系统时间戳
+        if (s_valid) {
+            // 转换为时间戳
+            time_t rtc_timestamp = mktime(&time);
+            if (rtc_timestamp != -1) {
+                struct timeval tv;
+                tv.tv_sec = rtc_timestamp;
+                tv.tv_usec = 0;
+                if (settimeofday(&tv, NULL) == 0) {
+                    ESP_LOGI(TAG, "System time set from RTC: %04d-%02d-%02d %02d:%02d:%02d",
+                             time.tm_year + 1900, time.tm_mon + 1, time.tm_mday,
+                             time.tm_hour, time.tm_min, time.tm_sec);
+                } else {
+                    ESP_LOGW(TAG, "Failed to set system time from RTC");
+                }
+            } else {
+                ESP_LOGW(TAG, "Failed to convert RTC time to timestamp");
+            }
+        } else {
+            ESP_LOGW(TAG, "RTC time is not valid, skipping system time sync");
+        }
+    } else {
         printf("Error %d: %s\n", r, esp_err_to_name(r));
+    }
     
     return ESP_OK;
 }

@@ -62,6 +62,14 @@ int cmd_handle_test_conn_ota(cJSON *params);
  */
 int cmd_handle_set_binding_jwt(cJSON *params);
 
+/**
+ * @brief 处理设置时间命令
+ * 
+ * @param params JSON params 对象，包含 timestamp 和 timezone
+ * @return int 0成功，-1失败
+ */
+int cmd_handle_test_set_time(cJSON *params);
+
 #ifdef __cplusplus
 }
 #endif

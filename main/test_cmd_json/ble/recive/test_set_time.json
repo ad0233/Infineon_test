@@ -1,0 +1,9 @@
+{
+    "cmd": "test_set_time",
+    "params": {
+        "timestamp": 1763730351,
+        "timezone": "CST-8"
+    }
+}
+
+

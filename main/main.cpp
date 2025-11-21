@@ -17,6 +17,7 @@
 
 #include "esp_log_timestamp.h"
 #include "freertos/idf_additions.h"
+#include "freertos/projdefs.h"
 #include "nvs_flash.h"
 #include "esp_event.h"
 #include "esp_netif.h"
@@ -465,12 +466,14 @@ void encoder_test(void *arg)
     TickType_t last_lidar_flush = 0;
     TickType_t last_ota_flush = 0;
     TickType_t last_wifi_flush = 0;
+    TickType_t last_time_update = 0;
     const TickType_t radar_flush_interval = pdMS_TO_TICKS(100);  // 100ms
     const TickType_t fsm_flush_interval = pdMS_TO_TICKS(100);    // 100ms
     const TickType_t ble_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t lidar_flush_interval = pdMS_TO_TICKS(1000);      // 1000ms
     const TickType_t ota_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t wifi_flush_interval = pdMS_TO_TICKS(200);    // 200ms
+    const TickType_t time_update_interval = pdMS_TO_TICKS(1000); // 1s
     
     // 雷达检测状态（用于避免重复触发）
     static bool last_radar_found = false;
@@ -502,6 +505,17 @@ void encoder_test(void *arg)
                 default:
                     break;
             }
+        }
+
+        // 定时刷新时钟
+        if ((current_tick - last_time_update) >= time_update_interval) {
+            struct tm timeinfo;
+            bool valid = false;
+            my_rtc_get_time(&timeinfo, &valid);
+            if (valid) {
+                my_ui_clock_set_now_time(timeinfo.tm_hour, timeinfo.tm_min);
+            }
+            last_time_update = current_tick;
         }
         
         // 定时刷新雷达数据（每100ms）
