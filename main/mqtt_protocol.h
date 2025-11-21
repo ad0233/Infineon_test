@@ -7,10 +7,19 @@
 extern "C" {
 #endif
 
-// 发布雷达数据到 MQTT
+// 协议类型枚举
+typedef enum {
+    PROTOCOL_TYPE_MQTT = 0,
+    PROTOCOL_TYPE_BLE = 1
+} protocol_type_t;
+
+// 发布雷达数据到 MQTT 或蓝牙
+// @param protocol 协议类型（MQTT 或 BLE）
+// @param data 雷达数据（不可变引用）
+// @param topic MQTT 主题（MQTT 时必填，BLE 时可传 NULL）
 // 自动获取时间戳、转换为 JSON、发布并释放内存
 // 返回 0 成功，-1 失败
-int mqtt_publish_radar_data(const radar_latest_data_t *data, const char *topic);
+int protocol_publish_radar_data(protocol_type_t protocol, const radar_latest_data_t *data, const char *topic);
 
 #ifdef __cplusplus
 }
