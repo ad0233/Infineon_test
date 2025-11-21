@@ -1,0 +1,21 @@
+{
+  "topic": "lunawake/device_001/body_signal_tick",
+  "data": {
+    "timestamp": 1704067200,
+    "movement": {
+      "value": 15,
+      "timestamp": 1704067200,
+      "system_timestamp": 10
+    },
+    "respiratory": {
+      "value": 18,
+      "timestamp": 1704067200,
+      "system_timestamp": 10
+    },
+    "heart_rate": {
+      "value": 72,
+      "timestamp": 1704067200,
+      "system_timestamp": 10
+    }
+  }
+}
