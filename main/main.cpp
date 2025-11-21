@@ -537,6 +537,23 @@ void encoder_test(void *arg)
                 last_radar_found = false;
             }
             
+            // 在找人动画状态时，定时检测是否找到人
+            if(current_state == F_MAIN_S_FINDPERSONC_ANIM) {
+                radar_latest_data_t radar_data;
+                if(my_radar_get_latest_data(&radar_data)) {
+                    // 挥挥手就识别成功了
+                    if(radar_data.movement_param > 15) {
+                        fsm_main_set_person_found_during_anim(true);
+                        ESP_LOGI(TAG, "Person found during find animation (movement_param: %d)", radar_data.movement_param);
+                    }
+                    // 心率检测：如果最近5秒内有心率更新，说明有人
+                    else if(esp_log_timestamp() - radar_data.heart_rate_system_timestamp < 5) {
+                        fsm_main_set_person_found_during_anim(true);
+                        ESP_LOGI(TAG, "Person found during find animation (heart rate detected)");
+                    }
+                }
+            }
+            
             last_radar_flush = current_tick;
         }
         

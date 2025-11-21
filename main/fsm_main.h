@@ -185,6 +185,9 @@ const char* fsm_main_get_current_state_str(void);
 void fsm_main_set_radar_detect_enabled(bool enabled);
 bool fsm_main_get_radar_detect_enabled(void);
 
+// 设置动画期间找到人的标志位
+void fsm_main_set_person_found_during_anim(bool found);
+
 // 超时刷新函数（由主线程定时调用）
 void fsm_main_timeout_flush(void);
 
