@@ -29,6 +29,8 @@ static int i2c_init()
     return ret;
 }
 static bool s_valid;
+static bool s_ntp_synced = false;  // NTP同步状态标志
+
 int my_rtc_init() {
     // 初始化I2C总线
     int ret = i2c_init();
@@ -110,10 +112,24 @@ int my_rtc_sync_from_ntp(void) {
     // 写入RTC
     int ret = my_rtc_set_time(&timeinfo);
     if (ret == 0) {
+        s_ntp_synced = true;  // 标记NTP已同步
         ESP_LOGI(TAG, "RTC synced from NTP successfully");
         return ESP_OK;
     } else {
         ESP_LOGE(TAG, "Failed to sync RTC from NTP (err=%d)", ret);
         return ESP_FAIL;
     }
+}
+
+void my_rtc_set_ntp_synced(bool synced) {
+    s_ntp_synced = synced;
+    if (synced) {
+        ESP_LOGI(TAG, "NTP sync status set to synced");
+    } else {
+        ESP_LOGI(TAG, "NTP sync status set to not synced");
+    }
+}
+
+bool my_rtc_is_ntp_synced(void) {
+    return s_ntp_synced;
 }

@@ -97,6 +97,7 @@ typedef struct {
     pipe_player_state_e     player_state;
     bool                    running;
     tone_play_callback_t    tone_cb;
+    bool                    is_switching;  // 标志位：是否正在切换音频
 } audio_player_t;
 
 static audio_player_t             *s_audio_player      = NULL;
@@ -432,9 +433,11 @@ static void audio_player_state_task(void *arg)
             && msg.cmd == AEL_MSG_CMD_REPORT_STATUS
             && (((int)msg.data == AEL_STATUS_STATE_STOPPED) || ((int)msg.data == AEL_STATUS_STATE_FINISHED))) {
             ESP_LOGI(TAG, "[ * ] Stop event received");
-            audio_tone_stop();
-            s_audio_player->tone_cb(AEL_STATUS_STATE_FINISHED);
+            // 注意：这里不要调用 audio_tone_stop()，因为会设置 is_switching 标志
+            // 直接更新状态即可
             s_audio_player->player_state = PIPE_STATE_IDLE;
+            s_audio_player->is_switching = false;  // 清除切换标志
+            s_audio_player->tone_cb(AEL_STATUS_STATE_FINISHED);
         }
     }
 }
@@ -443,6 +446,7 @@ esp_err_t audio_tone_init(tone_play_callback_t callback)
 {
     s_audio_player = (audio_player_t *)audio_calloc(1, sizeof(audio_player_t));
     AUDIO_MEM_CHECK(TAG, s_audio_player, goto _exit_open);
+    s_audio_player->is_switching = false;  // 初始化切换标志
 
     ESP_LOGI(TAG, "Create audio pipeline for audio player");
     audio_pipeline_cfg_t pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
@@ -491,42 +495,135 @@ esp_err_t audio_tone_play(const char *uri)
 {
     ESP_RETURN_ON_FALSE(s_audio_player != NULL, ESP_FAIL, TAG, "audio tone not initialized");
     
-    // 检查是否有未完全结束的音频，如果有则先完全停止（非阻塞方式）
+    // 防止重复调用：如果正在切换，等待一小段时间后重试
+    if (s_audio_player->is_switching) {
+        ESP_LOGW(TAG, "Audio is switching, wait a bit and retry...");
+        // 等待最多100ms，每次10ms
+        int retry_count = 0;
+        const int max_retry = 10;
+        while (s_audio_player->is_switching && retry_count < max_retry) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+            retry_count++;
+        }
+        // 如果还是切换中，强制清除标志（可能是卡住了）
+        if (s_audio_player->is_switching) {
+            ESP_LOGW(TAG, "Audio switching timeout, force clear flag");
+            s_audio_player->is_switching = false;
+        }
+    }
+    
+    // 设置切换标志
+    s_audio_player->is_switching = true;
+    
+    // 无论状态如何，都先停止并重置管道，确保状态一致
     if (s_audio_player->player_state == PIPE_STATE_RUNNING) {
         ESP_LOGW(TAG, "Audio is still running, stopping first...");
         audio_pipeline_stop(s_audio_player->pipeline);
-        
-        // 非阻塞等待：只等待很短时间（10ms），然后强制终止
-        // 这样可以避免长时间阻塞，让LCD刷新能够及时处理
-        vTaskDelay(pdMS_TO_TICKS(10));
-        
-        // 直接终止管道，不等待完全停止（非阻塞）
-        audio_pipeline_terminate(s_audio_player->pipeline);
-        audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
-        audio_pipeline_reset_elements(s_audio_player->pipeline);
-        s_audio_player->player_state = PIPE_STATE_IDLE;
-        ESP_LOGI(TAG, "Previous audio stopped (non-blocking)");
     }
+    
+    // 等待管道停止（使用阻塞等待，确保完全停止）
+    esp_err_t wait_ret = audio_pipeline_wait_for_stop(s_audio_player->pipeline);
+    if (wait_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Pipeline stop wait failed or timeout, force terminate");
+        // 如果等待失败，强制终止
+        audio_pipeline_terminate(s_audio_player->pipeline);
+        // 等待终止完成
+        vTaskDelay(pdMS_TO_TICKS(100));
+    } else {
+        // 等待成功，再等待一小段时间确保完全停止
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+    
+    // 重置管道（无论之前状态如何）
+    audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
+    audio_pipeline_reset_elements(s_audio_player->pipeline);
+    s_audio_player->player_state = PIPE_STATE_IDLE;
+    ESP_LOGI(TAG, "Audio pipeline reset to IDLE");
     
     ESP_LOGI(TAG, "audio_tone_play: %s", uri);
     
+    // 设置新的URI
     audio_element_set_uri(s_audio_player->spiffs_stream, uri);
-    audio_pipeline_run(s_audio_player->pipeline);
-    s_audio_player->player_state = PIPE_STATE_RUNNING;
-    return ESP_OK;
+    
+    // 在启动前，再次确保管道完全停止（双重保险）
+    // 先停止（如果还在运行）
+    audio_pipeline_stop(s_audio_player->pipeline);
+    
+    // 等待停止完成（带超时处理）
+    esp_err_t wait_ret = audio_pipeline_wait_for_stop(s_audio_player->pipeline);
+    if (wait_ret != ESP_OK) {
+        ESP_LOGW(TAG, "Pipeline wait_for_stop failed: %s, force terminate", esp_err_to_name(wait_ret));
+        // 如果等待失败，强制终止
+        audio_pipeline_terminate(s_audio_player->pipeline);
+        // 等待更长时间确保终止完成
+        vTaskDelay(pdMS_TO_TICKS(150));
+    } else {
+        // 等待成功，再等待一小段时间确保完全停止
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    
+    // 无论等待是否成功，都强制终止一次（清除所有内部状态）
+    audio_pipeline_terminate(s_audio_player->pipeline);
+    vTaskDelay(pdMS_TO_TICKS(100));  // 等待终止完成
+    
+    // 重置管道状态
+    audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
+    audio_pipeline_reset_elements(s_audio_player->pipeline);
+    s_audio_player->player_state = PIPE_STATE_IDLE;
+    
+    // 再等待一下，确保所有操作完成
+    vTaskDelay(pdMS_TO_TICKS(50));
+    
+    // 启动新的音频
+    esp_err_t ret = audio_pipeline_run(s_audio_player->pipeline);
+    if (ret == ESP_OK) {
+        s_audio_player->player_state = PIPE_STATE_RUNNING;
+        ESP_LOGI(TAG, "Audio pipeline started successfully");
+    } else {
+        ESP_LOGE(TAG, "Failed to run audio pipeline: %s", esp_err_to_name(ret));
+        s_audio_player->player_state = PIPE_STATE_IDLE;
+    }
+    
+    // 清除切换标志
+    s_audio_player->is_switching = false;
+    
+    return ret;
 }
 
 esp_err_t audio_tone_stop(void)
 {
     ESP_RETURN_ON_FALSE(s_audio_player != NULL, ESP_FAIL, TAG, "audio tone not initialized");
     if (s_audio_player->player_state == PIPE_STATE_IDLE) {
-        return ESP_FAIL;
+        return ESP_OK;  // 已经是IDLE状态，直接返回成功
     }
+    
+    // 设置切换标志，防止在停止过程中被新的播放请求打断
+    s_audio_player->is_switching = true;
+    
+    // 停止管道
     audio_pipeline_stop(s_audio_player->pipeline);
-    audio_pipeline_wait_for_stop(s_audio_player->pipeline);
-    audio_pipeline_terminate(s_audio_player->pipeline);
+    
+    // 非阻塞等待：最多等待100ms
+    int wait_count = 0;
+    const int max_wait = 10;  // 最多等待10次，每次10ms
+    while (s_audio_player->player_state == PIPE_STATE_RUNNING && wait_count < max_wait) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        wait_count++;
+    }
+    
+    // 如果还没停止，强制终止
+    if (s_audio_player->player_state == PIPE_STATE_RUNNING) {
+        ESP_LOGW(TAG, "Force terminate audio pipeline");
+        audio_pipeline_terminate(s_audio_player->pipeline);
+    }
+    
+    // 重置管道
     audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
     audio_pipeline_reset_elements(s_audio_player->pipeline);
     s_audio_player->player_state = PIPE_STATE_IDLE;
+    
+    // 清除切换标志
+    s_audio_player->is_switching = false;
+    
     return ESP_OK;
 }
