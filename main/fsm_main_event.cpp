@@ -521,9 +521,8 @@ void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
     } else {
         ESP_LOGI(TAG, "fsm_unwind_next_item: diff is 0, no action");
     }
-    if(my_ui_unwind_get_animal() == UNWIND_ANIMAL_CAT) {
-        fsm_main_set_radar_detect_enabled(true);
-    }
+    
+
 }
 
 /*----------------------------------------------------------------------------------volume-------------------------------------------------------------------------------------*/
@@ -759,10 +758,6 @@ void fsm_main_in_offline(void *arg, uint8_t last_state, uint8_t next_state) {
 
 void fsm_main_in_memu(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in menu...");
-    
-    // 回到主菜单时，启用雷达检测
-    fsm_main_set_radar_detect_enabled(true);
-    
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_Memu);
     lvgl_port_unlock();
@@ -850,12 +845,10 @@ void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
     if(last_state == F_MAIN_S_MENU_UNWIND_PLAYING) {
         my_ui_unwind_set_animal(UNWIND_ANIMAL_CAT);
     }
-    if(last_state == F_MAIN_S_MENU) {
-        fsm_main_set_radar_detect_enabled(true);
-    }
-    lvgl_port_lock(0);
-    lv_disp_load_scr(ui_UnwindSelet);
-    lvgl_port_unlock();
+    
+    // 调用UI函数，内部会处理显示和3秒定时器
+    my_ui_in_unwind();
+
     
     // audio_tone_play 内部会处理停止逻辑，直接调用即可
     audio_tone_play("spiffs://spiffs/water-fountain.mp3");

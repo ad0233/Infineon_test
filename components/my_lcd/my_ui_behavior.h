@@ -128,6 +128,7 @@ void my_ui_unwind_set_animal(unwind_animal_t animal);
 unwind_animal_t my_ui_unwind_get_animal(void);
 void my_ui_unwind_next_animal(void);
 void my_ui_unwind_prev_animal(void);
+bool my_ui_unwind_is_animation_started(void);  // 获取动画开始标志位
 uint8_t my_ui_noise_time_get_selection(void);
 void my_ui_unwind_select_mode(uint8_t mode);
 void my_ui_in_good_morning();

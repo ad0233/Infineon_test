@@ -15,6 +15,9 @@
 #include <string.h>
 #include <stdio.h>
 
+// 前向声明，避免循环依赖
+void fsm_main_set_radar_detect_enabled(bool enabled);
+
 #define TAG "UI_BEHAVIOR"
 
 // 页面状态管理
@@ -25,6 +28,8 @@ static bool is_online = false;
 
 // Unwind动物选择相关
 static unwind_animal_t current_unwind_animal = UNWIND_ANIMAL_CAT;  // 默认选择cat
+static TimerHandle_t unwind_label_timer = NULL;  // 文字隐藏定时器
+static bool unwind_animation_started = false;    // 动画开始标志位
 // WakeModeTest相关变量
 static int wakeModeTestIndex = 0;
 static bool isWakeModeTestAnimating = false; // 跟踪动画是否正在进行
@@ -47,6 +52,9 @@ static const UnwindImageInfo unwind_animal_info[UNWIND_ANIMAL_MAX] = {
 // 前向声明
 static void update_unwind_display(void);
 static void update_unwind_choose_animation(void);
+static void unwind_label_show(void);
+static void unwind_label_hide(void);
+static void unwind_label_timer_callback(TimerHandle_t xTimer);
 
 void my_ui_set_light(uint8_t val) {
     if (val > 100) val = 100;
@@ -425,10 +433,20 @@ void my_ui_in_unwind() {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_UnwindSelet);
     current_page = PAGE_UNWIND;
-    lvgl_port_unlock();
+    
+    // 重置动画标志位
+    unwind_animation_started = false;
+    
+    // 先强制显示文字（确保从菜单进入时文字是显示的）
+    lv_obj_clear_flag(ui_UnwindSeletLabel, LV_OBJ_FLAG_HIDDEN);
     
     // 显示当前选中的动物图片和标签
     update_unwind_display();
+    
+    lvgl_port_unlock();
+    
+    // 显示文字并启动3秒定时器（从菜单进入时也会启动）
+    unwind_label_show();
 }
 
 void my_ui_unwind_select_mode(uint8_t mode) {
@@ -520,6 +538,91 @@ static void update_unwind_display(void) {
     lvgl_port_unlock();
 }
 
+// 显示文字并启动3秒定时器
+static void unwind_label_show(void) {
+    if (!lvgl_port_lock(0)) {
+        ESP_LOGW(TAG, "unwind_label_show: failed to lock lvgl");
+        return;
+    }
+    
+    // 检查当前屏幕是否是 UnwindSelet
+    lv_obj_t* current_screen = lv_disp_get_scr_act(NULL);
+    if (current_screen != ui_UnwindSelet) {
+        lvgl_port_unlock();
+        return;
+    }
+    
+    // 显示文字（确保文字是显示的）
+    lv_obj_clear_flag(ui_UnwindSeletLabel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_invalidate(ui_UnwindSeletLabel);
+    
+    lvgl_port_unlock();
+    
+    // 停止之前的定时器（如果存在）
+    if (unwind_label_timer != NULL) {
+        xTimerStop(unwind_label_timer, 0);
+        // 重置定时器为3秒
+        xTimerChangePeriod(unwind_label_timer, pdMS_TO_TICKS(3000), 0);
+    } else {
+        // 创建定时器（一次性，3秒）
+        unwind_label_timer = xTimerCreate("unwind_label_timer", 
+                                         pdMS_TO_TICKS(3000), 
+                                         pdFALSE, 
+                                         NULL, 
+                                         unwind_label_timer_callback);
+        if (unwind_label_timer == NULL) {
+            ESP_LOGE(TAG, "Failed to create unwind label timer");
+            return;
+        }
+    }
+    
+    // 启动定时器
+    if (xTimerStart(unwind_label_timer, 0) != pdPASS) {
+        ESP_LOGE(TAG, "Failed to start unwind label timer");
+    } else {
+        ESP_LOGI(TAG, "unwind_label_show: label shown, timer started");
+    }
+}
+
+// 隐藏文字并设置动画开始标志位
+static void unwind_label_hide(void) {
+    if (!lvgl_port_lock(0)) {
+        ESP_LOGW(TAG, "unwind_label_hide: failed to lock lvgl");
+        return;
+    }
+    
+    // 检查当前屏幕是否是 UnwindSelet
+    lv_obj_t* current_screen = lv_disp_get_scr_act(NULL);
+    if (current_screen != ui_UnwindSelet) {
+        lvgl_port_unlock();
+        return;
+    }
+    
+    // 隐藏文字
+    lv_obj_add_flag(ui_UnwindSeletLabel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_invalidate(ui_UnwindSeletLabel);
+    
+    lvgl_port_unlock();
+    
+    // 设置动画开始标志位
+    unwind_animation_started = true;
+    ESP_LOGI(TAG, "unwind_label_hide: label hidden, animation flag set");
+    
+    // 如果是猫猫，触发雷达
+    if (current_unwind_animal == UNWIND_ANIMAL_CAT) {
+        ESP_LOGI(TAG, "unwind_label_hide: cat selected, enabling radar");
+        fsm_main_set_radar_detect_enabled(true);
+    }else if (current_unwind_animal != UNWIND_ANIMAL_CAT){
+        fsm_main_set_radar_detect_enabled(false);
+    }
+}
+
+// 定时器回调函数
+static void unwind_label_timer_callback(TimerHandle_t xTimer) {
+    ESP_LOGI(TAG, "unwind_label_timer_callback: timer expired, hiding label");
+    unwind_label_hide();
+}
+
 // 创建圆弧动画
 static void update_unwind_choose_animation(void) {
     ESP_LOGI(TAG, "update_unwind_choose_animation, current_page: %d", current_page);
@@ -559,11 +662,19 @@ void my_ui_unwind_set_animal(unwind_animal_t animal) {
     }
     current_unwind_animal = animal;
     
+    // 重置动画标志位
+    unwind_animation_started = false;
+    ESP_LOGI(TAG, "my_ui_unwind_set_animal: animation flag reset to false");
+    
     // 更新显示
     update_unwind_display();
     
+    // 显示文字并启动3秒定时器（切换动物时重新显示）
+    unwind_label_show();
+    
     // 播放选择动画
     update_unwind_choose_animation();
+    
 }
 
 // 获取当前选择的动物
@@ -585,6 +696,11 @@ void my_ui_unwind_prev_animal(void) {
     unwind_animal_t prev_animal = (unwind_animal_t)((current_unwind_animal + UNWIND_ANIMAL_MAX - 1) % UNWIND_ANIMAL_MAX);
     ESP_LOGI(TAG, "my_ui_unwind_prev_animal, prev: %d", prev_animal);
     my_ui_unwind_set_animal(prev_animal);
+}
+
+// 获取动画开始标志位
+bool my_ui_unwind_is_animation_started(void) {
+    return unwind_animation_started;
 }
 
 // 获取NoiseTime roller当前选中项

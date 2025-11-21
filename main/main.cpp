@@ -569,7 +569,7 @@ void encoder_test(void *arg)
             my_ota_flush_v1();
             last_ota_flush = current_tick;
         }
-
+        //FIXME: 好像wifi没有定时。
         // 定时检查WiFi状态（每200ms）
         if ((current_tick - last_wifi_flush) >= wifi_flush_interval) {
             wifi_state_t current_wifi_state = my_wifi_get_state();

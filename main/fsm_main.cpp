@@ -288,7 +288,7 @@ const char* fsm_main_get_current_state_str(void) {
 }
 
 // 雷达检测使能标志位
-static bool s_radar_detect_enabled = true;
+static bool s_radar_detect_enabled = false;
 
 void fsm_main_set_radar_detect_enabled(bool enabled) {
     s_radar_detect_enabled = enabled;
