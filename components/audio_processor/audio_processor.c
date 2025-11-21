@@ -546,32 +546,35 @@ esp_err_t audio_tone_play(const char *uri)
     audio_element_set_uri(s_audio_player->spiffs_stream, uri);
     
     // 在启动前，再次确保管道完全停止（双重保险）
-    // 先停止（如果还在运行）
-    audio_pipeline_stop(s_audio_player->pipeline);
-    
-    // 等待停止完成（带超时处理）
-    esp_err_t wait_ret = audio_pipeline_wait_for_stop(s_audio_player->pipeline);
-    if (wait_ret != ESP_OK) {
-        ESP_LOGW(TAG, "Pipeline wait_for_stop failed: %s, force terminate", esp_err_to_name(wait_ret));
-        // 如果等待失败，强制终止
+    // 如果管道状态不是IDLE，说明还没完全重置，需要再次处理
+    if (s_audio_player->player_state != PIPE_STATE_IDLE) {
+        // 先停止（如果还在运行）
+        audio_pipeline_stop(s_audio_player->pipeline);
+        
+        // 等待停止完成（带超时处理）
+        wait_ret = audio_pipeline_wait_for_stop(s_audio_player->pipeline);
+        if (wait_ret != ESP_OK) {
+            ESP_LOGW(TAG, "Pipeline wait_for_stop failed: %s, force terminate", esp_err_to_name(wait_ret));
+            // 如果等待失败，强制终止
+            audio_pipeline_terminate(s_audio_player->pipeline);
+            // 等待更长时间确保终止完成
+            vTaskDelay(pdMS_TO_TICKS(150));
+        } else {
+            // 等待成功，再等待一小段时间确保完全停止
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        
+        // 无论等待是否成功，都强制终止一次（清除所有内部状态）
         audio_pipeline_terminate(s_audio_player->pipeline);
-        // 等待更长时间确保终止完成
-        vTaskDelay(pdMS_TO_TICKS(150));
-    } else {
-        // 等待成功，再等待一小段时间确保完全停止
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(100));  // 等待终止完成
+        
+        // 重置管道状态
+        audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
+        audio_pipeline_reset_elements(s_audio_player->pipeline);
+        s_audio_player->player_state = PIPE_STATE_IDLE;
     }
     
-    // 无论等待是否成功，都强制终止一次（清除所有内部状态）
-    audio_pipeline_terminate(s_audio_player->pipeline);
-    vTaskDelay(pdMS_TO_TICKS(100));  // 等待终止完成
-    
-    // 重置管道状态
-    audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
-    audio_pipeline_reset_elements(s_audio_player->pipeline);
-    s_audio_player->player_state = PIPE_STATE_IDLE;
-    
-    // 再等待一下，确保所有操作完成
+    // 等待一下，确保所有操作完成
     vTaskDelay(pdMS_TO_TICKS(50));
     
     // 启动新的音频

@@ -41,7 +41,7 @@ void ui_Memu_screen_init(void)
     lv_obj_set_style_radius(ui_MemuContainer, 150, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_MueuRoller = lv_roller_create(ui_MemuContainer);
-    lv_roller_set_options(ui_MueuRoller, "Wi-Fi\nWake Mode\nAlarm\nUnwind\nVolume\nScreen Brightness\nSet Time",
+    lv_roller_set_options(ui_MueuRoller, "Wi-Fi\nWake Mode\nAlarm\nUnwind\nVolume\nBrightness\nSet Time",
                           LV_ROLLER_MODE_NORMAL);
     lv_roller_set_selected(ui_MueuRoller, 2, LV_ANIM_OFF);
     lv_obj_set_width(ui_MueuRoller, 300);

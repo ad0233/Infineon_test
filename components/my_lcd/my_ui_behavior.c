@@ -539,15 +539,15 @@ static void update_unwind_choose_animation(void) {
     
     ESP_LOGI(TAG, "update_unwind_choose_animation: starting arc animation");
     
-    // 创建圆弧动画
-    lv_anim_t arcAnim;
-    lv_anim_init(&arcAnim);
-    lv_anim_set_var(&arcAnim, ui_UnwindSeletArc);
-    lv_anim_set_values(&arcAnim, 0, 360);
-    lv_anim_set_time(&arcAnim, 300);  // 300ms
-    lv_anim_set_exec_cb(&arcAnim, (lv_anim_exec_xcb_t)lv_arc_set_value);
-    lv_anim_set_path_cb(&arcAnim, lv_anim_path_ease_out);  // ease-out缓动函数
-    lv_anim_start(&arcAnim);
+    //TODO:// 创建圆弧动画 甲方要求先去掉
+    // lv_anim_t arcAnim;
+    // lv_anim_init(&arcAnim);
+    // lv_anim_set_var(&arcAnim, ui_UnwindSeletArc);
+    // lv_anim_set_values(&arcAnim, 0, 360);
+    // lv_anim_set_time(&arcAnim, 300);  // 300ms
+    // lv_anim_set_exec_cb(&arcAnim, (lv_anim_exec_xcb_t)lv_arc_set_value);
+    // lv_anim_set_path_cb(&arcAnim, lv_anim_path_ease_out);  // ease-out缓动函数
+    // lv_anim_start(&arcAnim);
     
     lvgl_port_unlock();
 }

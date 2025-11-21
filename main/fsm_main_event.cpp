@@ -162,7 +162,7 @@ uint8_t fm_has_memu_state(void){
         case 4: // Volume
             ret = FM_MEMU_VOL;
             break;
-        case 5: // Screen Brightness
+        case 5: // Brightness
             ret = FM_MEMU_SC_BR;
             break;
         case 6: // Set Time
@@ -372,7 +372,7 @@ void fsm_menu_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
         "Alarm",           // 2
         "Unwind",          // 3
         "Volume",          // 4
-        "Screen Brightness", // 5
+        "Brightness",      // 5
         "Set Time"         // 6
     };
     
@@ -685,7 +685,7 @@ void fsm_main_memu_cat_playing(void *arg, uint8_t last_state, uint8_t next_state
     
     lvgl_port_stop();
     my_h264_start(anim_to_play, 100);
-    // 动画播放完成后，done_callback 会检查状态并直接加载页面
+
 }
 
 void fsm_main_lidar_find(void *arg, uint8_t last_state, uint8_t next_state) {
@@ -853,10 +853,6 @@ void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
     if(last_state == F_MAIN_S_MENU) {
         fsm_main_set_radar_detect_enabled(true);
     }
-    if(my_ui_unwind_get_animal() == UNWIND_ANIMAL_CAT) {
-        fsm_main_set_radar_detect_enabled(true);
-    }
-    
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_UnwindSelet);
     lvgl_port_unlock();

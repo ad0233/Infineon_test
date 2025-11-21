@@ -4,14 +4,14 @@
 #include <stdbool.h>
 
 // 功能菜单位置枚举（必须与UI中roller的顺序一致）
-// UI顺序：Wi-Fi\nWake Mode\nAlarm\nUnwind\nVolume\nScreen Brightness\nSet Time
+// UI顺序：Wi-Fi\nWake Mode\nAlarm\nUnwind\nVolume\nBrightness\nSet Time
 typedef enum {
     MENU_WIFI = 0,         // Wi-Fi
     MENU_WAKE_MODE,        // 唤醒模式 (Wake Mode)
     MENU_ALARM,            // 闹钟 (Alarm)
     MENU_UNWIND,     // 睡眠声音 (Unwind)
     MENU_VOLUME,           // 音量 (Volume)
-    MENU_BODY_DATA,        // 身体数据 (Screen Brightness)
+    MENU_BODY_DATA,        // 身体数据 (Brightness)
     MENU_SET_TIME,         // 设置时间 (Set Time)
     MENU_MAX               // 菜单项总数
 } menu_item_t;
