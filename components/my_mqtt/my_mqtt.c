@@ -13,6 +13,7 @@
 #include "esp_crt_bundle.h"
 #include "my_mqtt.h"
 #include "my_nvs.h"
+#include "my_wifi.h"
 
 static const char *TAG = "mqtts_example";
 
@@ -176,6 +177,9 @@ int my_mqtt_init(const char *broker_uri,
 
 int my_mqtt_publish(const char *topic, const char *payload, int payload_len, int qos, int retain)
 {
+    if(!my_wifi_is_connected()) {
+        return -1;
+    }
     if (!s_client) {
         ESP_LOGE(TAG, "MQTT client not initialized");
         return -1;
