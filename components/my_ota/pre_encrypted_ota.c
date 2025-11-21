@@ -121,6 +121,8 @@ int my_ota_begin_v1(const char *url, int ota_size) {
         return-1;
     }
 
+    s_ota_total_size = ota_size;
+
     esp_http_client_config_t config = {
         .url = url,
         .timeout_ms = 90 * 1000,
@@ -195,7 +197,7 @@ int my_ota_flush_v1() {
     }
     // 每 5 秒打印一次日志
     if (esp_timer_get_time() - start_time > 5000) {
-        ESP_LOGI(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
+        ESP_LOGI(TAG, "Image bytes read: %d %d", esp_https_ota_get_image_len_read(https_ota_handle), s_ota_total_size);
         start_time = esp_timer_get_time();
     }
     return 0;

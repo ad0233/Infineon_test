@@ -313,7 +313,7 @@ extern "C" void app_main()
 
     my_ota_register_progress_callback(
         [](int bytes_read, int total_bytes, void *user_ctx) {
-            uint8_t ota_progress = (total_bytes > 0) ? (bytes_read * 100 / total_bytes) : 0;
+            int ota_progress = (total_bytes > 0) ? (bytes_read * 100 / total_bytes) : 0;
             fsm_main_event_trig(F_MAIN_E_OTA_UPDATE, (void *)(size_t)(ota_progress));
         },
         nullptr
