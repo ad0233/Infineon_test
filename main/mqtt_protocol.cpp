@@ -35,7 +35,7 @@ int protocol_publish_radar_data(protocol_type_t protocol, const radar_latest_dat
         // MQTT 直接发送原始 JSON
         ret = my_mqtt_publish(topic, json_str, strlen(json_str), 0, 0);
         if (ret != 0) {
-            ESP_LOGE(TAG, "protocol_publish_radar_data: MQTT 发布失败");
+            // ESP_LOGE(TAG, "protocol_publish_radar_data: MQTT 发布失败");
         }
         free(json_str);
     } else if (protocol == PROTOCOL_TYPE_BLE) {
