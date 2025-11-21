@@ -243,26 +243,70 @@ extern "C" void app_main()
     print_mem_info();
     my_wifi_init();
     my_wifi_auto_connect();
+    // WiFi事件改为轮询方式，在encoder_test中处理
+    // my_wifi_set_event_callback 保留用于其他用途（如NTP同步任务）
     my_wifi_set_event_callback([](wifi_state_t state, void *context){
-        switch (state)
-        {
-        case WIFI_STATE_IDLE: {
-
-        }break;
-        case WIFI_STATE_CONNECTING: {
-
-        }break;
-        case WIFI_STATE_CONNECTED: {
-            fsm_main_event_trig(F_MAIN_E_WIFI_C_SUC, nullptr);
-        }break;
-        case WIFI_STATE_DISCONNECTED: {
-
-        }break;
-        case WIFI_STATE_FAILED: {
-            fsm_main_event_trig(F_MAIN_E_WIFI_C_FAIL, nullptr);
-        }break;
-        default:
-            break;
+        // WiFi连接成功后，初始化NTP并等待同步
+        if (state == WIFI_STATE_CONNECTED) {
+            xTaskCreate([](void *arg) {
+                // 先等待网络完全就绪（获取IP后还需要一点时间）
+                vTaskDelay(pdMS_TO_TICKS(500));
+                
+                // 设置时区为中国标准时间（在NTP初始化前设置）
+                setenv("TZ", "CST-8", 1);
+                tzset();
+                
+                // 初始化NTP（在WiFi连接成功后初始化，确保网络就绪）
+                // 使用中国的NTP服务器，通常响应更快
+                esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("cn.pool.ntp.org");
+                esp_err_t init_ret = esp_netif_sntp_init(&config);
+                if (init_ret != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to init SNTP: %s", esp_err_to_name(init_ret));
+                    my_rtc_set_ntp_synced(false);
+                    vTaskDelete(nullptr);
+                    return;
+                }
+                ESP_LOGI(TAG, "SNTP initialized with cn.pool.ntp.org");
+                
+                // 等待NTP同步完成
+                // 第一次等待稍长（给SNTP启动时间），后续等待时间缩短
+                int retry = 0;
+                const int retry_count = 5;  // 最多5次
+                esp_err_t ret = ESP_ERR_TIMEOUT;
+                
+                // 第一次等待稍长（8秒），给SNTP启动和DNS解析时间
+                ret = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(8000));
+                if (ret == ESP_ERR_TIMEOUT) {
+                    retry++;
+                    ESP_LOGI(TAG, "Waiting for NTP sync... (%d/%d)", retry, retry_count);
+                    
+                    // 后续等待时间缩短（3秒），因为已经启动过了
+                    while (ret == ESP_ERR_TIMEOUT && retry < retry_count) {
+                        ret = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(3000));
+                        if (ret == ESP_ERR_TIMEOUT) {
+                            retry++;
+                            ESP_LOGI(TAG, "Waiting for NTP sync... (%d/%d)", retry, retry_count);
+                        }
+                    }
+                }
+                
+                if (ret == ESP_OK) {
+                    ESP_LOGI(TAG, "NTP sync successful");
+                    // 标记NTP已同步
+                    my_rtc_set_ntp_synced(true);
+                    // 同步成功后写入RTC
+                    if (my_rtc_sync_from_ntp() == ESP_OK) {
+                        ESP_LOGI(TAG, "RTC synced from NTP");
+                    } else {
+                        ESP_LOGE(TAG, "Failed to sync RTC from NTP");
+                    }
+                } else {
+                    ESP_LOGE(TAG, "NTP sync failed: %s", esp_err_to_name(ret));
+                    my_rtc_set_ntp_synced(false);
+                }
+                
+                vTaskDelete(nullptr);
+            }, "ntp_sync_task", 4096, nullptr, 5, nullptr);
         }
     }, nullptr);
 
@@ -295,8 +339,9 @@ extern "C" void app_main()
 
     print_mem_info();
 
-    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-    esp_netif_sntp_init(&config);
+    // NTP初始化移到WiFi连接成功后，确保网络就绪
+    // esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+    // esp_netif_sntp_init(&config);
     print_mem_info();
 
     periph_spiffs_cfg_t spiffs_cfg = {
@@ -419,14 +464,19 @@ void encoder_test(void *arg)
     TickType_t last_ble_flush = 0;
     TickType_t last_lidar_flush = 0;
     TickType_t last_ota_flush = 0;
+    TickType_t last_wifi_flush = 0;
     const TickType_t radar_flush_interval = pdMS_TO_TICKS(100);  // 100ms
     const TickType_t fsm_flush_interval = pdMS_TO_TICKS(100);    // 100ms
     const TickType_t ble_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t lidar_flush_interval = pdMS_TO_TICKS(1000);      // 1000ms
     const TickType_t ota_flush_interval = pdMS_TO_TICKS(10);      // 10ms
+    const TickType_t wifi_flush_interval = pdMS_TO_TICKS(200);    // 200ms
     
     // 雷达检测状态（用于避免重复触发）
     static bool last_radar_found = false;
+    
+    // WiFi状态检测（用于避免重复触发）
+    static wifi_state_t last_wifi_state = WIFI_STATE_IDLE;
 
     while (1)
     {
@@ -466,14 +516,9 @@ void encoder_test(void *arg)
                 if(my_radar_get_latest_data(&radar_data)) {
                     bool current_radar_found = false;
                     // 挥挥手就识别成功了
-                    if(radar_data.movement_param > 50) {
+                    if(radar_data.movement_param > 20) {
                         current_radar_found = true;
-                    }
-                    // 心率检测
-                    if(esp_log_timestamp() - radar_data.heart_rate_system_timestamp < 5) {
-                        current_radar_found = true;
-                    }
-                    
+                    }                    
                     // 如果从没找到变为找到，再次确认状态后触发事件
                     if(current_radar_found && !last_radar_found) {
                         // 再次确认当前状态，避免状态在检测和触发之间发生变化
@@ -523,6 +568,33 @@ void encoder_test(void *arg)
             my_ota_flush_v1();
             last_ota_flush = current_tick;
         }
+
+        // 定时检查WiFi状态（每200ms）
+        if ((current_tick - last_wifi_flush) >= wifi_flush_interval) {
+            wifi_state_t current_wifi_state = my_wifi_get_state();
+            
+            // 检测状态变化并触发相应事件
+            if (current_wifi_state != last_wifi_state) {
+                // 从非CONNECTED状态变为CONNECTED，触发成功事件
+                if (current_wifi_state == WIFI_STATE_CONNECTED && 
+                    last_wifi_state != WIFI_STATE_CONNECTED) {
+                    fsm_main_event_trig(F_MAIN_E_WIFI_C_SUC, nullptr);
+                    ESP_LOGI(TAG, "WiFi connected, triggering F_MAIN_E_WIFI_C_SUC event");
+                }
+                // 从CONNECTING/IDLE状态变为FAILED，触发失败事件
+                else if (current_wifi_state == WIFI_STATE_FAILED && 
+                         (last_wifi_state == WIFI_STATE_CONNECTING || 
+                          last_wifi_state == WIFI_STATE_IDLE)) {
+                    fsm_main_event_trig(F_MAIN_E_WIFI_C_FAIL, nullptr);
+                    ESP_LOGI(TAG, "WiFi connection failed, triggering F_MAIN_E_WIFI_C_FAIL event");
+                }
+                
+                last_wifi_state = current_wifi_state;
+            }
+            
+            last_wifi_flush = current_tick;
+        }
+        
         vTaskDelay(1);
     }
 }

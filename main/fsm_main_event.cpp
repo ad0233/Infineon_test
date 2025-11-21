@@ -66,10 +66,17 @@ uint8_t fm_has_w_c_state(void) {
     }
     switch (my_wifi_get_state())
     {
-    case WIFI_STATE_CONNECTED:
-        ESP_LOGI(TAG, "wifi is connected");
-        return FM_W_SUC;
+    case WIFI_STATE_CONNECTED: {
+        // WiFi连接成功，检查NTP是否已同步
+        if (my_rtc_is_ntp_synced()) {
+            ESP_LOGI(TAG, "wifi is connected and NTP synced");
+            return FM_W_SUC;
+        } else {
+            ESP_LOGI(TAG, "wifi is connected but NTP not synced yet");
+            return FM_W_CONN;
+        }
         break;
+    }
     case WIFI_STATE_CONNECTING:
         ESP_LOGI(TAG, "wifi is connecting");
         return FM_W_CONN;
@@ -503,10 +510,14 @@ void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
         // 向下切换（下一个菜单项）
         ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_next_animal()");
         my_ui_unwind_next_animal();
+        // 切换后重新播放音频（audio_tone_play 内部会处理停止逻辑）
+        audio_tone_play("spiffs://spiffs/water-fountain.mp3");
     } else if (diff < 0) {
         // 向上切换（上一个菜单项）
         ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_prev_animal()");
         my_ui_unwind_prev_animal();
+        // 切换后重新播放音频（audio_tone_play 内部会处理停止逻辑）
+        audio_tone_play("spiffs://spiffs/water-fountain.mp3");
     } else {
         ESP_LOGI(TAG, "fsm_unwind_next_item: diff is 0, no action");
     }
@@ -849,7 +860,8 @@ void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_UnwindSelet);
     lvgl_port_unlock();
-    audio_tone_stop();
+    
+    // audio_tone_play 内部会处理停止逻辑，直接调用即可
     audio_tone_play("spiffs://spiffs/water-fountain.mp3");
 }
 
