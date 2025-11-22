@@ -16,6 +16,8 @@
 #include "esp_h264_dec_sw.h"
 #include "esp_h264_dec_param.h"
 
+#include "esp_lvgl_port.h"
+
 extern const uint8_t _binary_brand_motion2_h264_start[];
 extern const uint8_t _binary_brand_motion2_h264_end[];
 extern const uint8_t _binary_fail2_h264_start[];
@@ -226,6 +228,8 @@ int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
         ESP_LOGE("h264", "%s xQueueSend(h264_queue, &in_frame, wait_ticks) != pdPASS", __func__);
         return -1;
     }
+    lvgl_port_lock(0);
+    lvgl_port_unlock();
     return 0;
 }
 

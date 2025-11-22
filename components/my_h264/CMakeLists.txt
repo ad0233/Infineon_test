@@ -6,7 +6,7 @@ idf_component_register(
     INCLUDE_DIRS
         .
     REQUIRES
-        esp_h264
+        main
     EMBED_FILES
         ${H264_BIN_FILES}
 )

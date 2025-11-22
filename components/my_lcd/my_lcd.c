@@ -56,7 +56,6 @@ esp_err_t my_lcd_draw_rgb565(const uint16_t *frame, size_t pixel_count)
     }
     const int chunk_rows = EXAMPLE_LCD_V_RES / 10;
     esp_err_t err = ESP_OK;
-    lvgl_port_lock(0);
     for (int y = 0 * chunk_rows; y < EXAMPLE_LCD_V_RES; y += chunk_rows) {
         int rows = chunk_rows;
         if (y + rows > EXAMPLE_LCD_V_RES) {
@@ -70,7 +69,6 @@ esp_err_t my_lcd_draw_rgb565(const uint16_t *frame, size_t pixel_count)
             }
         }
     }
-    lvgl_port_unlock();
     return err;
 }
 
