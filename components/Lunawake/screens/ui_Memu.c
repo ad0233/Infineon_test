@@ -57,7 +57,7 @@ void ui_Memu_screen_init(void)
     lv_obj_set_style_radius(ui_MueuRoller, 150, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(ui_MueuRoller, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_MueuRoller, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(ui_MueuRoller, lv_color_hex(0x333333), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(ui_MueuRoller, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);  //灰色变成黑色
     lv_obj_set_style_border_opa(ui_MueuRoller, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(ui_MueuRoller, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
 

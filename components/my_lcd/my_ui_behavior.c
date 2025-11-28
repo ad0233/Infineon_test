@@ -269,7 +269,7 @@ void my_ui_function_menu_up() {
     uint32_t max = lv_roller_get_option_count(ui_MueuRoller);
     uint32_t cur = lv_roller_get_selected(ui_MueuRoller);
     if (cur == 0) {
-        cur = max - 1;
+        cur = 0;
     } else {
         cur -= 1;
     }
@@ -284,7 +284,7 @@ void my_ui_function_menu_down() {
     uint32_t max = lv_roller_get_option_count(ui_MueuRoller);
     uint32_t cur = lv_roller_get_selected(ui_MueuRoller);
     if (cur >= max - 1) {
-        cur = 0;
+        cur = max - 1;
     } else {
         cur += 1;
     }
