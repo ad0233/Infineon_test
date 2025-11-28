@@ -920,6 +920,20 @@ void fsm_main_in_reminder_tomorrow(void *arg, uint8_t last_state, uint8_t next_s
     lv_disp_load_scr(ui_ReminderTomorrow);
     lvgl_port_unlock();
 }
+void fsm_main_in_sleep_mode(void *arg, uint8_t last_state, uint8_t next_state) {
+    ESP_LOGI(TAG, "in sleep_mode...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_sleepMode);
+    lvgl_port_unlock();
+}
+
+void fsm_main_in_night_mode(void *arg, uint8_t last_state, uint8_t next_state) {
+    ESP_LOGI(TAG, "in night_mode...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_nightMode);
+    lvgl_port_unlock();
+}
+
 void fsm_main_in_OTA(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in ota mode...");
     lvgl_port_lock(0);

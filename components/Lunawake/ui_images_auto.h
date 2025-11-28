@@ -36,3 +36,8 @@ extern lv_image_dsc_t ui_img_ui_img_volumeno_png;
 extern lv_image_dsc_t ui_img_ui_img_volumeyes_png;
 extern lv_image_dsc_t ui_img_ui_img_wifino_png;
 extern lv_image_dsc_t ui_img_ui_img_wifiyes_png;
+extern lv_image_dsc_t ui_img_ui_img_nightleftwing_png;
+extern lv_image_dsc_t ui_img_ui_img_nightleftwing1_png;
+extern lv_image_dsc_t ui_img_ui_img_nightrighttwing_png;
+extern lv_image_dsc_t ui_img_ui_img_nightrightwing1_png;
+extern lv_image_dsc_t ui_img_ui_img_sleepmode_png;

@@ -145,6 +145,11 @@ void ui_init(void)
     ui_img_volumeno_png_load();
     ui_img_wifino_png_load();
     ui_img_wifiyes_png_load();
+    ui_img_sleepmode_png_load();
+    ui_img_nightleftwing_png_load();
+    ui_img_nightrightwing_png_load();
+    ui_img_nightleftwing1_png_load();
+    ui_img_nightrightwing1_png_load();
     ui_AlarmOFF_screen_init();
     ui_AlarmON_screen_init();
     ui_Volume__screen_init();
@@ -174,6 +179,8 @@ void ui_init(void)
     ui_sleepData_screen_init();
     ui_ReminderTomorrow_screen_init();
     ui_RadarInfo_screen_init();
+    ui_sleepMode_screen_init();
+    ui_nightMode_screen_init();
     ui____initial_actions0 = lv_obj_create(NULL);
     lv_disp_load_scr(ui_Boot);
 }
@@ -211,6 +218,8 @@ void ui_destroy(void)
     ui_sleepData_screen_destroy();
     ui_ReminderTomorrow_screen_destroy();
     ui_RadarInfo_screen_destroy();
+    ui_sleepMode_screen_destroy();
+    ui_nightMode_screen_destroy();
 }
 
 void ui_relocalize(void)
@@ -225,14 +234,13 @@ void ui_relocalize(void)
     ui_Memu_screen_relocalize();
 
     ui_WakeModeTest_screen_relocalize();
-
-        ui_NetworkBoot_screen_relocalize();
+    ui_NetworkBoot_screen_relocalize();
     ui_Connecting_screen_relocalize();
     ui_ConnectingSuccess_screen_relocalize();
     ui_ConnectingFailed_screen_relocalize();
     ui_OfflineMode_screen_relocalize();
 
-        ui_Boot_screen_relocalize();
+    ui_Boot_screen_relocalize();
     ui_Detection_screen_relocalize();
     ui_DetectionY_screen_relocalize();
     ui_DetectionN_screen_relocalize();
@@ -240,10 +248,13 @@ void ui_relocalize(void)
     ui_MianNoPerson_screen_relocalize();
     ui_MianYesPerson_screen_relocalize();
 
-        ui_MorningAnimation_screen_relocalize();
+    ui_MorningAnimation_screen_relocalize();
     ui_BluetoothMusic_screen_relocalize();
     ui_OTA_screen_relocalize();
     ui_sleepData_screen_relocalize();
     ui_ReminderTomorrow_screen_relocalize();
     ui_RadarInfo_screen_relocalize();
+    ui_RadarInfo_screen_relocalize();
+    ui_sleepMode_screen_relocalize();
+    ui_nightMode_screen_relocalize();
 }
