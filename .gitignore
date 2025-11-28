@@ -4,3 +4,4 @@ sdkconfig.old
 .DS_Store
 .cache/
 tools/__pycache__/
+dependencies.lock
