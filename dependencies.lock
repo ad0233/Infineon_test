@@ -6,14 +6,10 @@ dependencies:
       type: local
     version: 0.5.3
   espressif/dl_fft:
-    component_hash: 7dadbd644c0d7ba4733cc3726ec4cff6edf27b043725e1115861dec1609a3d28
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=5.0'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: /home/henry/esp/BY001-ESP32/dependencies/espressif__dl_fft
+      type: local
     version: 0.3.1
   espressif/esp-dsp:
     dependencies: []
@@ -72,6 +68,6 @@ direct_dependencies:
 - espressif/zlib
 - idf
 - lvgl/lvgl
-manifest_hash: 2d40d48480dbedc32ea94182ff0d943959f9796dffa40c60b233ffe63b34ccf5
+manifest_hash: 97078c20c2f8e7d14aa244c8e8b15a9ee3eb6b791ca363527f3be465b7ed519b
 target: esp32s3
 version: 2.0.0

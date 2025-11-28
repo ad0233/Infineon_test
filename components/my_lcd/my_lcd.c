@@ -44,47 +44,6 @@ static esp_lcd_panel_handle_t panel_handle = NULL;
 
 static lv_disp_t *lvgl_disp = NULL;
 
-esp_err_t my_lcd_draw_rgb565(const uint16_t *frame, size_t pixel_count)
-{
-    if (panel_handle == NULL || frame == NULL) {
-        ESP_LOGE(TAG, "panel_handle or frame is NULL");
-        return ESP_ERR_INVALID_STATE;
-    }
-    if (pixel_count != (EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES)) {
-        ESP_LOGE(TAG, "pixel_count is not equal to EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES");
-        return ESP_ERR_INVALID_ARG;
-    }
-    const int chunk_rows = EXAMPLE_LCD_V_RES / 10;
-    esp_err_t err = ESP_OK;
-    for (int y = 0 * chunk_rows; y < EXAMPLE_LCD_V_RES; y += chunk_rows) {
-        int rows = chunk_rows;
-        if (y + rows > EXAMPLE_LCD_V_RES) {
-            rows = EXAMPLE_LCD_V_RES - y;
-        }
-        const uint16_t *chunk_ptr = frame + (size_t)y * EXAMPLE_LCD_H_RES;
-        while(1) {
-            err = esp_lcd_panel_draw_bitmap(panel_handle, 0, y, EXAMPLE_LCD_H_RES, y + rows, chunk_ptr);
-            if (err == ESP_OK) {
-                break;
-            }
-        }
-    }
-    return err;
-}
-
-esp_err_t my_lvgl_force_refresh(void)
-{
-    lvgl_port_lock(0);
-    lv_disp_t *disp = lv_disp_get_default();
-    if (disp == NULL) {
-        lvgl_port_unlock();
-        return ESP_ERR_INVALID_STATE;
-    }
-    lv_refr_now(disp);
-    lvgl_port_unlock();
-    return ESP_OK;
-}
-
 void bsp_lcd_init(void);
 void bsp_lcd_bl_init(void);
 
