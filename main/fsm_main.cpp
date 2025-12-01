@@ -272,9 +272,9 @@ void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg) {
                  fsm_main_get_current_state_str(), fsm_main_get_current_state());
         break;
     case -1:
-        // 找不到分支
-        ESP_LOGW(TAG, "fsm_main_event_trig %s,%s(id=%d) -> no match (err=-1)", 
-                 fsm_event_to_str(event), last_state_str, last_state_id);
+        // // 找不到分支
+        // ESP_LOGW(TAG, "fsm_main_event_trig %s,%s(id=%d) -> no match (err=-1)", 
+        //          fsm_event_to_str(event), last_state_str, last_state_id);
         break;
     case -2:
         ESP_LOGW(TAG, "fsm_main_event_trig sem trig");

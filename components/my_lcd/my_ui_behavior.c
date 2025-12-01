@@ -171,6 +171,19 @@ void my_ui_in_clock() {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_MianNoPerson);
     current_page = PAGE_CLOCK;
+    
+    // 从NVS读取保存的闹钟时间并更新主页面显示（无论是否启用，都显示保存的时间）
+    const struct device_config *cfg = my_nvs_get_config();
+    if (cfg != NULL && ui_MainMorningAlarm != NULL) {
+        uint8_t alarm_hour = cfg->alarm_hour;
+        uint8_t alarm_minute = cfg->alarm_minute;
+        
+        // 显示保存的闹钟时间（即使闹钟被禁用，也显示上次设置的时间）
+        static char alarm_time_str[8] = {0};
+        snprintf(alarm_time_str, sizeof(alarm_time_str), "%02d:%02d", alarm_hour, alarm_minute);
+        lv_label_set_text(ui_MainMorningAlarm, alarm_time_str);
+    }
+    
     lvgl_port_unlock();
 }
 
@@ -266,7 +279,6 @@ void my_ui_function_menu_up() {
     if (!lvgl_port_lock(0)) {
         return;  // 如果获取锁失败，直接返回
     }
-    uint32_t max = lv_roller_get_option_count(ui_MueuRoller);
     uint32_t cur = lv_roller_get_selected(ui_MueuRoller);
     if (cur == 0) {
         cur = 0;
