@@ -966,15 +966,28 @@ static void animate_to_gray(lv_obj_t* label) {
 
 // 初始化WakeModeTest页面的文本颜色
 void initWakeModeTestTextColors(void) {
-    // 默认选中Classic项（index 0）
-    lv_obj_set_style_text_color(ui_WakeModeTestLabel1, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(ui_WakeModeTestLabel2, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(ui_WakeModeTestLabel3, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(ui_WakeModeTestLabel4, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
-    
-    // 默认选中Container2（index 0），显示Label2，隐藏Label4
-    lv_obj_clear_flag(ui_WakeModeTestLabel2, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(ui_WakeModeTestLabel4, LV_OBJ_FLAG_HIDDEN);
+    // 读取当前的wakeModeTestIndex值，根据它来设置显示状态
+    if (wakeModeTestIndex == 0) {
+        // 选中Container2（index 0）
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel1, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel2, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel3, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel4, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+        
+        // 显示Container2的解释内容，隐藏Container3的解释内容
+        lv_obj_clear_flag(ui_WakeModeTestLabel2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_WakeModeTestLabel4, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        // 选中Container3（index 1）
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel1, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel2, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel3, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel4, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        
+        // 隐藏Container2的解释内容，显示Container3的解释内容
+        lv_obj_add_flag(ui_WakeModeTestLabel2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_WakeModeTestLabel4, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 // LVGL定时器回调：延迟重置动画标志
