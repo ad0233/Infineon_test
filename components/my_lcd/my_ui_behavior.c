@@ -971,6 +971,10 @@ void initWakeModeTestTextColors(void) {
     lv_obj_set_style_text_color(ui_WakeModeTestLabel2, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(ui_WakeModeTestLabel3, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(ui_WakeModeTestLabel4, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+    
+    // 默认选中Container2（index 0），显示Label2，隐藏Label4
+    lv_obj_clear_flag(ui_WakeModeTestLabel2, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui_WakeModeTestLabel4, LV_OBJ_FLAG_HIDDEN);
 }
 
 // LVGL定时器回调：延迟重置动画标志
@@ -1008,11 +1012,15 @@ void wakeModeTestUP(void) {
     
     // 更新文本颜色：使用渐变动画实现逐渐选中的感觉
     if (wakeModeTestIndex == 0) {
-        // 选中Classic项：Classic文本渐变为白色，Smart文本渐变为灰色
+        // 选中Container2：Container2文本渐变为白色，Container3文本渐变为灰色
         animate_to_white(ui_WakeModeTestLabel1);
         animate_to_white(ui_WakeModeTestLabel2);
         animate_to_gray(ui_WakeModeTestLabel3);
         animate_to_gray(ui_WakeModeTestLabel4);
+        
+        // 显示Container2的解释内容，隐藏Container3的解释内容
+        lv_obj_clear_flag(ui_WakeModeTestLabel2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_WakeModeTestLabel4, LV_OBJ_FLAG_HIDDEN);
     }
     
     lvgl_port_unlock();
@@ -1052,11 +1060,15 @@ void wakeModeTestDown(void) {
     
     // 更新文本颜色：使用渐变动画实现逐渐选中的感觉
     if (wakeModeTestIndex == 1) {
-        // 选中Smart项：Classic文本渐变为灰色，Smart文本渐变为白色
+        // 选中Container3：Container2文本渐变为灰色，Container3文本渐变为白色
         animate_to_gray(ui_WakeModeTestLabel1);
         animate_to_gray(ui_WakeModeTestLabel2);
         animate_to_white(ui_WakeModeTestLabel3);
         animate_to_white(ui_WakeModeTestLabel4);
+        
+        // 隐藏Container2的解释内容，显示Container3的解释内容
+        lv_obj_add_flag(ui_WakeModeTestLabel2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_WakeModeTestLabel4, LV_OBJ_FLAG_HIDDEN);
     }
     
     lvgl_port_unlock();

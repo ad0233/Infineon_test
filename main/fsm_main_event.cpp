@@ -803,6 +803,7 @@ void fsm_main_in_wake_mode(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in wake_mode mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_WakeModeTest);
+    initWakeModeTestTextColors();  // 初始化页面显示状态
     lvgl_port_unlock();
 }
 
