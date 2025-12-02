@@ -228,7 +228,7 @@ extern "C" void app_main()
         ESP_LOGI(TAG, "After trigger, current state: %s (state_id=%d)", 
                  fsm_main_get_current_state_str(), fsm_main_get_current_state());
     }, nullptr);
-    my_h264_set_fps(24);
+    my_h264_set_fps(15);
 
     print_mem_info();
 
