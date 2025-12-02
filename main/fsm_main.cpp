@@ -162,11 +162,13 @@ static struct StateTable fsm_user_table[] = {
     
     //主页面去
     // {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_CLOCK                    ,F_MAIN_S_MEMU_FINDPERSONC_ANIM    ,0  ,false    ,  fsm_main_lidar_find_playing},//主页面--找人动画
-    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_CLOCK                     ,F_MAIN_S_BOYA_DATA               ,0  ,false    ,  fsm_main_in_boya_data},//找人动画--睡眠数据
-    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_BOYA_DATA                   ,F_MAIN_S_RadarInfo               ,0  ,false    ,  fsm_main_in_radarinfo},//找人动画--睡眠数据
-    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_RadarInfo                 ,F_MAIN_S_GoodMorning_DEMO     ,0  ,false    ,  fsm_main_in_GoodMorning_demo},//睡眠时间---早报dome
+    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_CLOCK                     ,F_MAIN_S_BOYA_DATA               ,0  ,false    ,  fsm_main_in_boya_data},//主页面--睡眠数据
+    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_BOYA_DATA                   ,F_MAIN_S_RadarInfo               ,0  ,false    ,  fsm_main_in_radarinfo},//睡眠数据--雷达数据
+    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_RadarInfo                 ,F_MAIN_S_GoodMorning_DEMO     ,0  ,false    ,  fsm_main_in_GoodMorning_demo},//雷达数据---早报dome
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_GoodMorning_DEMO          ,F_MAIN_S_REMINDER            ,0  ,false    ,  fsm_main_in_reminder_tomorrow},//早报dome---提醒 
-    {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_REMINDER                   ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//提醒--主页面  
+    {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_REMINDER                   ,F_MAIN_S_SLEEPMODE     ,0  ,false    ,  fsm_main_in_sleep_mode},//提醒--入睡提示dome
+    {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_SLEEPMODE                   ,F_MAIN_S_NIGHTMODE     ,0  ,false    ,  fsm_main_in_night_mode},//入睡提示dome--夜间模式
+    {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_NIGHTMODE                   ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//夜间模式--主页面
 
     // //状态卡片  10s退回
     // {nullptr             ,0                     , F_MAIN_E_TIMEOUT    ,F_MAIN_S_BOYA_DATA              ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//睡眠数据--主页面
@@ -270,9 +272,9 @@ void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg) {
                  fsm_main_get_current_state_str(), fsm_main_get_current_state());
         break;
     case -1:
-        // 找不到分支
-        ESP_LOGW(TAG, "fsm_main_event_trig %s,%s(id=%d) -> no match (err=-1)", 
-                 fsm_event_to_str(event), last_state_str, last_state_id);
+        // // 找不到分支
+        // ESP_LOGW(TAG, "fsm_main_event_trig %s,%s(id=%d) -> no match (err=-1)", 
+        //          fsm_event_to_str(event), last_state_str, last_state_id);
         break;
     case -2:
         ESP_LOGW(TAG, "fsm_main_event_trig sem trig");

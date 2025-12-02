@@ -92,7 +92,7 @@ void ui_WakeModeTest_screen_init(void)
     lv_obj_set_x(ui_WakeModeTestLabel1, 0);
     lv_obj_set_y(ui_WakeModeTestLabel1, -15);
     lv_obj_set_align(ui_WakeModeTestLabel1, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_WakeModeTestLabel1, "Classic");
+    lv_label_set_text(ui_WakeModeTestLabel1, "Rhythm");
     lv_obj_set_style_text_color(ui_WakeModeTestLabel1, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_WakeModeTestLabel1, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_WakeModeTestLabel1, &ui_font_sfprodisplay36, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -103,7 +103,7 @@ void ui_WakeModeTest_screen_init(void)
     lv_obj_set_x(ui_WakeModeTestLabel2, 0);
     lv_obj_set_y(ui_WakeModeTestLabel2, 20);
     lv_obj_set_align(ui_WakeModeTestLabel2, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_WakeModeTestLabel2, " Fixed time wake-up\n");
+    lv_label_set_text(ui_WakeModeTestLabel2, " Fixed wake-up Alarm\n");
     lv_obj_set_style_text_color(ui_WakeModeTestLabel2, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_WakeModeTestLabel2, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_WakeModeTestLabel2, &ui_font_sfprodisplay14, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -111,7 +111,7 @@ void ui_WakeModeTest_screen_init(void)
     ui_WakeModeTestContainer3 = lv_obj_create(ui_WakeModeTest);
     lv_obj_remove_style_all(ui_WakeModeTestContainer3);
     lv_obj_set_width(ui_WakeModeTestContainer3, 200);
-    lv_obj_set_height(ui_WakeModeTestContainer3, 60);
+    lv_obj_set_height(ui_WakeModeTestContainer3, 70);
     lv_obj_set_x(ui_WakeModeTestContainer3, 0);
     lv_obj_set_y(ui_WakeModeTestContainer3, 80);
     lv_obj_set_align(ui_WakeModeTestContainer3, LV_ALIGN_CENTER);
@@ -123,7 +123,7 @@ void ui_WakeModeTest_screen_init(void)
     lv_obj_set_x(ui_WakeModeTestLabel3, 0);
     lv_obj_set_y(ui_WakeModeTestLabel3, -15);
     lv_obj_set_align(ui_WakeModeTestLabel3, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_WakeModeTestLabel3, "Smart");
+    lv_label_set_text(ui_WakeModeTestLabel3, "Recovery");
     lv_obj_set_style_text_color(ui_WakeModeTestLabel3, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_WakeModeTestLabel3, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_WakeModeTestLabel3, &ui_font_sfprodisplay36, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -132,11 +132,12 @@ void ui_WakeModeTest_screen_init(void)
     lv_obj_set_width(ui_WakeModeTestLabel4, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_WakeModeTestLabel4, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_WakeModeTestLabel4, 0);
-    lv_obj_set_y(ui_WakeModeTestLabel4, 13);
+    lv_obj_set_y(ui_WakeModeTestLabel4, 20);
     lv_obj_set_align(ui_WakeModeTestLabel4, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_WakeModeTestLabel4, "Adaptive wake-up");
+    lv_label_set_text(ui_WakeModeTestLabel4, "No alarm - sleep tracking \non, greeting on wake.");
     lv_obj_set_style_text_color(ui_WakeModeTestLabel4, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_WakeModeTestLabel4, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_align(ui_WakeModeTestLabel4, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_WakeModeTestLabel4, &ui_font_sfprodisplay14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_add_event_cb(ui_WakeModeTestContainer2, ui_event_WakeModeTestContainer2, LV_EVENT_ALL, NULL);

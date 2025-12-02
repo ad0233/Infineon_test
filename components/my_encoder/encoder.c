@@ -64,7 +64,7 @@ static const char *TAG = "encoder";
 static rotary_encoder_t *encs[CONFIG_RE_MAX] = { 0 };
 static SemaphoreHandle_t mutex;
 static QueueHandle_t _queue;
-// static bool gpio_isr_service_installed = false;
+static bool gpio_isr_service_installed = false;
 
 #define GPIO_BIT(x) ((x) < 32 ? BIT(x) : ((uint64_t)(((uint64_t)1)<<(x))))
 #define CHECK(x) do { esp_err_t __; if ((__ = x) != ESP_OK) return __; } while (0)
@@ -286,19 +286,19 @@ esp_err_t rotary_encoder_init(QueueHandle_t queue)
     }
 
     // 安装GPIO中断服务（只安装一次）
-    // if (!gpio_isr_service_installed) {
-    //     esp_err_t ret = gpio_install_isr_service(0);
-    //     if (ret == ESP_OK) {
-    //         gpio_isr_service_installed = true;
-    //     } else if (ret == ESP_ERR_INVALID_STATE) {
-    //         // GPIO中断服务已经安装，这是正常的
-    //         ESP_LOGI(TAG, "GPIO ISR service already installed");
-    //         gpio_isr_service_installed = true;
-    //     } else {
-    //         ESP_LOGE(TAG, "Failed to install GPIO ISR service: %s", esp_err_to_name(ret));
-    //         return ret;
-    //     }
-    // }
+    if (!gpio_isr_service_installed) {
+        esp_err_t ret = gpio_install_isr_service(0);
+        if (ret == ESP_OK) {
+            gpio_isr_service_installed = true;
+        } else if (ret == ESP_ERR_INVALID_STATE) {
+            // GPIO中断服务已经安装，这是正常的
+            ESP_LOGI(TAG, "GPIO ISR service already installed");
+            gpio_isr_service_installed = true;
+        } else {
+            ESP_LOGE(TAG, "Failed to install GPIO ISR service: %s", esp_err_to_name(ret));
+            return ret;
+        }
+    }
 
     CHECK(esp_timer_create(&timer_args, &timer));
     CHECK(esp_timer_start_periodic(timer, CONFIG_RE_INTERVAL_US));

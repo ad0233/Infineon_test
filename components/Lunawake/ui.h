@@ -52,6 +52,8 @@ extern "C" {
 #include "screens/ui_sleepData.h"
 #include "screens/ui_ReminderTomorrow.h"
 #include "screens/ui_RadarInfo.h"
+#include "screens/ui_sleepMode.h"
+#include "screens/ui_nightMode.h"
 ///////////////////// VARIABLES ////////////////////
 
 extern lv_anim_t * Imagezoom_Animation(lv_obj_t * TargetObject, int delay);
@@ -133,6 +135,16 @@ extern lv_image_dsc_t ui_img_wifino_png;   // assets/WiFiNo.png
 void ui_img_wifino_png_load();
 extern lv_image_dsc_t ui_img_wifiyes_png;   // assets/WiFiYes.png
 void ui_img_wifiyes_png_load();
+extern lv_image_dsc_t ui_img_sleepmode_png;   // assets/SleepMode.png
+void ui_img_sleepmode_png_load();
+extern lv_image_dsc_t ui_img_nightleftwing_png;   // assets/NightLeftWing.png
+void ui_img_nightleftwing_png_load();
+extern lv_image_dsc_t ui_img_nightrightwing_png;   // assets/NightRightWing.png
+void ui_img_nightrightwing_png_load();
+extern lv_image_dsc_t ui_img_nightleftwing1_png;   // assets/NightLeftWing1.png
+void ui_img_nightleftwing1_png_load();
+extern lv_image_dsc_t ui_img_nightrightwing1_png;   // assets/NightRightWing1.png
+void ui_img_nightrightwing1_png_load();
 
 // FONTS
 LV_FONT_DECLARE(ui_font_sfprodisplay14);

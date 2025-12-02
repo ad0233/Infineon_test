@@ -353,6 +353,18 @@ void fsm_main_to_clock(void *arg, uint8_t last_state, uint8_t next_state) {
     lv_label_set_text(ui_MainHour, hour_str);
     lv_label_set_text(ui_MainMinute, min_str);
     
+    // 从NVS读取保存的闹钟时间并更新主页面显示（无论是否启用，都显示保存的时间）
+    const struct device_config *cfg = my_nvs_get_config();
+    if (cfg != nullptr && ui_MainMorningAlarm != NULL) {
+        uint8_t alarm_hour = cfg->alarm_hour;
+        uint8_t alarm_minute = cfg->alarm_minute;
+        
+        // 显示保存的闹钟时间（即使闹钟被禁用，也显示上次设置的时间）
+        char alarm_time_str[8];
+        snprintf(alarm_time_str, sizeof(alarm_time_str), "%02d:%02d", alarm_hour, alarm_minute);
+        lv_label_set_text(ui_MainMorningAlarm, alarm_time_str);
+    }
+    
     lvgl_port_unlock();
     
     ESP_LOGI(TAG, "Clock time updated: %02d:%02d", hour, minute);
@@ -803,6 +815,7 @@ void fsm_main_in_wake_mode(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in wake_mode mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_WakeModeTest);
+    initWakeModeTestTextColors();  // 初始化页面显示状态
     lvgl_port_unlock();
 }
 
@@ -920,6 +933,20 @@ void fsm_main_in_reminder_tomorrow(void *arg, uint8_t last_state, uint8_t next_s
     lv_disp_load_scr(ui_ReminderTomorrow);
     lvgl_port_unlock();
 }
+void fsm_main_in_sleep_mode(void *arg, uint8_t last_state, uint8_t next_state) {
+    ESP_LOGI(TAG, "in sleep_mode...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_sleepMode);
+    lvgl_port_unlock();
+}
+
+void fsm_main_in_night_mode(void *arg, uint8_t last_state, uint8_t next_state) {
+    ESP_LOGI(TAG, "in night_mode...");
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_nightMode);
+    lvgl_port_unlock();
+}
+
 void fsm_main_in_OTA(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in ota mode...");
     lvgl_port_lock(0);

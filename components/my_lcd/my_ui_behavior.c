@@ -171,6 +171,19 @@ void my_ui_in_clock() {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_MianNoPerson);
     current_page = PAGE_CLOCK;
+    
+    // 从NVS读取保存的闹钟时间并更新主页面显示（无论是否启用，都显示保存的时间）
+    const struct device_config *cfg = my_nvs_get_config();
+    if (cfg != NULL && ui_MainMorningAlarm != NULL) {
+        uint8_t alarm_hour = cfg->alarm_hour;
+        uint8_t alarm_minute = cfg->alarm_minute;
+        
+        // 显示保存的闹钟时间（即使闹钟被禁用，也显示上次设置的时间）
+        static char alarm_time_str[8] = {0};
+        snprintf(alarm_time_str, sizeof(alarm_time_str), "%02d:%02d", alarm_hour, alarm_minute);
+        lv_label_set_text(ui_MainMorningAlarm, alarm_time_str);
+    }
+    
     lvgl_port_unlock();
 }
 
@@ -266,10 +279,9 @@ void my_ui_function_menu_up() {
     if (!lvgl_port_lock(0)) {
         return;  // 如果获取锁失败，直接返回
     }
-    uint32_t max = lv_roller_get_option_count(ui_MueuRoller);
     uint32_t cur = lv_roller_get_selected(ui_MueuRoller);
     if (cur == 0) {
-        cur = max - 1;
+        cur = 0;
     } else {
         cur -= 1;
     }
@@ -284,7 +296,7 @@ void my_ui_function_menu_down() {
     uint32_t max = lv_roller_get_option_count(ui_MueuRoller);
     uint32_t cur = lv_roller_get_selected(ui_MueuRoller);
     if (cur >= max - 1) {
-        cur = 0;
+        cur = max - 1;
     } else {
         cur += 1;
     }
@@ -966,11 +978,28 @@ static void animate_to_gray(lv_obj_t* label) {
 
 // 初始化WakeModeTest页面的文本颜色
 void initWakeModeTestTextColors(void) {
-    // 默认选中Classic项（index 0）
-    lv_obj_set_style_text_color(ui_WakeModeTestLabel1, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(ui_WakeModeTestLabel2, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(ui_WakeModeTestLabel3, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(ui_WakeModeTestLabel4, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+    // 读取当前的wakeModeTestIndex值，根据它来设置显示状态
+    if (wakeModeTestIndex == 0) {
+        // 选中Container2（index 0）
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel1, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel2, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel3, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel4, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+        
+        // 显示Container2的解释内容，隐藏Container3的解释内容
+        lv_obj_clear_flag(ui_WakeModeTestLabel2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_WakeModeTestLabel4, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        // 选中Container3（index 1）
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel1, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel2, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel3, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(ui_WakeModeTestLabel4, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        
+        // 隐藏Container2的解释内容，显示Container3的解释内容
+        lv_obj_add_flag(ui_WakeModeTestLabel2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_WakeModeTestLabel4, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 // LVGL定时器回调：延迟重置动画标志
@@ -1008,11 +1037,15 @@ void wakeModeTestUP(void) {
     
     // 更新文本颜色：使用渐变动画实现逐渐选中的感觉
     if (wakeModeTestIndex == 0) {
-        // 选中Classic项：Classic文本渐变为白色，Smart文本渐变为灰色
+        // 选中Container2：Container2文本渐变为白色，Container3文本渐变为灰色
         animate_to_white(ui_WakeModeTestLabel1);
         animate_to_white(ui_WakeModeTestLabel2);
         animate_to_gray(ui_WakeModeTestLabel3);
         animate_to_gray(ui_WakeModeTestLabel4);
+        
+        // 显示Container2的解释内容，隐藏Container3的解释内容
+        lv_obj_clear_flag(ui_WakeModeTestLabel2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(ui_WakeModeTestLabel4, LV_OBJ_FLAG_HIDDEN);
     }
     
     lvgl_port_unlock();
@@ -1052,11 +1085,15 @@ void wakeModeTestDown(void) {
     
     // 更新文本颜色：使用渐变动画实现逐渐选中的感觉
     if (wakeModeTestIndex == 1) {
-        // 选中Smart项：Classic文本渐变为灰色，Smart文本渐变为白色
+        // 选中Container3：Container2文本渐变为灰色，Container3文本渐变为白色
         animate_to_gray(ui_WakeModeTestLabel1);
         animate_to_gray(ui_WakeModeTestLabel2);
         animate_to_white(ui_WakeModeTestLabel3);
         animate_to_white(ui_WakeModeTestLabel4);
+        
+        // 隐藏Container2的解释内容，显示Container3的解释内容
+        lv_obj_add_flag(ui_WakeModeTestLabel2, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(ui_WakeModeTestLabel4, LV_OBJ_FLAG_HIDDEN);
     }
     
     lvgl_port_unlock();
