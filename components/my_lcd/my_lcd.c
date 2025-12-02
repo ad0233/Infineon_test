@@ -21,6 +21,8 @@
 
 #include "freertos/semphr.h"
 
+#include "my_ui_canvas.h"
+
 #define TAG __FILE__
 
 #define LCD_BL_PWM GPIO_NUM_8
@@ -84,6 +86,7 @@ int my_lcd_init() {
     lvgl_port_lock(0);
     ui_init();
     lv_disp_load_scr(ui_Boot);
+    my_ui_canvas_init();
     lvgl_port_unlock();
     bsp_lcd_bl_set(100);
 

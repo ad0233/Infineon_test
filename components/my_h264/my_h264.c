@@ -79,7 +79,7 @@ static uint16_t s_dst_width = 0;
 static uint16_t s_dst_height = 0;
 static size_t s_rgb_frame_bytes = 0;
 static bool s_buffers_initialized = false;
-static uint32_t s_target_fps = 24;
+static uint32_t s_target_fps = 15;
 static TickType_t s_frame_interval_ticks = 0;
 
 #define H264_ANIM_COUNT (7)
