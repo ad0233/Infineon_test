@@ -48,6 +48,9 @@ void bsp_lcd_init(void);
 void bsp_lcd_bl_init(void);
 
 int my_lcd_init() {
+    int ram_dma = heap_caps_get_free_size(MALLOC_CAP_DMA);
+    int ram_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+
     bsp_lcd_init();
     bsp_lcd_bl_init();
     const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
@@ -83,6 +86,10 @@ int my_lcd_init() {
     lv_disp_load_scr(ui_Boot);
     lvgl_port_unlock();
     bsp_lcd_bl_set(100);
+
+    ESP_LOGW("MEM", "my_lcd_init consume ram: %d bytes, dma: %d bytes",
+        ram_internal - heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+        ram_dma - heap_caps_get_free_size(MALLOC_CAP_DMA));
     return -1;
 }
 
