@@ -17,6 +17,7 @@
 #include "esp_h264_dec_param.h"
 
 #include "esp_lvgl_port.h"
+#include "my_ui_canvas.h"
 
 extern const uint8_t _binary_brand_motion2_h264_start[];
 extern const uint8_t _binary_brand_motion2_h264_end[];
@@ -228,8 +229,7 @@ int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
         ESP_LOGE("h264", "%s xQueueSend(h264_queue, &in_frame, wait_ticks) != pdPASS", __func__);
         return -1;
     }
-    lvgl_port_lock(0);
-    lvgl_port_unlock();
+    my_ui_canvas_enter();
     return 0;
 }
 
@@ -430,8 +430,8 @@ static void ConvertYUV420SPToRGB565_LUT(const unsigned char *src,
 
             const uint16_t color = (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
             const size_t dst_pos = ((size_t)dst_row_offset + j) << 1;
-            dst[dst_pos] = (uint8_t)(color >> 8);
-            dst[dst_pos + 1] = (uint8_t)(color & 0xFF);
+            dst[dst_pos] = (uint8_t)(color & 0xFF);
+            dst[dst_pos + 1] = (uint8_t)(color >> 8);
         }
     }
 }

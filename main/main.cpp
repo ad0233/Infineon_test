@@ -217,8 +217,6 @@ extern "C" void app_main()
     
     rust_lib_init();
     my_lcd_init();
-    my_ui_lottie_init();
-    my_ui_lottie_enter();
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
         my_ui_canvas_update(rgb565_buf, rgb565_buf_len);
     }, NULL, [](void *context) {

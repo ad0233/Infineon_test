@@ -626,14 +626,10 @@ void fsm_main_lidar_clock_update(void *arg, uint8_t last_state, uint8_t next_sta
 
 //开机动画
 void fsm_main_uninit_playing(void *arg, uint8_t last_state, uint8_t next_state){
-    lvgl_port_stop();
     my_h264_start(MY_H264_ANIM_BRAND_MOTION2,100);
-
-    
 }
 //找人动画前
 void fsm_main_lidar_find_boot(void *arg, uint8_t last_state, uint8_t next_state){
-    lvgl_port_stop();
     my_h264_start(MY_H264_ANIM_GO_UP,100);
 }
 
@@ -643,8 +639,7 @@ void fsm_main_lidar_find_playing(void *arg, uint8_t last_state, uint8_t next_sta
     // 重置失败时间戳，开始新的检测周期
     // 清除找到人的标志位，开始新的检测
     s_person_found_during_anim = false;
-    
-    lvgl_port_stop();
+
     my_h264_start(MY_H264_ANIM_PROCESSING,100);
 
     if(last_state == F_MAIN_S_UNINIT_PLAYING || last_state == F_MAIN_S_FINDFAIL) {
@@ -655,14 +650,12 @@ void fsm_main_lidar_find_playing(void *arg, uint8_t last_state, uint8_t next_sta
 void fsm_main_find_someone(void *arg, uint8_t last_state, uint8_t next_state){
     // 清除标志位，因为已经进入成功流程
     s_person_found_during_anim = false;
-    lvgl_port_stop();
     my_h264_start(MY_H264_ANIM_HUMAN_RECOGNIZED,100);
 }
 //没找到人动画
 void fsm_main_no_find_someone(void *arg, uint8_t last_state, uint8_t next_state){
     // 清除标志位，因为已经进入失败流程
     s_person_found_during_anim = false;
-    lvgl_port_stop();
     my_h264_start(MY_H264_ANIM_FAIL2,100);
 }
 
@@ -715,8 +708,7 @@ void fsm_main_memu_cat_playing(void *arg, uint8_t last_state, uint8_t next_state
         ESP_LOGW(TAG, "Unknown animal type, using CAT animation");
         break;
     }
-    
-    lvgl_port_stop();
+
     my_h264_start(anim_to_play, 100);
 
 }

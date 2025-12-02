@@ -2,49 +2,43 @@ dependencies:
   espressif/cmake_utilities:
     dependencies: []
     source:
-      path: /home/henry/esp/BY001-ESP32/dependencies/espressif__cmake_utilities
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__cmake_utilities
       type: local
     version: 0.5.3
-  espressif/dl_fft:
-    dependencies: []
-    source:
-      path: /home/henry/esp/BY001-ESP32/dependencies/espressif__dl_fft
-      type: local
-    version: 0.3.1
   espressif/esp-dsp:
     dependencies: []
     source:
-      path: /home/henry/esp/BY001-ESP32/dependencies/espressif__esp-dsp
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__esp-dsp
       type: local
     version: 1.6.0
   espressif/esp_secure_cert_mgr:
     dependencies: []
     source:
-      path: /home/henry/esp/BY001-ESP32/dependencies/espressif__esp_secure_cert_mgr
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__esp_secure_cert_mgr
       type: local
     version: 2.6.1
   espressif/esp_websocket_client:
     dependencies: []
     source:
-      path: /home/henry/esp/BY001-ESP32/dependencies/espressif__esp_websocket_client
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__esp_websocket_client
       type: local
     version: 1.5.0
   espressif/jsmn:
     dependencies: []
     source:
-      path: /home/henry/esp/BY001-ESP32/dependencies/espressif__jsmn
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__jsmn
       type: local
     version: 1.1.0
   espressif/nghttp:
     dependencies: []
     source:
-      path: /home/henry/esp/BY001-ESP32/dependencies/espressif__nghttp
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__nghttp
       type: local
     version: 1.65.0
   espressif/zlib:
     dependencies: []
     source:
-      path: /home/henry/esp/BY001-ESP32/dependencies/espressif__zlib
+      path: /home/henry/BY001-ESP32-main/dependencies/espressif__zlib
       type: local
     version: 1.3.1
   idf:
@@ -54,12 +48,11 @@ dependencies:
   lvgl/lvgl:
     dependencies: []
     source:
-      path: /home/henry/esp/BY001-ESP32/dependencies/lvgl__lvgl
+      path: /home/henry/BY001-ESP32-main/dependencies/lvgl__lvgl
       type: local
     version: 9.2.2
 direct_dependencies:
 - espressif/cmake_utilities
-- espressif/dl_fft
 - espressif/esp-dsp
 - espressif/esp_secure_cert_mgr
 - espressif/esp_websocket_client
@@ -68,6 +61,6 @@ direct_dependencies:
 - espressif/zlib
 - idf
 - lvgl/lvgl
-manifest_hash: 97078c20c2f8e7d14aa244c8e8b15a9ee3eb6b791ca363527f3be465b7ed519b
+manifest_hash: 90bb5c619fc2a6ad277dbc73b2df6ab0c474dff9b12a8554f9fea8934f55d592
 target: esp32s3
 version: 2.0.0
