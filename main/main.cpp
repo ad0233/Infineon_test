@@ -490,16 +490,23 @@ void encoder_test(void *arg)
         if (current_tick - last_bs814_poll >= pdMS_TO_TICKS(20)) {
             last_bs814_poll = current_tick;
 
-            key_evt_t ev = bs814_key3_update();  // 刷新按键状态
+            // KEY2 处理
+            key_evt_t ev = bs814_key2_update();  // 刷新按键状态
 
             if (ev == KEY_EVT_CLICKED) {
-                ESP_LOGI(TAG, "BS814 KEY3 CLICKED");
+                ESP_LOGI(TAG, "BS814 KEY2 CLICKED");
                 fsm_main_event_trig(F_MAIN_E_BTN_CLICKED, NULL);
             }
             else if (ev == KEY_EVT_LONG) {
-                ESP_LOGI(TAG, "BS814 KEY3 LONG");
+                ESP_LOGI(TAG, "BS814 KEY2 LONG");
                 fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, NULL);
             }
+
+            // KEY1 处理（音量减，已在 btn.c 中处理）
+            bs814_key1_update();
+
+            // KEY3 处理（音量加，已在 btn.c 中处理）
+            bs814_key3_update();
         }
 
         // 处理编码器事件

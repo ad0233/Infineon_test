@@ -26,7 +26,13 @@ typedef enum {
     KEY_EVT_CLICKED       // 短按点击
 } key_evt_t;
 
-// KEY3 更新函数（必须定时调用）
+// KEY2 更新函数（必须定时调用）
+key_evt_t bs814_key2_update(void);
+
+// KEY1 更新函数（必须定时调用）- 音量减
+key_evt_t bs814_key1_update(void);
+
+// KEY3 更新函数（必须定时调用）- 音量加
 key_evt_t bs814_key3_update(void);
 
 #ifdef __cplusplus
