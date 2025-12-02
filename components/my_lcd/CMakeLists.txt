@@ -4,6 +4,7 @@ idf_component_register(
         ./my_ui_behavior.c
         ./my_ui_assets.c
         ./my_ui_canvas.c
+        ./my_ui_lottie.c
     INCLUDE_DIRS
         .
     REQUIRES

@@ -62,6 +62,7 @@
 #include "ble_protocol.h"
 
 #include "my_ui_canvas.h"
+#include "my_ui_lottie.h"
 
 // 时间调整函数 - 根据编码器变化调整时间
 static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
@@ -216,6 +217,8 @@ extern "C" void app_main()
     
     rust_lib_init();
     my_lcd_init();
+    my_ui_lottie_init();
+    my_ui_lottie_enter();
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
         my_ui_canvas_update(rgb565_buf, rgb565_buf_len);
     }, NULL, [](void *context) {
