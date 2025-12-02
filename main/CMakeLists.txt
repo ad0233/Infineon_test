@@ -6,6 +6,7 @@ set(COMPONENT_SRCS
     "cmd_handlers.cpp"
     "mqtt_protocol.cpp"
     "ble_protocol.cpp"
+    "btn.c"
 )
 set(COMPONENT_ADD_INCLUDEDIRS .)
 register_component()
