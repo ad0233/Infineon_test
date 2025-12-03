@@ -9,7 +9,6 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_io_interface.h"
 #include "esp_lcd_st77916.h"
-// #include "esp_lcd_touch_cst816s.h"
 #include "esp_lvgl_port.h"
 
 #include <driver/gpio.h>
@@ -38,20 +37,21 @@
 #define EXAMPLE_LCD_V_RES           (360)
 #define EXAMPLE_LCD_BIT_PER_PIXEL   (16)
 
-static const uint16_t bl_map[9] = {
-    204,  // 20%
+// 亮度映射表（10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%）
+static const uint16_t bl_map[10] = {
+    204,  // 10%
+    210,  // 20%
     217,  // 30%
-    230,  // 40%
-    242,  // 50%
-    255,  // 60%
-    268,  // 70%
-    281,  // 80%
-    293,  // 90%
-    306   // 100%
+    223,  // 40%
+    230,  // 50%
+    237,  // 60%
+    243,  // 70%
+    250,  // 80%
+    256,  // 90%
+    272   // 100%
 };
 
 static esp_lcd_panel_io_handle_t io_handle = NULL;
-// static esp_lcd_touch_handle_t tp_handle;
 static esp_lcd_panel_handle_t panel_handle = NULL;
 
 static lv_disp_t *lvgl_disp = NULL;
@@ -178,10 +178,10 @@ void bsp_lcd_init(void)
 
 void bsp_lcd_bl_set(int percent)
 {
-    if (percent < 20) percent = 20;
+    if (percent < 10) percent = 10;
     if (percent > 100) percent = 100;
 
-    int index = (percent - 20) / 10;
+    int index = (percent - 10) / 10;
     uint16_t duty = bl_map[index];
 
     ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);

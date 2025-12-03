@@ -42,6 +42,7 @@ images/ui_img_offalarm_png.c
 images/ui_img_800502611.c
 images/ui_img_volumeyes_png.c
 images/ui_img_swan_png.c
+images/ui_img_light10_png.c
 images/ui_img_light20_png.c
 images/ui_img_vector_136_png.c
 images/ui_img_738525346.c

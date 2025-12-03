@@ -114,6 +114,7 @@ void ui_init(void)
     ui_img_800502611_load();
     ui_img_volumeyes_png_load();
     ui_img_swan_png_load();
+    ui_img_light10_png_load();
     ui_img_light20_png_load();
     ui_img_vector_136_png_load();
     ui_img_738525346_load();

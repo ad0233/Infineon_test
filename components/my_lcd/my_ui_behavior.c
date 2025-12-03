@@ -36,7 +36,7 @@ static bool isWakeModeTestAnimating = false; // 跟踪动画是否正在进行
 
 // Unwind图片和标签信息结构体
 typedef struct {
-    const lv_img_dsc_t* image;  // 照片
+    const lv_image_dsc_t* image;  // 照片
     const char* label;          // 标签
 } UnwindImageInfo;
 
@@ -1112,8 +1112,9 @@ void wakeModeTestDown(void) {
 static uint8_t current_light_duty = 100;  // 默认100%
 
 
-// 亮度图片映射表（按顺序：20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%）
-static const lv_img_dsc_t* light_images[9] = {
+// 亮度图片映射表（按顺序：10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%）
+static const lv_image_dsc_t* light_images[10] = {
+    &ui_img_light10_png,   // 10%
     &ui_img_light20_png,   // 20%
     &ui_img_light30_png,   // 30%
     &ui_img_light40_png,   // 40%
@@ -1137,12 +1138,12 @@ void my_ui_in_light() {
 
 // 设置亮度并更新UI显示
 void my_ui_light_set(uint8_t duty) {
-    // 限制亮度范围：20%-100%，步进10%
-    if (duty < 20) duty = 20;
+    // 限制亮度范围：10%-100%，步进10%
+    if (duty < 10) duty = 10;
     if (duty > 100) duty = 100;
-    if ((duty - 20) % 10 != 0) {
+    if ((duty - 10) % 10 != 0) {
         // 如果不是10的倍数，调整到最近的10的倍数
-        duty = ((duty - 20) / 10) * 10 + 20;
+        duty = ((duty - 10) / 10) * 10 + 10;
     }
     
     current_light_duty = duty;
@@ -1155,9 +1156,9 @@ void my_ui_light_set(uint8_t duty) {
     lv_label_set_text(ui_LightLabel, light_str);
     
     // 更新亮度图片
-    // 计算图片索引：(duty - 20) / 10
-    uint8_t image_index = (duty - 20) / 10;
-    if (image_index < 9) {
+    // 计算图片索引：(duty - 10) / 10
+    uint8_t image_index = (duty - 10) / 10;
+    if (image_index < 10) {
         lv_image_set_src(ui_LightImage, light_images[image_index]);
     }
     bsp_lcd_bl_set(duty);
@@ -1181,10 +1182,10 @@ void my_ui_light_next(void) {
 
 // 切换到上一个亮度档位
 void my_ui_light_prev(void) {
-    if (current_light_duty > 20) {
+    if (current_light_duty > 10) {
         my_ui_light_set(current_light_duty - 10);
     } else {
-        my_ui_light_set(20);  
+        my_ui_light_set(10);  
     }
 }
 
