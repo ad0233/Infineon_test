@@ -63,7 +63,7 @@
 
 #include "my_ui_canvas.h"
 #include "my_ui_lottie.h"
-
+#include "btn.h"
 // 时间调整函数 - 根据编码器变化调整时间
 static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
     // 计算新的分钟值
@@ -244,6 +244,7 @@ extern "C" void app_main()
     ble_protocol_init();  // 初始化蓝牙协议解析（不启用发送任务）
     print_mem_info();
     my_wifi_init();
+    bs814_init();
     my_wifi_auto_connect();
     // WiFi事件改为轮询方式，在encoder_test中处理
     // my_wifi_set_event_callback 保留用于其他用途（如NTP同步任务）
@@ -431,7 +432,7 @@ static rotary_encoder_t re;
 
 #define RE_A_GPIO   GPIO_NUM_20
 #define RE_B_GPIO   GPIO_NUM_39
-#define RE_BTN_GPIO GPIO_NUM_38
+// #define RE_BTN_GPIO GPIO_NUM_38
 #define EV_QUEUE_LEN 5
 
 static void alarm_set_tips();
@@ -450,7 +451,7 @@ void encoder_test(void *arg)
     memset(&re, 0, sizeof(rotary_encoder_t));
     re.pin_a = RE_A_GPIO;
     re.pin_b = RE_B_GPIO;
-    re.pin_btn = RE_BTN_GPIO;
+    // re.pin_btn = RE_BTN_GPIO;
     ESP_ERROR_CHECK(rotary_encoder_add(&re));
 
     rotary_encoder_event_t e;
@@ -486,6 +487,29 @@ void encoder_test(void *arg)
     {
         TickType_t current_tick = xTaskGetTickCount();
         
+        static TickType_t last_bs814_poll = 0;
+        if (current_tick - last_bs814_poll >= pdMS_TO_TICKS(20)) {
+            last_bs814_poll = current_tick;
+
+            // KEY2 处理
+            key_evt_t ev = bs814_key2_update();  // 刷新按键状态
+
+            if (ev == KEY_EVT_CLICKED) {
+                ESP_LOGI(TAG, "BS814 KEY2 CLICKED");
+                fsm_main_event_trig(F_MAIN_E_BTN_CLICKED, NULL);
+            }
+            else if (ev == KEY_EVT_LONG) {
+                ESP_LOGI(TAG, "BS814 KEY2 LONG");
+                fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, NULL);
+            }
+
+            // KEY1 处理（音量减，已在 btn.c 中处理）
+            bs814_key1_update();
+
+            // KEY3 处理（音量加，已在 btn.c 中处理）
+            bs814_key3_update();
+        }
+
         // 处理编码器事件
         if(xQueueReceive(event_queue, &e, 0) == pdTRUE) {
             switch (e.type)

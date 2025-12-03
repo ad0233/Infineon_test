@@ -73,6 +73,8 @@ extern lv_image_dsc_t ui_img_volumeyes_png;   // assets/VolumeYes.png
 void ui_img_volumeyes_png_load();
 extern lv_image_dsc_t ui_img_swan_png;   // assets/swan.png
 void ui_img_swan_png_load();
+extern lv_image_dsc_t ui_img_light10_png;   // assets/light10.png
+void ui_img_light10_png_load();
 extern lv_image_dsc_t ui_img_light20_png;   // assets/light20.png
 void ui_img_light20_png_load();
 extern lv_image_dsc_t ui_img_vector_136_png;   // assets/Vector 136.png
