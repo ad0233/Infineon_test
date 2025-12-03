@@ -60,6 +60,9 @@
 #include "freertos/task.h"
 #include "mqtt_protocol.h"
 #include "ble_protocol.h"
+
+#include "my_ui_canvas.h"
+#include "my_ui_lottie.h"
 #include "btn.h"
 // 时间调整函数 - 根据编码器变化调整时间
 static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
@@ -215,20 +218,18 @@ extern "C" void app_main()
     rust_lib_init();
     my_lcd_init();
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
-        my_lcd_draw_rgb565(reinterpret_cast<const uint16_t *>(rgb565_buf), rgb565_buf_len / 2);
+        my_ui_canvas_update(rgb565_buf, rgb565_buf_len);
     }, NULL, [](void *context) {
         uint8_t current_state = fsm_main_get_current_state();
         ESP_LOGI(TAG, "my_h264_playback_done, current state: %s (state_id=%d, expected=%d)", 
                  fsm_main_get_current_state_str(), current_state, F_MAIN_S_MENU_UNWIND_PLAYING);
-        lvgl_port_resume();
-        my_lvgl_force_refresh();
         print_mem_info();
         ESP_LOGI(TAG, "Triggering F_MAIN_E_ANIM_PLAY_SUC event");
         fsm_main_event_trig(F_MAIN_E_ANIM_PLAY_SUC, nullptr);
         ESP_LOGI(TAG, "After trigger, current state: %s (state_id=%d)", 
                  fsm_main_get_current_state_str(), fsm_main_get_current_state());
     }, nullptr);
-    my_h264_set_fps(24);
+    my_h264_set_fps(15);
 
     print_mem_info();
 

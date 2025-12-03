@@ -107,6 +107,9 @@ static struct StateTable fsm_user_table[] = {
     //二维码
     { nullptr           ,0                  ,F_MAIN_E_WIFI_CMD_TRIG   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_WIFI_CONN        ,0    ,false          , fsm_main_wifi_connecting},   //二维码去连接中
     //rtcF_MAIN_E_LIDAR_FIND
+    { fm_has_rtc_state   ,FM_RTC_EXIST       ,F_MAIN_E_BTN_L_CLICKED    , F_MAIN_S_WIFI_GUIDE     , F_MAIN_S_CLOCK   ,0    ,false        ,fsm_main_to_clock },//二维码去 ---rtc 有主页面
+    { fm_has_rtc_state   ,FM_RTC_NO_EXIST   ,F_MAIN_E_BTN_L_CLICKED   , F_MAIN_S_WIFI_GUIDE       , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false        , fsm_main_set_time},//二维码去 ---rtc 无配置时间
+
     { fm_has_rtc_state   ,FM_RTC_EXIST       ,F_MAIN_E_BTN_CLICKED    , F_MAIN_S_FINDSUC         , F_MAIN_S_CLOCK   ,0    ,false        ,fsm_main_to_clock },//二维码去 ---rtc 有主页面
     { fm_has_rtc_state   ,FM_RTC_NO_EXIST   ,F_MAIN_E_BTN_CLICKED   , F_MAIN_S_FINDSUC         , F_MAIN_S_RTC_DETECT_CLK   ,0    ,false        , fsm_main_set_time},//二维码去 ---rtc 无配置时间
 

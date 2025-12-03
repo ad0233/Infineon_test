@@ -286,6 +286,7 @@ void my_ui_function_menu_up() {
         cur -= 1;
     }
     lv_roller_set_selected(ui_MueuRoller, cur, LV_ANIM_ON);
+    lvgl_port_task_wake(LVGL_PORT_EVENT_DISPLAY, NULL);
     lvgl_port_unlock();
 }
 
@@ -301,6 +302,7 @@ void my_ui_function_menu_down() {
         cur += 1;
     }
     lv_roller_set_selected(ui_MueuRoller, cur, LV_ANIM_ON);
+    lvgl_port_task_wake(LVGL_PORT_EVENT_DISPLAY, NULL);
     lvgl_port_unlock();
 }
 

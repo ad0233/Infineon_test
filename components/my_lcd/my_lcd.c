@@ -20,6 +20,8 @@
 
 #include "freertos/semphr.h"
 
+#include "my_ui_canvas.h"
+
 #define TAG __FILE__
 
 #define LCD_BL_PWM GPIO_NUM_8
@@ -56,51 +58,13 @@ static esp_lcd_panel_handle_t panel_handle = NULL;
 
 static lv_disp_t *lvgl_disp = NULL;
 
-esp_err_t my_lcd_draw_rgb565(const uint16_t *frame, size_t pixel_count)
-{
-    if (panel_handle == NULL || frame == NULL) {
-        ESP_LOGE(TAG, "panel_handle or frame is NULL");
-        return ESP_ERR_INVALID_STATE;
-    }
-    if (pixel_count != (EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES)) {
-        ESP_LOGE(TAG, "pixel_count is not equal to EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES");
-        return ESP_ERR_INVALID_ARG;
-    }
-    const int chunk_rows = EXAMPLE_LCD_V_RES / 10;
-    esp_err_t err = ESP_OK;
-    for (int y = 0 * chunk_rows; y < EXAMPLE_LCD_V_RES; y += chunk_rows) {
-        int rows = chunk_rows;
-        if (y + rows > EXAMPLE_LCD_V_RES) {
-            rows = EXAMPLE_LCD_V_RES - y;
-        }
-        const uint16_t *chunk_ptr = frame + (size_t)y * EXAMPLE_LCD_H_RES;
-        while(1) {
-            err = esp_lcd_panel_draw_bitmap(panel_handle, 0, y, EXAMPLE_LCD_H_RES, y + rows, chunk_ptr);
-            if (err == ESP_OK) {
-                break;
-            }
-        }
-    }
-    return err;
-}
-
-esp_err_t my_lvgl_force_refresh(void)
-{
-    lvgl_port_lock(0);
-    lv_disp_t *disp = lv_disp_get_default();
-    if (disp == NULL) {
-        lvgl_port_unlock();
-        return ESP_ERR_INVALID_STATE;
-    }
-    lv_refr_now(disp);
-    lvgl_port_unlock();
-    return ESP_OK;
-}
-
 void bsp_lcd_init(void);
 void bsp_lcd_bl_init(void);
 
 int my_lcd_init() {
+    int ram_dma = heap_caps_get_free_size(MALLOC_CAP_DMA);
+    int ram_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+
     bsp_lcd_init();
     bsp_lcd_bl_init();
     const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
@@ -134,8 +98,13 @@ int my_lcd_init() {
     lvgl_port_lock(0);
     ui_init();
     lv_disp_load_scr(ui_Boot);
+    my_ui_canvas_init();
     lvgl_port_unlock();
     bsp_lcd_bl_set(100);
+
+    ESP_LOGW("MEM", "my_lcd_init consume ram: %d bytes, dma: %d bytes",
+        ram_internal - heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+        ram_dma - heap_caps_get_free_size(MALLOC_CAP_DMA));
     return -1;
 }
 

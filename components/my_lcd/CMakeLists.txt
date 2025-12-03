@@ -3,9 +3,13 @@ idf_component_register(
         ./my_lcd.c
         ./my_ui_behavior.c
         ./my_ui_assets.c
+        ./my_ui_canvas.c
+        ./my_ui_lottie.c
     INCLUDE_DIRS
         .
     REQUIRES
         main
         Lunawake
+    EMBED_TXTFILES
+        ./lottie/lunawake.json
 )

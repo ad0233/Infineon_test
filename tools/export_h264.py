@@ -20,6 +20,8 @@ def export_file(ffmpeg: str, src: Path, dst: Path) -> None:
         "-y",
         "-i",
         str(src),
+        # "-r",
+        # "15",
         "-c:v",
         "libx264",
         "-profile:v",
