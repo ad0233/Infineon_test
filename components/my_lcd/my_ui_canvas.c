@@ -50,9 +50,8 @@ void my_ui_canvas_update(const uint8_t *data, uint32_t length) {
     // 从 h264 的 buffer 复制数据到 canvas 自己的 buffer
     size_t copy_len = length < (CANVAS_WIDTH * CANVAS_HEIGHT * sizeof(uint16_t)) ? length : (CANVAS_WIDTH * CANVAS_HEIGHT * sizeof(uint16_t));
     memcpy(canvas_buffer, data, copy_len);
-    lv_canvas_set_buffer(ui_Canvas, canvas_buffer, CANVAS_WIDTH, CANVAS_HEIGHT, LV_COLOR_FORMAT_RGB565);
-    // lv_obj_invalidate(ui_Canvas);
-    ESP_LOGI("my_ui_canvas", "canvas_buffer updated %ld bytes %d", length, copy_len);
+    // lv_canvas_set_buffer(ui_Canvas, canvas_buffer, CANVAS_WIDTH, CANVAS_HEIGHT, LV_COLOR_FORMAT_RGB565);
+    lv_obj_invalidate(ui_Canvas);
     
     lvgl_port_unlock();
 }
