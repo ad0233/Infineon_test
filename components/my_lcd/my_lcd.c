@@ -38,6 +38,18 @@
 #define EXAMPLE_LCD_V_RES           (360)
 #define EXAMPLE_LCD_BIT_PER_PIXEL   (16)
 
+static const uint16_t bl_map[9] = {
+    204,  // 20%
+    217,  // 30%
+    230,  // 40%
+    242,  // 50%
+    255,  // 60%
+    268,  // 70%
+    281,  // 80%
+    293,  // 90%
+    306   // 100%
+};
+
 static esp_lcd_panel_io_handle_t io_handle = NULL;
 // static esp_lcd_touch_handle_t tp_handle;
 static esp_lcd_panel_handle_t panel_handle = NULL;
@@ -163,19 +175,16 @@ void bsp_lcd_init(void)
     
     esp_lcd_panel_disp_on_off(panel_handle, true);
 }
-//FIXME: LCD的亮度bug  20-30 突然变亮  30-100 肉眼无变化
-void bsp_lcd_bl_set(int brightness_percent)
-{
-    if (brightness_percent > 100) {
-        brightness_percent = 100;
-    }
-    if (brightness_percent < 0) {
-        brightness_percent = 0;
-    }
 
-    ESP_LOGI(TAG, "Setting LCD backlight: %d%%", brightness_percent);
-    uint32_t duty_cycle = (1023 * brightness_percent) / 100; // LEDC resolution set to 10bits, thus: 100% = 1023
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty_cycle);
+void bsp_lcd_bl_set(int percent)
+{
+    if (percent < 20) percent = 20;
+    if (percent > 100) percent = 100;
+
+    int index = (percent - 20) / 10;
+    uint16_t duty = bl_map[index];
+
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 }
 

@@ -73,23 +73,25 @@ config COZE_URL
         depends on COZE_REQUEST
 
 
-config RTC_TOKEN
+menu "RTC Token Configuration"
     depends on RTC_TOKEN_REQUEST
+    
     config APPID
         string "appid"
-        depends on RTC_TOKEN_REQUEST
+        default ""
     
     config ROOMID
         string "roomid"
-        depends on RTC_TOKEN_REQUEST
+        default ""
     
     config UID
         string "userid"
-        depends on RTC_TOKEN_REQUEST
+        default ""
 
     config TOKEN
         string "token"
-        depends on RTC_TOKEN_REQUEST
+        default ""
+endmenu
 
 config ENABLE_RECORDER_DEBUG
     bool "enable recorder debug save to sdcard"
