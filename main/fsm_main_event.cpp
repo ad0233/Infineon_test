@@ -949,6 +949,10 @@ void fsm_main_in_OTA(void *arg, uint8_t last_state, uint8_t next_state) {
     lv_label_set_text(ui_OTALabel2, progress_str);
     lv_slider_set_range(ui_OTASlider, 0, 100);
     lv_slider_set_value(ui_OTASlider, ota_progress, LV_ANIM_OFF);
+    lv_disp_t *disp = lv_disp_get_default();
+    if (disp != NULL) {
+        lv_refr_now(disp);
+    }
     lvgl_port_unlock();
 }
 

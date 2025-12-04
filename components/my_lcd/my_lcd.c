@@ -12,6 +12,7 @@
 #include "esp_lvgl_port.h"
 
 #include <driver/gpio.h>
+#include <stdbool.h>
 #include "driver/ledc.h"
 #include "driver/i2c.h"
 #include "driver/spi_master.h"
@@ -84,7 +85,7 @@ int my_lcd_init() {
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io_handle,
         .panel_handle = panel_handle,
-        .buffer_size = EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES / 20,
+        .buffer_size = EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES / 10,
         .double_buffer = 1,
         .hres = EXAMPLE_LCD_H_RES,
         .vres = EXAMPLE_LCD_V_RES,
@@ -98,7 +99,7 @@ int my_lcd_init() {
         },
         .flags = {
             .swap_bytes = true,
-            .buff_dma = true,
+            .buff_dma = false,
             .buff_spiram = true,
         }
     };
