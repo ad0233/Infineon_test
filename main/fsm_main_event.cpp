@@ -84,7 +84,8 @@ uint8_t fm_has_w_c_state(void) {
     {
     case WIFI_STATE_CONNECTED: {
         // WiFi连接成功，检查NTP是否已同步
-        if (my_rtc_is_ntp_synced()) {
+        my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+        if (rtc_handle != NULL && my_rtc_is_ntp_synced(rtc_handle)) {
             ESP_LOGI(TAG, "wifi is connected and NTP synced");
             return FM_W_SUC;
         } else {
@@ -118,7 +119,8 @@ uint8_t fsm_has_wifi_config(void) {
 /*----------------------------------------------------------------------rtc-----------------------------------------------------------------------------------------------*/
 uint8_t fm_has_rtc_state(void) {
     // my_rtc_is_time_valid() 返回 bool 类型：true(1) 表示有效，false(0) 表示无效
-    bool rtc_valid = my_rtc_is_time_valid();
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    bool rtc_valid = (rtc_handle != NULL) ? my_rtc_is_time_valid(rtc_handle) : false;
     
     if (rtc_valid) {
         ESP_LOGI(TAG, "RTC connected");
@@ -208,7 +210,8 @@ void fsm_main_set_time(void *arg, uint8_t last_state, uint8_t next_state) {
     bool valid = false;
 
     // 检查 RTC 是否有效
-    if (my_rtc_get_time(&t, &valid) == 0 && valid) {
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    if (rtc_handle != NULL && my_rtc_get_time(rtc_handle, &t, &valid) == 0 && valid) {
         // RTC 已设置，使用 RTC 时间
         s_editing_hour   = t.tm_hour;
         s_editing_minute = t.tm_min;
@@ -297,7 +300,8 @@ void fsm_main_rtc_save_and_exit(void *arg, uint8_t last_state, uint8_t next_stat
     bool valid = false;
 
     //---- 1. 尝试从 RTC 获取当前日期 ----
-    if (my_rtc_get_time(&t, &valid) != 0) {
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    if (rtc_handle == NULL || my_rtc_get_time(rtc_handle, &t, &valid) != 0) {
         ESP_LOGW(TAG, "RTC read failed, using default date.");
 
         t.tm_year = 124;  // 2024 = 1900 + 124
@@ -312,7 +316,7 @@ void fsm_main_rtc_save_and_exit(void *arg, uint8_t last_state, uint8_t next_stat
     t.tm_sec  = 0;
 
     //---- 3. 写入 RTC ----
-    int ret = my_rtc_set_time(&t);
+    int ret = my_rtc_set_time(rtc_handle, &t);
 
     if (ret == 0) {
         ESP_LOGI(TAG, "RTC saved successfully: %02d:%02d",
@@ -336,7 +340,8 @@ void fsm_main_to_clock(void *arg, uint8_t last_state, uint8_t next_state) {
     uint8_t hour = 7;
     uint8_t minute = 30;
     
-    if (my_rtc_get_time(&time, &valid) == 0) {
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    if (rtc_handle != NULL && my_rtc_get_time(rtc_handle, &time, &valid) == 0) {
         hour = time.tm_hour;
         minute = time.tm_min;
     }
@@ -616,7 +621,8 @@ void fsm_light_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
 }
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 uint8_t fsm_clock_need_cfg(void) {
-    return my_rtc_is_time_valid();
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    return (rtc_handle != NULL) ? my_rtc_is_time_valid(rtc_handle) : false;
 }
 
 void fsm_main_lidar_clock_update(void *arg, uint8_t last_state, uint8_t next_state) {

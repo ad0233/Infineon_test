@@ -13,6 +13,7 @@
 #include "cJSON.h"
 #include "my_rtc.h"
 #include "my_ui_behavior.h"
+#include "fsm_main.h"
 
 static const char *TAG = "cmd_handlers";
 
@@ -437,7 +438,8 @@ int cmd_handle_test_set_time(cJSON *params) {
     struct tm timeinfo;
     localtime_r(&timestamp, &timeinfo);
     
-    int rtc_ret = my_rtc_set_time(&timeinfo);
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    int rtc_ret = (rtc_handle != NULL) ? my_rtc_set_time(rtc_handle, &timeinfo) : ESP_ERR_INVALID_STATE;
     if (rtc_ret != 0) {
         ESP_LOGE(TAG, "Failed to set RTC time (err=%d)", rtc_ret);
         

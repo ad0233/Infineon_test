@@ -3,12 +3,21 @@
 #include <stdint.h>
 
 #include "fsm_lib.h"
+#include "my_rtc.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int fsm_main_init(void);
+// FSM上下文结构体
+typedef struct {
+    my_rtc_handle_t rtc_handle;
+} fsm_main_context_t;
+
+int fsm_main_init(const fsm_main_context_t *ctx);
+
+// 获取RTC句柄
+my_rtc_handle_t fsm_main_get_rtc_handle(void);
 
 enum fm_wifi_conn_state {
     FM_W_N_CFG,

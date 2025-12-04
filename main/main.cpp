@@ -144,6 +144,7 @@ void heart_rate_data_callback(const radar_heart_rate_data_t *data)
 
 static const char *TAG = "main";
 static audio_board_handle_t board_handle;
+static my_rtc_handle_t s_rtc_handle = NULL;  // RTC句柄，仅在main.cpp中使用
 
 #if defined(ENABLE_TASK_MONITOR)
 static void monitor_task(void *arg)
@@ -233,7 +234,16 @@ extern "C" void app_main()
 
     print_mem_info();
 
-    if (fsm_main_init() != 0) {
+    // 初始化RTC
+    if (my_rtc_init(&s_rtc_handle) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init RTC");
+    }
+    
+    // 初始化FSM，传入上下文
+    fsm_main_context_t fsm_ctx = {
+        .rtc_handle = s_rtc_handle
+    };
+    if (fsm_main_init(&fsm_ctx) != 0) {
         ESP_LOGE(TAG, "fsm_main_init failed");
         vTaskDelete(nullptr);
     }
@@ -265,7 +275,9 @@ extern "C" void app_main()
                 esp_err_t init_ret = esp_netif_sntp_init(&config);
                 if (init_ret != ESP_OK) {
                     ESP_LOGE(TAG, "Failed to init SNTP: %s", esp_err_to_name(init_ret));
-                    my_rtc_set_ntp_synced(false);
+                    if (s_rtc_handle != NULL) {
+                        my_rtc_set_ntp_synced(s_rtc_handle, false);
+                    }
                     vTaskDelete(nullptr);
                     return;
                 }
@@ -296,16 +308,20 @@ extern "C" void app_main()
                 if (ret == ESP_OK) {
                     ESP_LOGI(TAG, "NTP sync successful");
                     // 标记NTP已同步
-                    my_rtc_set_ntp_synced(true);
-                    // 同步成功后写入RTC
-                    if (my_rtc_sync_from_ntp() == ESP_OK) {
-                        ESP_LOGI(TAG, "RTC synced from NTP");
-                    } else {
-                        ESP_LOGE(TAG, "Failed to sync RTC from NTP");
+                    if (s_rtc_handle != NULL) {
+                        my_rtc_set_ntp_synced(s_rtc_handle, true);
+                        // 同步成功后写入RTC
+                        if (my_rtc_sync_from_ntp(s_rtc_handle) == ESP_OK) {
+                            ESP_LOGI(TAG, "RTC synced from NTP");
+                        } else {
+                            ESP_LOGE(TAG, "Failed to sync RTC from NTP");
+                        }
                     }
                 } else {
                     ESP_LOGE(TAG, "NTP sync failed: %s", esp_err_to_name(ret));
-                    my_rtc_set_ntp_synced(false);
+                    if (s_rtc_handle != NULL) {
+                        my_rtc_set_ntp_synced(s_rtc_handle, false);
+                    }
                 }
                 
                 vTaskDelete(nullptr);
@@ -322,7 +338,6 @@ extern "C" void app_main()
     );
     
     print_mem_info();
-    my_rtc_init();
     my_radar_init();
     my_radar_set_human_presence_callback(human_presence_callback);
     my_radar_set_human_movement_callback(human_movement_callback);
@@ -534,11 +549,13 @@ void encoder_test(void *arg)
 
         // 定时刷新时钟
         if ((current_tick - last_time_update) >= time_update_interval) {
-            struct tm timeinfo;
-            bool valid = false;
-            my_rtc_get_time(&timeinfo, &valid);
-            if (valid) {
-                my_ui_clock_set_now_time(timeinfo.tm_hour, timeinfo.tm_min);
+            if (s_rtc_handle != NULL) {
+                struct tm timeinfo;
+                bool valid = false;
+                my_rtc_get_time(s_rtc_handle, &timeinfo, &valid);
+                if (valid) {
+                    my_ui_clock_set_now_time(timeinfo.tm_hour, timeinfo.tm_min);
+                }
             }
             last_time_update = current_tick;
         }
@@ -662,7 +679,9 @@ static void alarm_set_tips() {
     struct tm time;
     memset(&time, 0, sizeof(time));
     bool valid = false;
-    my_rtc_get_time(&time, &valid);
+    if (s_rtc_handle != NULL) {
+        my_rtc_get_time(s_rtc_handle, &time, &valid);
+    }
     if(alarm_hour < time.tm_hour ||
         (alarm_hour == time.tm_hour && alarm_minute <= time.tm_min)) {
         my_ui_alarm_set_title("TOMORROW");

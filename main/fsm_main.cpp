@@ -7,6 +7,7 @@
 #include "my_h264.h"
 #include "esp_lvgl_port.h"
 #include "my_ui_behavior.h"
+#include <string.h>
 
 static const char *TAG = "fsm_main";
 
@@ -218,6 +219,7 @@ static struct StateTable fsm_user_table[] = {
 
 static uint32_t timeout_ms_tick = 0;
 static fsm_handle_t s_fsm_handle = nullptr;
+static fsm_main_context_t s_fsm_context = {NULL};
 
 static void fsm_set_timeout_s(uint16_t sec) {
     if (sec) {
@@ -245,10 +247,18 @@ void fsm_main_timeout_flush(void) {
         fsm_timeout_trig(s_fsm_handle);
     }
 }
-int fsm_main_init(void) {
+int fsm_main_init(const fsm_main_context_t *ctx) {
     if (s_fsm_handle != nullptr) {
         return 0;
     }
+    
+    // 保存上下文
+    if (ctx != NULL) {
+        s_fsm_context = *ctx;
+    } else {
+        memset(&s_fsm_context, 0, sizeof(fsm_main_context_t));
+    }
+    
     s_fsm_handle =
         fsm_init(fsm_user_table, 
             F_MAIN_S_UNINIT, 
@@ -261,6 +271,10 @@ int fsm_main_init(void) {
 
     // 不再创建独立线程，改为在主线程中调用 fsm_main_timeout_flush()
     return 0;
+}
+
+my_rtc_handle_t fsm_main_get_rtc_handle(void) {
+    return s_fsm_context.rtc_handle;
 }
 
 void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg) {
