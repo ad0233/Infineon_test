@@ -29,7 +29,7 @@ void ui_ReminderTomorrow_screen_init(void)
     lv_obj_set_align(ui_ReminderTomorrowContainer, LV_ALIGN_CENTER);
     lv_obj_remove_flag(ui_ReminderTomorrowContainer, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);      /// Flags
     lv_obj_set_style_radius(ui_ReminderTomorrowContainer, 145, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(ui_ReminderTomorrowContainer, lv_color_hex(0xF8F8F8), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(ui_ReminderTomorrowContainer, lv_color_hex(0x000000), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_opa(ui_ReminderTomorrowContainer, 100, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(ui_ReminderTomorrowContainer, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
 
