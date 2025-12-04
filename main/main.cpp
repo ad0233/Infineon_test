@@ -316,7 +316,14 @@ extern "C" void app_main()
     my_ota_register_progress_callback(
         [](int bytes_read, int total_bytes, void *user_ctx) {
             int ota_progress = (total_bytes > 0) ? (bytes_read * 100 / total_bytes) : 0;
-            fsm_main_event_trig(F_MAIN_E_OTA_UPDATE, (void *)(size_t)(ota_progress));
+            lvgl_port_lock(0);
+            lv_disp_load_scr(ui_OTA);
+            char progress_str[10];
+            snprintf(progress_str, sizeof(progress_str), "%d%%", ota_progress);
+            lv_label_set_text(ui_OTALabel2, progress_str);
+            lv_slider_set_range(ui_OTASlider, 0, 100);
+            lv_slider_set_value(ui_OTASlider, ota_progress, LV_ANIM_OFF);
+            lvgl_port_unlock();
         },
         nullptr
     );
