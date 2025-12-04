@@ -19,6 +19,7 @@
 #include "ui.h"
 
 #include "freertos/semphr.h"
+#include "freertos/task.h"  // 添加这个头文件
 
 #include "my_ui_canvas.h"
 
@@ -58,6 +59,14 @@ static esp_lcd_panel_handle_t panel_handle = NULL;
 
 static lv_disp_t *lvgl_disp = NULL;
 
+// 添加 flush_wait_cb 回调，避免忙等待阻塞 IDLE 任务
+static void lcd_flush_wait_cb(lv_display_t *disp)
+{
+    // 使用 vTaskDelay 让出 CPU，避免忙等待
+    // 等待传输完成（通常 SPI 传输很快，但需要给硬件时间）
+    vTaskDelay(pdMS_TO_TICKS(1));
+}
+
 void bsp_lcd_init(void);
 void bsp_lcd_bl_init(void);
 
@@ -75,7 +84,7 @@ int my_lcd_init() {
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io_handle,
         .panel_handle = panel_handle,
-        .buffer_size = EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES / 10,
+        .buffer_size = EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES / 20,
         .double_buffer = 1,
         .hres = EXAMPLE_LCD_H_RES,
         .vres = EXAMPLE_LCD_V_RES,
@@ -94,6 +103,9 @@ int my_lcd_init() {
         }
     };
     lvgl_disp = lvgl_port_add_disp(&disp_cfg);
+    
+    // 设置 flush_wait_cb，避免忙等待阻塞 IDLE 任务
+    lv_display_set_flush_wait_cb(lvgl_disp, lcd_flush_wait_cb);
 
     lvgl_port_lock(0);
     ui_init();
