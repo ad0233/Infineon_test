@@ -32,12 +32,13 @@
 #define SDCARD_OPEN_FILE_NUM_MAX    (5)
 #define SDCARD_INTR_GPIO            GPIO_NUM_NC
 #define SDCARD_PWR_CTRL             GPIO_NUM_NC
-#define ESP_SD_PIN_CLK              GPIO_NUM_11 // SPI SCK
-#define ESP_SD_PIN_CMD              GPIO_NUM_13 // SPI MOSI
-#define ESP_SD_PIN_D0               GPIO_NUM_12 // SPI MISO
-#define ESP_SD_PIN_D1               GPIO_NUM_NC
-#define ESP_SD_PIN_D2               GPIO_NUM_NC
-#define ESP_SD_PIN_D3               GPIO_NUM_10 // SPI CS
+// MKDV4GCL-ABB SD卡引脚定义
+#define ESP_SD_PIN_CLK              GPIO_NUM_20 // CLK
+#define ESP_SD_PIN_CMD              GPIO_NUM_21 // CMD
+#define ESP_SD_PIN_D0               GPIO_NUM_19 // DATA0
+#define ESP_SD_PIN_D1               GPIO_NUM_17 // DATA1
+#define ESP_SD_PIN_D2               GPIO_NUM_16 // DATA2
+#define ESP_SD_PIN_D3               GPIO_NUM_18 // DATA3
 #define ESP_SD_PIN_D4               GPIO_NUM_NC
 #define ESP_SD_PIN_D5               GPIO_NUM_NC
 #define ESP_SD_PIN_D6               GPIO_NUM_NC
@@ -63,7 +64,7 @@
 #define RECORD_HARDWARE_AEC       (true)
 #define BOARD_PA_GAIN             (6)  /* Power amplifier gain defined by board (dB) */
 #define HEADPHONE_DETECT          (-1)
-#define PA_ENABLE_GPIO            GPIO_NUM_48
+// #define PA_ENABLE_GPIO            GPIO_NUM_48
 #define ES8311_MCLK_SOURCE        (0)  /* 0 From MCLK of esp32   1 From BCLK */
 #define ES7210_MIC_SELECT         (ES7210_INPUT_MIC1 | ES7210_INPUT_MIC2 | ES7210_INPUT_MIC3)
 
