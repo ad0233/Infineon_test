@@ -210,6 +210,11 @@ extern "C" void app_main()
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
 
+    // ========== LCD 初始化 ==========
+    ESP_LOGI(TAG, "Initializing LCD...");
+    my_lcd_init();
+    ESP_LOGI(TAG, "LCD initialized successfully");
+
     // ========== 以下代码已注释，仅保留音频相关 ==========
     /*
     auto iot_config_view = my_nvs_get_iot_config_view();
@@ -316,7 +321,7 @@ extern "C" void app_main()
     */
 
     // ========== 音频初始化（已注释）==========
-   
+    /*
     board_handle = audio_board_init();
     audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
     audio_hal_set_volume(board_handle->audio_hal, 25);
@@ -342,6 +347,7 @@ extern "C" void app_main()
     // 播放音频
     vTaskDelay(500 / portTICK_PERIOD_MS); // 等待音频系统完全初始化
     audio_tone_play("spiffs://spiffs/water-fountain.mp3");
+    */
 
     // ========== MKDV4GCL-ABB 驱动测试 ==========
     ESP_LOGI(TAG, "========================================");
@@ -370,7 +376,8 @@ extern "C" void app_main()
         .format_if_mount_failed = false,
         .max_files = 5,
         .allocation_unit_size = 16 * 1024,
-        .disk_status_check_enable = false
+        .disk_status_check_enable = false,
+        .use_one_fat = false
     };
     
     sdmmc_card_t* card = NULL;

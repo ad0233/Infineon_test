@@ -26,16 +26,16 @@
 
 #define TAG __FILE__
 
-#define LCD_BL_PWM GPIO_NUM_8
-#define LCD_RESET GPIO_NUM_15
+#define LCD_BL_PWM GPIO_NUM_3
+#define LCD_RESET -1  // 使用软件复位
 
 #define LCD_HOST            (SPI2_HOST)
-#define LCD_CS GPIO_NUM_16
-#define LCD_SCK GPIO_NUM_4
+#define LCD_CS GPIO_NUM_39
+#define LCD_SCK GPIO_NUM_8
 #define LCD_DA0 GPIO_NUM_6
-#define LCD_DA1 GPIO_NUM_14
-#define LCD_DA2 GPIO_NUM_9
-#define LCD_DA3 GPIO_NUM_2
+#define LCD_DA1 GPIO_NUM_2
+#define LCD_DA2 GPIO_NUM_4
+#define LCD_DA3 GPIO_NUM_7
 
 #define EXAMPLE_LCD_H_RES           (360)
 #define EXAMPLE_LCD_V_RES           (360)
@@ -145,14 +145,18 @@ void bsp_lcd_init(void)
         },
     };
     const esp_lcd_panel_dev_config_t panel_config = {
-        .reset_gpio_num = LCD_RESET,
+        .reset_gpio_num = (LCD_RESET == -1) ? GPIO_NUM_NC : LCD_RESET,  // 如果为-1则使用软件复位
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,     // Implemented by LCD command `36h`
         .bits_per_pixel = EXAMPLE_LCD_BIT_PER_PIXEL,    // Implemented by LCD command `3Ah` (16/18)
         .vendor_config = &vendor_config,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_st77916(io_handle, &panel_config, &panel_handle));
 
-    esp_lcd_panel_reset(panel_handle);
+    // 复位LCD（如果reset_gpio_num为-1，驱动会自动使用软件复位）
+    if (LCD_RESET == -1) {
+        ESP_LOGI(TAG, "Using software reset (reset_gpio_num = -1)");
+    }
+    esp_lcd_panel_reset(panel_handle);  // 驱动会自动判断使用硬件或软件复位
     esp_lcd_panel_init(panel_handle);
     
     esp_lcd_panel_disp_on_off(panel_handle, true);
