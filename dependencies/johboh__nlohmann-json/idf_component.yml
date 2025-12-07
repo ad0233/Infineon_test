@@ -1,0 +1,9 @@
+dependencies:
+  idf: '>=4.4'
+description: Arduino/ESP-IDF library wrapper for https://github.com/nlohmann/json
+repository: git://github.com/Johboh/nlohmann-json.git
+repository_info:
+  commit_sha: 297cac612b3b03008d315636025b9e9a8d5c2807
+  path: .
+url: https://github.com/Johboh/nlohmann-json
+version: 3.12.0
