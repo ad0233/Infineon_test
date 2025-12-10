@@ -10,6 +10,7 @@
 // 环境库
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_netif_sntp.h"
 #include "i2c_bus.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -25,6 +26,18 @@ struct my_rtc_impl {
     i2c_bus_handle_t i2c;
     bool valid;
     bool ntp_synced;
+    // 回调函数
+    my_rtc_ntp_sync_callback_t ntp_sync_cb;
+    void *ntp_sync_context;
+    my_rtc_second_callback_t second_cb;
+    void *second_context;
+    // flush 相关
+    uint8_t last_second;  // 上次触发回调的秒数
+    uint32_t last_flush_time;  // 上次flush执行时间（毫秒）
+    // NTP同步相关
+    bool ntp_syncing;      // 是否正在同步
+    int ntp_retry_count;   // 重试次数
+    uint32_t ntp_last_check_time;  // 上次检查时间（毫秒）
 };
 
 static int i2c_init(my_rtc_handle_t self)
@@ -61,7 +74,7 @@ static void sync_system_time_from_rtc(const struct tm *time)
     if (settimeofday(&tv, NULL) != 0) {
         ESP_LOGW(TAG, "Failed to set system time from RTC");
         return;
-    }
+    } 
     
     ESP_LOGI(TAG, "System time set from RTC: %04d-%02d-%02d %02d:%02d:%02d",
              time->tm_year + 1900, time->tm_mon + 1, time->tm_mday,
@@ -111,10 +124,16 @@ int my_rtc_init(my_rtc_handle_t *self_out) {
                time.tm_mday, time.tm_hour, time.tm_min, time.tm_sec, self->valid ? "VALID" : "NOT VALID");
         
         if (self->valid) {
+            // 设置默认时区UTC+8
+            setenv("TZ", "CST-8", 1);
+            tzset();
             // 如果RTC时间有效，设置系统时间戳
             sync_system_time_from_rtc(&time);
         } else {
             ESP_LOGW(TAG, "RTC time is not valid, skipping system time sync");
+            // 即使RTC无效，也设置默认时区UTC+8
+            setenv("TZ", "CST-8", 1);
+            tzset();
         }
     }
     
@@ -174,6 +193,10 @@ int my_rtc_sync_from_ntp(my_rtc_handle_t self) {
     if (ret == ESP_OK) {
         self->ntp_synced = true;
         ESP_LOGI(TAG, "RTC synced from NTP successfully");
+        // 触发NTP同步成功回调
+        if (self->ntp_sync_cb != NULL) {
+            self->ntp_sync_cb(self->ntp_sync_context, self);
+        }
         return ESP_OK;
     } else {
         ESP_LOGE(TAG, "Failed to sync RTC from NTP (err=%d)", ret);
@@ -181,16 +204,34 @@ int my_rtc_sync_from_ntp(my_rtc_handle_t self) {
     }
 }
 
-void my_rtc_set_ntp_synced(my_rtc_handle_t self, bool synced) {
+int my_rtc_start_ntp_sync(my_rtc_handle_t self) {
     if (self == NULL) {
-        return;
+        return ESP_ERR_INVALID_ARG;
     }
-    self->ntp_synced = synced;
-    if (synced) {
-        ESP_LOGI(TAG, "NTP sync status set to synced");
-    } else {
-        ESP_LOGI(TAG, "NTP sync status set to not synced");
+    
+    // 如果已经在同步，直接返回
+    if (self->ntp_syncing) {
+        return ESP_OK;
     }
+    
+    // 初始化NTP（在WiFi连接成功后初始化，确保网络就绪）
+    // 使用中国的NTP服务器，通常响应更快
+    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("cn.pool.ntp.org");
+    esp_err_t init_ret = esp_netif_sntp_init(&config);
+    if (init_ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init SNTP: %s", esp_err_to_name(init_ret));
+        self->ntp_synced = false;
+        return init_ret;
+    }
+    
+    ESP_LOGI(TAG, "SNTP initialized with cn.pool.ntp.org");
+    
+    // 标记开始同步
+    self->ntp_syncing = true;
+    self->ntp_retry_count = 0;
+    self->ntp_last_check_time = 0;
+    
+    return ESP_OK;
 }
 
 bool my_rtc_is_ntp_synced(my_rtc_handle_t self) {
@@ -198,4 +239,104 @@ bool my_rtc_is_ntp_synced(my_rtc_handle_t self) {
         return false;
     }
     return self->ntp_synced;
+}
+
+int my_rtc_reg_cb_ntp_sync(my_rtc_handle_t self, my_rtc_ntp_sync_callback_t func, void *context) {
+    if (self == NULL || func == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    // 建议只允许被注册一次
+    if (self->ntp_sync_cb != NULL) {
+        ESP_LOGW(TAG, "NTP sync callback already registered");
+        return ESP_ERR_INVALID_STATE;
+    }
+    self->ntp_sync_cb = func;
+    self->ntp_sync_context = context;
+    return ESP_OK;
+}
+
+int my_rtc_reg_cb_second(my_rtc_handle_t self, my_rtc_second_callback_t func, void *context) {
+    if (self == NULL || func == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    // 建议只允许被注册一次
+    if (self->second_cb != NULL) {
+        ESP_LOGW(TAG, "Second callback already registered");
+        return ESP_ERR_INVALID_STATE;
+    }
+    self->second_cb = func;
+    self->second_context = context;
+    return ESP_OK;
+}
+
+int my_rtc_flush(my_rtc_handle_t self, uint32_t interval_ms) {
+    if (self == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // 检查是否到了执行间隔
+    uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    if (self->last_flush_time != 0 && 
+        (current_time - self->last_flush_time) < interval_ms) {
+        // 还没到执行间隔，直接退出
+        return ESP_OK;
+    }
+    self->last_flush_time = current_time;
+    
+    // 如果正在NTP同步，检查同步状态
+    if (self->ntp_syncing) {
+        uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+        const uint32_t wait_interval = 3000;  // 每3秒检查一次
+        
+        // 检查是否到了等待时间
+        if (self->ntp_last_check_time == 0 || 
+            (current_time - self->ntp_last_check_time) >= wait_interval) {
+            
+            self->ntp_last_check_time = current_time;
+            
+            // 非阻塞检查同步状态
+            esp_err_t ret = esp_netif_sntp_sync_wait(0);
+            
+            if (ret == ESP_OK) {
+                ESP_LOGI(TAG, "NTP sync successful");
+                self->ntp_syncing = false;
+                self->ntp_synced = true;
+                // 同步成功后写入RTC
+                if (my_rtc_sync_from_ntp(self) == ESP_OK) {
+                    ESP_LOGI(TAG, "RTC synced from NTP");
+                } else {
+                    ESP_LOGE(TAG, "Failed to sync RTC from NTP");
+                }
+            } else if (ret == ESP_ERR_TIMEOUT) {
+                // 继续等待，不限制重试次数
+                self->ntp_retry_count++;
+                ESP_LOGI(TAG, "Waiting for NTP sync... (retry %d)", self->ntp_retry_count);
+            } else {
+                // 其他错误
+                ESP_LOGE(TAG, "NTP sync error: %s", esp_err_to_name(ret));
+                self->ntp_syncing = false;
+                self->ntp_synced = false;
+            }
+        }
+    }
+    
+    // 如果注册了秒回调，检查是否需要触发
+    if (self->second_cb != NULL) {
+        // 使用系统时间而不是RTC时间
+        struct timeval tv;
+        if (gettimeofday(&tv, NULL) == 0) {
+            struct tm timeinfo;
+            time_t now = tv.tv_sec;
+            localtime_r(&now, &timeinfo);
+            
+            // 检查是否到了新的一秒
+            if (timeinfo.tm_sec != self->last_second) {
+                self->last_second = timeinfo.tm_sec;
+                // 触发回调，传入时分
+                self->second_cb(timeinfo.tm_hour, timeinfo.tm_min, self->second_context, self);
+            }
+        }
+    }
+    
+    return ESP_OK;
 }

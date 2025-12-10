@@ -12,6 +12,10 @@
 // 句柄声明 struct my_rtc_impl* 是在源文件内部实现，这里隐式声明，避免使用空指针
 typedef struct my_rtc_impl* my_rtc_handle_t;
 
+// 事件回调声明，context 是用于传递上下文
+typedef void (*my_rtc_ntp_sync_callback_t)(void *context, my_rtc_handle_t self);
+typedef void (*my_rtc_second_callback_t)(uint8_t hour, uint8_t minute, void *context, my_rtc_handle_t self);
+
 // CPP 文件兼容声明，很多时候还是需要用到 cpp 一些特性来简化代码
 #ifdef __cplusplus
 extern "C" {
@@ -22,6 +26,10 @@ extern "C" {
 int my_rtc_init(my_rtc_handle_t *self_out);
 
 //******** 功能函数 ********
+
+// 注册回调函数，建议只允许被注册一次，不然会有很多异步冲突的问题导致异常
+int my_rtc_reg_cb_ntp_sync(my_rtc_handle_t self, my_rtc_ntp_sync_callback_t func, void *context);
+int my_rtc_reg_cb_second(my_rtc_handle_t self, my_rtc_second_callback_t func, void *context);
 
 // 获取RTC时间
 int my_rtc_get_time(my_rtc_handle_t self, struct tm *time, bool *valid);
@@ -35,11 +43,14 @@ bool my_rtc_is_time_valid(my_rtc_handle_t self);
 // 从NTP同步时间到RTC
 int my_rtc_sync_from_ntp(my_rtc_handle_t self);
 
-// 设置NTP同步状态
-void my_rtc_set_ntp_synced(my_rtc_handle_t self, bool synced);
+// 开始NTP同步（在WiFi连接成功后调用）
+int my_rtc_start_ntp_sync(my_rtc_handle_t self);
 
 // 获取NTP同步状态
 bool my_rtc_is_ntp_synced(my_rtc_handle_t self);
+
+// 用于节省内存，定时刷新函数，可以让一个线程运行多个组件的 flush，减少线程数量
+int my_rtc_flush(my_rtc_handle_t self, uint32_t interval_ms);
 
 #ifdef __cplusplus
 }

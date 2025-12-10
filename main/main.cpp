@@ -259,73 +259,11 @@ extern "C" void app_main()
     // WiFi事件改为轮询方式，在encoder_test中处理
     // my_wifi_set_event_callback 保留用于其他用途（如NTP同步任务）
     my_wifi_set_event_callback([](wifi_state_t state, void *context){
-        // WiFi连接成功后，初始化NTP并等待同步
+        // WiFi连接成功后，开始NTP同步
         if (state == WIFI_STATE_CONNECTED) {
-            xTaskCreate([](void *arg) {
-                // 先等待网络完全就绪（获取IP后还需要一点时间）
-                vTaskDelay(pdMS_TO_TICKS(500));
-                
-                // 设置时区为中国标准时间（在NTP初始化前设置）
-                setenv("TZ", "CST-8", 1);
-                tzset();
-                
-                // 初始化NTP（在WiFi连接成功后初始化，确保网络就绪）
-                // 使用中国的NTP服务器，通常响应更快
-                esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("cn.pool.ntp.org");
-                esp_err_t init_ret = esp_netif_sntp_init(&config);
-                if (init_ret != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to init SNTP: %s", esp_err_to_name(init_ret));
-                    if (s_rtc_handle != NULL) {
-                        my_rtc_set_ntp_synced(s_rtc_handle, false);
-                    }
-                    vTaskDelete(nullptr);
-                    return;
-                }
-                ESP_LOGI(TAG, "SNTP initialized with cn.pool.ntp.org");
-                
-                // 等待NTP同步完成
-                // 第一次等待稍长（给SNTP启动时间），后续等待时间缩短
-                int retry = 0;
-                const int retry_count = 5;  // 最多5次
-                esp_err_t ret = ESP_ERR_TIMEOUT;
-                
-                // 第一次等待稍长（8秒），给SNTP启动和DNS解析时间
-                ret = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(8000));
-                if (ret == ESP_ERR_TIMEOUT) {
-                    retry++;
-                    ESP_LOGI(TAG, "Waiting for NTP sync... (%d/%d)", retry, retry_count);
-                    
-                    // 后续等待时间缩短（3秒），因为已经启动过了
-                    while (ret == ESP_ERR_TIMEOUT && retry < retry_count) {
-                        ret = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(3000));
-                        if (ret == ESP_ERR_TIMEOUT) {
-                            retry++;
-                            ESP_LOGI(TAG, "Waiting for NTP sync... (%d/%d)", retry, retry_count);
-                        }
-                    }
-                }
-                
-                if (ret == ESP_OK) {
-                    ESP_LOGI(TAG, "NTP sync successful");
-                    // 标记NTP已同步
-                    if (s_rtc_handle != NULL) {
-                        my_rtc_set_ntp_synced(s_rtc_handle, true);
-                        // 同步成功后写入RTC
-                        if (my_rtc_sync_from_ntp(s_rtc_handle) == ESP_OK) {
-                            ESP_LOGI(TAG, "RTC synced from NTP");
-                        } else {
-                            ESP_LOGE(TAG, "Failed to sync RTC from NTP");
-                        }
-                    }
-                } else {
-                    ESP_LOGE(TAG, "NTP sync failed: %s", esp_err_to_name(ret));
-                    if (s_rtc_handle != NULL) {
-                        my_rtc_set_ntp_synced(s_rtc_handle, false);
-                    }
-                }
-                
-                vTaskDelete(nullptr);
-            }, "ntp_sync_task", 4096, nullptr, 5, nullptr);
+            if (s_rtc_handle != NULL) {
+                my_rtc_start_ntp_sync(s_rtc_handle);
+            }
         }
     }, nullptr);
 
@@ -642,6 +580,10 @@ void encoder_test(void *arg)
             my_ota_flush_v1();
             last_ota_flush = current_tick;
         }
+        
+        // 定时刷新RTC（每100ms）
+        my_rtc_flush(s_rtc_handle, 100);
+        
         //FIXME: 好像wifi没有定时。
         // 定时检查WiFi状态（每200ms）
         if ((current_tick - last_wifi_flush) >= wifi_flush_interval) {
