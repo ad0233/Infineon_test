@@ -12,6 +12,7 @@
 #include "esp_lvgl_port.h"
 
 #include <driver/gpio.h>
+#include <stdbool.h>
 #include "driver/ledc.h"
 #include "driver/i2c.h"
 #include "driver/spi_master.h"
@@ -19,6 +20,7 @@
 #include "ui.h"
 
 #include "freertos/semphr.h"
+#include "freertos/task.h"  // 添加这个头文件
 
 #include "my_ui_canvas.h"
 
@@ -58,6 +60,14 @@ static esp_lcd_panel_handle_t panel_handle = NULL;
 
 static lv_disp_t *lvgl_disp = NULL;
 
+// 添加 flush_wait_cb 回调，避免忙等待阻塞 IDLE 任务
+static void lcd_flush_wait_cb(lv_display_t *disp)
+{
+    // 使用 vTaskDelay 让出 CPU，避免忙等待
+    // 等待传输完成（通常 SPI 传输很快，但需要给硬件时间）
+    vTaskDelay(pdMS_TO_TICKS(1));
+}
+
 void bsp_lcd_init(void);
 void bsp_lcd_bl_init(void);
 
@@ -89,11 +99,14 @@ int my_lcd_init() {
         },
         .flags = {
             .swap_bytes = true,
-            .buff_dma = true,
+            .buff_dma = false,
             .buff_spiram = true,
         }
     };
     lvgl_disp = lvgl_port_add_disp(&disp_cfg);
+    
+    // 设置 flush_wait_cb，避免忙等待阻塞 IDLE 任务
+    lv_display_set_flush_wait_cb(lvgl_disp, lcd_flush_wait_cb);
 
     lvgl_port_lock(0);
     ui_init();

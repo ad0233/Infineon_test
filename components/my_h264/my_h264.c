@@ -18,6 +18,7 @@
 
 #include "esp_lvgl_port.h"
 #include "my_ui_canvas.h"
+#include "my_utils.h"
 
 extern const uint8_t _binary_brand_motion2_h264_start[];
 extern const uint8_t _binary_brand_motion2_h264_end[];
@@ -176,11 +177,11 @@ void my_h264_init(my_h264_callback_t callback, void *context, my_h264_done_callb
     }
     
     s_frame_interval_ticks = fps_to_ticks(s_target_fps);
-    if (xTaskCreatePinnedToCore(playback_thread, "h264_play_thread", 1024 * 6, NULL, 5, NULL, 1) != pdPASS) {
+    if (my_task_create_pinned_psram(playback_thread, "h264_play_thread", 1024 * 6, NULL, 5, NULL, 1) != ESP_OK) {
         ESP_LOGE("h264", "Failed to create playback task");
         return;
     }
-    if (xTaskCreatePinnedToCore(i420_decode_thread, "i420_decode_thread", 1024 * 10, NULL, 5, NULL, 0) != pdPASS) {
+    if (my_task_create_pinned_psram(i420_decode_thread, "i420_decode_thread", 1024 * 10, NULL, 5, NULL, 0) != ESP_OK) {
         ESP_LOGE("h264", "Failed to create decode task");
     }
 }
