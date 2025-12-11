@@ -321,7 +321,7 @@ int my_rtc_flush(my_rtc_handle_t self, uint32_t interval_ms) {
     }
     
     // 如果注册了秒回调，检查是否需要触发
-    if (self->second_cb != NULL) {
+    if (self->second_cb != NULL && self->valid) {
         // 使用系统时间而不是RTC时间
         struct timeval tv;
         if (gettimeofday(&tv, NULL) == 0) {
