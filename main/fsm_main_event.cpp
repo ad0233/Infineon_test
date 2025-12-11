@@ -18,6 +18,7 @@
 #include "my_rtc.h"
 #include "my_lidar.h"
 #include "my_lcd.h"
+#include "fsm_main.h"
 
 #define TAG "fsm_main"
 
@@ -52,7 +53,8 @@ uint8_t fm_has_h_fd_state(void) {
     }
     
     radar_latest_data_t radar_data;
-    if(my_radar_get_latest_data(&radar_data)) {
+    my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
+    if(lidar_handle != NULL && my_lidar_get_latest_data(lidar_handle, &radar_data) == ESP_OK) {
         ESP_LOGI(TAG, "movement_param: %d", radar_data.movement_param);
         // 挥挥手就识别成功了
         if(radar_data.movement_param >15) {

@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <inttypes.h>
 
 static const char *TAG = "MY_UTILS";
 
@@ -135,7 +136,7 @@ esp_err_t my_task_create_psram(
         *pvCreatedTask = handle;
     }
 
-    ESP_LOGI(TAG, "Created task %s with %u bytes stack in PSRAM", pcName ? pcName : "unnamed", usStackDepth);
+    ESP_LOGI(TAG, "Created task %s with %" PRIu32 " bytes stack in PSRAM", pcName ? pcName : "unnamed", usStackDepth);
     return ESP_OK;
 }
 
@@ -193,7 +194,7 @@ esp_err_t my_task_create_pinned_psram(
         *pvCreatedTask = handle;
     }
 
-    ESP_LOGI(TAG, "Created task %s with %u bytes stack in PSRAM on core %d", 
+    ESP_LOGI(TAG, "Created task %s with %" PRIu32 " bytes stack in PSRAM on core %d", 
              pcName ? pcName : "unnamed", usStackDepth, xCoreID);
     return ESP_OK;
 }

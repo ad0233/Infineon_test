@@ -4,6 +4,7 @@
 
 #include "fsm_lib.h"
 #include "my_rtc.h"
+#include "my_lidar.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,12 +13,16 @@ extern "C" {
 // FSM上下文结构体
 typedef struct {
     my_rtc_handle_t rtc_handle;
+    my_lidar_handle_t lidar_handle;
 } fsm_main_context_t;
 
 int fsm_main_init(const fsm_main_context_t *ctx);
 
 // 获取RTC句柄
 my_rtc_handle_t fsm_main_get_rtc_handle(void);
+
+// 获取雷达句柄
+my_lidar_handle_t fsm_main_get_lidar_handle(void);
 
 enum fm_wifi_conn_state {
     FM_W_N_CFG,

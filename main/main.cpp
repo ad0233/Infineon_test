@@ -92,15 +92,19 @@ static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
 }
 
 // 人体存在检测数据回调函数
-void human_presence_callback(const radar_human_data_t *data)
+void human_presence_callback(const radar_human_data_t *data, void *context, my_lidar_handle_t self)
 {
+    (void)context;
+    (void)self;
     // 有人没人 - 状态变化时上报
     // ESP_LOGI("HUMAN", "有人: %s", data->presence ? "是" : "否");
 }
 
 // 体动参数数据回调函数（已不使用，保留接口）
-void human_movement_callback(const radar_human_data_t *data)
+void human_movement_callback(const radar_human_data_t *data, void *context, my_lidar_handle_t self)
 {
+    (void)context;
+    (void)self;
     // ESP_LOGI("HUMAN", "体动参数: %d", data->movement_param);
     // 体动参数可用于更新图表曲线
     if (ui_RadarInfoChart != NULL && lvgl_port_lock(0)) {
@@ -113,8 +117,10 @@ void human_movement_callback(const radar_human_data_t *data)
 }
 
 // 呼吸监测数据回调函数
-void respiratory_data_callback(const radar_respiratory_data_t *data)
+void respiratory_data_callback(const radar_respiratory_data_t *data, void *context, my_lidar_handle_t self)
 {
+    (void)context;
+    (void)self;
     // ESP_LOGI("RESPIRATORY", "呼吸: %d 次/min", data->respiratory_value);
     if (ui_RadarInfoBreathingX != NULL && lvgl_port_lock(0)) {
         char text[16];
@@ -125,8 +131,10 @@ void respiratory_data_callback(const radar_respiratory_data_t *data)
 }
 
 // 心率监测数据回调函数
-void heart_rate_data_callback(const radar_heart_rate_data_t *data)
+void heart_rate_data_callback(const radar_heart_rate_data_t *data, void *context, my_lidar_handle_t self)
 {
+    (void)context;
+    (void)self;
     // ESP_LOGI("HEART_RATE", "心率: %d 次/min", data->heart_rate_value);
     if (ui_RadarInfoHeartX != NULL && lvgl_port_lock(0)) {
         char text[16];
@@ -145,6 +153,7 @@ void heart_rate_data_callback(const radar_heart_rate_data_t *data)
 static const char *TAG = "main";
 static audio_board_handle_t board_handle;
 static my_rtc_handle_t s_rtc_handle = NULL;  // RTC句柄，仅在main.cpp中使用
+static my_lidar_handle_t s_lidar_handle = NULL;  // 雷达句柄，仅在main.cpp中使用
 
 #if defined(ENABLE_TASK_MONITOR)
 static void monitor_task(void *arg)
@@ -248,7 +257,8 @@ extern "C" void app_main()
     
     // 初始化FSM，传入上下文
     fsm_main_context_t fsm_ctx = {
-        .rtc_handle = s_rtc_handle
+        .rtc_handle = s_rtc_handle,
+        .lidar_handle = s_lidar_handle
     };
     if (fsm_main_init(&fsm_ctx) != 0) {
         ESP_LOGE(TAG, "fsm_main_init failed");
@@ -290,11 +300,11 @@ extern "C" void app_main()
     );
     
     print_mem_info();
-    my_radar_init();
-    my_radar_set_human_presence_callback(human_presence_callback);
-    my_radar_set_human_movement_callback(human_movement_callback);
-    my_radar_set_respiratory_callback(respiratory_data_callback);
-    my_radar_set_heart_rate_callback(heart_rate_data_callback);
+    my_lidar_init(&s_lidar_handle);
+    my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
+    my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
+    my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
+    my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
 
     gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
@@ -381,7 +391,7 @@ extern "C" void app_main()
 
     fsm_main_event_trig(F_MAIN_E_INIT, nullptr);
     xTaskCreate(encoder_test, "encoder_test", 1024 * 6, nullptr, 10, nullptr);
-    my_radar_start();
+    my_lidar_start(s_lidar_handle);
 
     print_mem_info();
     return;
@@ -499,14 +509,18 @@ void encoder_test(void *arg)
         
         // 定时刷新雷达数据（每100ms）
         if ((current_tick - last_radar_flush) >= radar_flush_interval) {
-            my_radar_flush();
+            my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
+            if (lidar_handle != NULL) {
+                my_lidar_flush(lidar_handle, 100);
+            }
             
             // 只在 MENU_UNWIND 状态且雷达检测使能时检查雷达并触发事件
             uint8_t current_state = fsm_main_get_current_state();
             if(current_state == F_MAIN_S_MENU_UNWIND && fsm_main_get_radar_detect_enabled()) {
                 // 检查雷达是否找到人，如果找到则触发事件
                 radar_latest_data_t radar_data;
-                if(my_radar_get_latest_data(&radar_data)) {
+                my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
+                if(lidar_handle != NULL && my_lidar_get_latest_data(lidar_handle, &radar_data) == ESP_OK) {
                     bool current_radar_found = false;
                     // 挥挥手就识别成功了
                     if(radar_data.movement_param > 20) {
@@ -533,7 +547,8 @@ void encoder_test(void *arg)
             // 在找人动画状态时，定时检测是否找到人
             if(current_state == F_MAIN_S_FINDPERSONC_ANIM) {
                 radar_latest_data_t radar_data;
-                if(my_radar_get_latest_data(&radar_data)) {
+                my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
+                if(lidar_handle != NULL && my_lidar_get_latest_data(lidar_handle, &radar_data) == ESP_OK) {
                     // 挥挥手就识别成功了
                     if(radar_data.movement_param > 15) {
                         fsm_main_set_person_found_during_anim(true);
@@ -566,10 +581,12 @@ void encoder_test(void *arg)
         // 定时发送mqtt LIDAR数据（每1000ms）
         if ((current_tick - last_lidar_flush) >= lidar_flush_interval) {
             radar_latest_data_t data;
-            my_radar_get_latest_data(&data);
-            if(esp_log_timestamp() - data.heart_rate_system_timestamp < 10 * 1000) {
-                protocol_publish_radar_data(PROTOCOL_TYPE_MQTT, &data, t_radar);
-                protocol_publish_radar_data(PROTOCOL_TYPE_BLE, &data, t_radar);
+            my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
+            if (lidar_handle != NULL && my_lidar_get_latest_data(lidar_handle, &data) == ESP_OK) {
+                if(esp_log_timestamp() - data.heart_rate_system_timestamp < 10 * 1000) {
+                    protocol_publish_radar_data(PROTOCOL_TYPE_MQTT, &data, t_radar);
+                    protocol_publish_radar_data(PROTOCOL_TYPE_BLE, &data, t_radar);
+                }
             }
             last_lidar_flush = current_tick;
         }
