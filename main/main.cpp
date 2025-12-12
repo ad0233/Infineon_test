@@ -446,21 +446,16 @@ void encoder_test(void *arg)
     while(xQueueReceive(event_queue, &e, 1) == pdTRUE) {}
 
     // 定时刷新相关变量
-    TickType_t last_radar_flush = 0;
     TickType_t last_fsm_flush = 0;
     TickType_t last_ble_flush = 0;
     TickType_t last_lidar_flush = 0;
     TickType_t last_ota_flush = 0;
     TickType_t last_wifi_flush = 0;
-    const TickType_t radar_flush_interval = pdMS_TO_TICKS(100);  // 100ms
     const TickType_t fsm_flush_interval = pdMS_TO_TICKS(100);    // 100ms
     const TickType_t ble_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t lidar_flush_interval = pdMS_TO_TICKS(1000);      // 1000ms
     const TickType_t ota_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t wifi_flush_interval = pdMS_TO_TICKS(200);    // 200ms
-    
-    // 雷达检测状态（用于避免重复触发）
-    static bool last_radar_found = false;
     
     // WiFi状态检测（用于避免重复触发）
     static wifi_state_t last_wifi_state = WIFI_STATE_IDLE;
