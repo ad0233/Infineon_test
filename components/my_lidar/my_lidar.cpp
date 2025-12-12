@@ -32,8 +32,11 @@ struct my_lidar_impl {
     void *respiratory_context;
     my_lidar_heart_rate_callback_t heart_rate_cb;
     void *heart_rate_context;
+    my_lidar_move_trig_callback_t move_trig_cb;
+    void *move_trig_context;
     // flush 相关
     uint32_t last_flush_time;  // 上次flush执行时间（毫秒）
+    uint32_t last_move_trig_time;  // 上次move_trig事件触发时间（毫秒）
     // 灵敏度参数
     uint8_t movement_threshold;      // 体动参数阈值（默认20）
     uint32_t heart_rate_timeout_ms;  // 心率数据超时时间（默认5秒=5000ms）
@@ -364,6 +367,20 @@ int my_lidar_flush(my_lidar_handle_t self, uint32_t interval_ms) {
             self->have_human = true;
         } else if (heart_rate_age > self->heart_rate_timeout_ms) {
             self->have_human = false;
+        }
+        
+        // 检查是否触发 move_trig 事件
+        // 条件：体动参数大于阈值，且数据是1秒内的，且距离上次触发至少1秒
+        if (self->move_trig_cb != NULL) {
+            uint32_t movement_age = current_time - data.movement_system_timestamp;
+            uint32_t time_since_last_trig = current_time - self->last_move_trig_time;
+            
+            if (data.movement_param > self->movement_threshold && 
+                movement_age < 1000 &&  // 数据是1秒内的
+                time_since_last_trig >= 1000) {  // 距离上次触发至少1秒，避免频繁触发
+                self->last_move_trig_time = current_time;
+                self->move_trig_cb(self->move_trig_context, self);
+            }
         }
     }
 #endif

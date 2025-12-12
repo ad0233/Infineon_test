@@ -82,6 +82,7 @@ typedef void (*my_lidar_human_presence_callback_t)(const radar_human_data_t *dat
 typedef void (*my_lidar_human_movement_callback_t)(const radar_human_data_t *data, void *context, my_lidar_handle_t self);
 typedef void (*my_lidar_respiratory_callback_t)(const radar_respiratory_data_t *data, void *context, my_lidar_handle_t self);
 typedef void (*my_lidar_heart_rate_callback_t)(const radar_heart_rate_data_t *data, void *context, my_lidar_handle_t self);
+typedef void (*my_lidar_move_trig_callback_t)(void *context, my_lidar_handle_t self);
 
 // CPP 文件兼容声明，很多时候还是需要用到 cpp 一些特性来简化代码
 #ifdef __cplusplus
@@ -105,6 +106,7 @@ int my_lidar_reg_cb_human_presence(my_lidar_handle_t self, my_lidar_human_presen
 int my_lidar_reg_cb_human_movement(my_lidar_handle_t self, my_lidar_human_movement_callback_t func, void *context);
 int my_lidar_reg_cb_respiratory(my_lidar_handle_t self, my_lidar_respiratory_callback_t func, void *context);
 int my_lidar_reg_cb_heart_rate(my_lidar_handle_t self, my_lidar_heart_rate_callback_t func, void *context);
+int my_lidar_reg_cb_move_trig(my_lidar_handle_t self, my_lidar_move_trig_callback_t func, void *context);
 
 // 查询连接状态
 bool my_lidar_is_connected(my_lidar_handle_t self);

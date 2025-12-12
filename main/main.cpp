@@ -254,13 +254,18 @@ extern "C" void app_main()
         },
         nullptr
     );
-    
+
     my_lidar_init(&s_lidar_handle);
     my_lidar_set_sensitivity(s_lidar_handle, 20, 5 * 1000);
     my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
     my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
     my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
     my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
+    my_lidar_reg_cb_move_trig(s_lidar_handle, [](void *context, my_lidar_handle_t self){
+        (void)context;
+        (void)self;
+        fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
+    }, nullptr);
     
     // 初始化FSM，传入上下文
     fsm_main_context_t fsm_ctx = {
