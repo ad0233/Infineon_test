@@ -154,6 +154,7 @@ static const char *TAG = "main";
 static audio_board_handle_t board_handle;
 static my_rtc_handle_t s_rtc_handle = NULL;  // RTC句柄，仅在main.cpp中使用
 static my_lidar_handle_t s_lidar_handle = NULL;  // 雷达句柄，仅在main.cpp中使用
+static my_wifi_handle_t s_wifi_handle = NULL;  // WiFi句柄
 
 #if defined(ENABLE_TASK_MONITOR)
 static void monitor_task(void *arg)
@@ -267,27 +268,31 @@ extern "C" void app_main()
         fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
     }, nullptr);
     
-    // 初始化FSM，传入上下文
-    fsm_main_context_t fsm_ctx = {
-        .rtc_handle = s_rtc_handle,
-        .lidar_handle = s_lidar_handle
-    };
-    if (fsm_main_init(&fsm_ctx) != 0) {
-        ESP_LOGE(TAG, "fsm_main_init failed");
-        vTaskDelete(nullptr);
-    }
     print_mem_info();
     my_ui_generate_qr_code("https://lunawake.ai", iot_config_view->thing_name);
     my_ble_init(iot_config_view->thing_name);  // 使用默认名称，或传入自定义名称
     print_mem_info();
     ble_protocol_init();  // 初始化蓝牙协议解析（不启用发送任务）
     print_mem_info();
-    my_wifi_init();
+    if (my_wifi_init(&s_wifi_handle) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init WiFi");
+    }
+    
+    // 初始化FSM，传入上下文
+    fsm_main_context_t fsm_ctx = {
+        .rtc_handle = s_rtc_handle,
+        .lidar_handle = s_lidar_handle,
+        .wifi_handle = s_wifi_handle
+    };
+    if (fsm_main_init(&fsm_ctx) != 0) {
+        ESP_LOGE(TAG, "fsm_main_init failed");
+        vTaskDelete(nullptr);
+    }
     // bs814_init();
-    my_wifi_auto_connect();
+    my_wifi_auto_connect(s_wifi_handle);
     // WiFi事件改为轮询方式，在encoder_test中处理
     // my_wifi_set_event_callback 保留用于其他用途（如NTP同步任务）
-    my_wifi_set_event_callback([](wifi_state_t state, void *context){
+    my_wifi_set_event_callback(s_wifi_handle, [](wifi_state_t state, void *context, my_wifi_handle_t self){
         // WiFi连接成功后，开始NTP同步
         if (state == WIFI_STATE_CONNECTED) {
             if (s_rtc_handle != NULL) {
@@ -548,7 +553,7 @@ void encoder_test(void *arg)
         //FIXME: 好像wifi没有定时。
         // 定时检查WiFi状态（每200ms）
         if ((current_tick - last_wifi_flush) >= wifi_flush_interval) {
-            wifi_state_t current_wifi_state = my_wifi_get_state();
+            wifi_state_t current_wifi_state = my_wifi_get_state(s_wifi_handle);
             
             // 检测状态变化并触发相应事件
             if (current_wifi_state != last_wifi_state) {

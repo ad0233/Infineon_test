@@ -42,24 +42,30 @@ int cmd_handle_wifi_connect(cJSON *params) {
     
     ESP_LOGI(TAG, "WiFi connect: ssid=%s", ssid);
     
-    esp_err_t ret = my_wifi_connect(ssid, password);
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (!wifi_handle) {
+        ESP_LOGE(TAG, "WiFi handle is NULL");
+        return -1;
+    }
+    
+    esp_err_t ret = my_wifi_connect(wifi_handle, ssid, password);
     bool wifi_connected = false;
     char ip_str[16] = "";
     
     if (ret == ESP_OK) {
-        my_wifi_save_credentials(ssid, password);
+        my_wifi_save_credentials(wifi_handle, ssid, password);
         ESP_LOGI(TAG, "WiFi connected and saved");
         
         // 等待连接完成并获取 IP
         int wait_count = 0;
-        while (!my_wifi_is_connected() && wait_count < 50) {
+        while (!my_wifi_is_connected(wifi_handle) && wait_count < 50) {
             vTaskDelay(pdMS_TO_TICKS(100));
             wait_count++;
         }
         
-        if (my_wifi_is_connected()) {
+        if (my_wifi_is_connected(wifi_handle)) {
             wifi_connected = true;
-            if (my_wifi_get_ip(ip_str, sizeof(ip_str)) != ESP_OK) {
+            if (my_wifi_get_ip(wifi_handle, ip_str, sizeof(ip_str)) != ESP_OK) {
                 ip_str[0] = '\0';
             }
         }
@@ -101,7 +107,13 @@ int cmd_handle_wifi_connect(cJSON *params) {
 int cmd_handle_forget_wifi(cJSON *params) {
     ESP_LOGI(TAG, "Forget WiFi credentials");
     
-    esp_err_t ret = my_wifi_clear_credentials();
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (!wifi_handle) {
+        ESP_LOGE(TAG, "WiFi handle is NULL");
+        return -1;
+    }
+    
+    esp_err_t ret = my_wifi_clear_credentials(wifi_handle);
     bool success = (ret == ESP_OK);
     
     if (success) {
@@ -154,9 +166,15 @@ int cmd_handle_wifi_config(cJSON *data) {
     
     ESP_LOGI(TAG, "WiFi config: ssid=%s", ssid);
     
-    esp_err_t ret = my_wifi_connect(ssid, password);
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (!wifi_handle) {
+        ESP_LOGE(TAG, "WiFi handle is NULL");
+        return -1;
+    }
+    
+    esp_err_t ret = my_wifi_connect(wifi_handle, ssid, password);
     if (ret == ESP_OK) {
-        my_wifi_save_credentials(ssid, password);
+        my_wifi_save_credentials(wifi_handle, ssid, password);
         ESP_LOGI(TAG, "WiFi connected and saved");
     } else {
         ESP_LOGE(TAG, "WiFi connect failed: %s", esp_err_to_name(ret));
@@ -301,7 +319,8 @@ int cmd_handle_test_conn_ota(cJSON *params) {
     const char *ota_url = ota_url_item->valuestring;
     int ota_size = cJSON_IsNumber(ota_size_item) ? ota_size_item->valueint : 0;
     
-    if(my_wifi_is_connected()) {
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (wifi_handle && my_wifi_is_connected(wifi_handle)) {
         ESP_LOGI(TAG, "WiFi already connected");
     }
     

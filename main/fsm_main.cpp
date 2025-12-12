@@ -252,6 +252,10 @@ my_lidar_handle_t fsm_main_get_lidar_handle(void) {
     return s_fsm_context.lidar_handle;
 }
 
+my_wifi_handle_t fsm_main_get_wifi_handle(void) {
+    return s_fsm_context.wifi_handle;
+}
+
 void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg) {
     auto last_state_str = fsm_main_get_current_state_str();
     auto last_state_id = fsm_main_get_current_state();

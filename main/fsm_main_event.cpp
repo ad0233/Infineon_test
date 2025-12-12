@@ -61,7 +61,13 @@ uint8_t fm_has_w_c_state(void) {
         ESP_LOGI(TAG, "wifi not configured");
         return FM_W_N_CFG;
     }
-    switch (my_wifi_get_state())
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (!wifi_handle) {
+        ESP_LOGI(TAG, "wifi not initialized");
+        return FM_W_FAI;
+    }
+    
+    switch (my_wifi_get_state(wifi_handle))
     {
     case WIFI_STATE_CONNECTED: {
         // WiFi连接成功，检查NTP是否已同步
@@ -137,7 +143,8 @@ uint8_t fm_has_memu_state(void){
     uint8_t ret = 0;
     switch(current_index) {
         case 0: // Wi-Fi
-            if(my_wifi_get_state() == WIFI_STATE_CONNECTED){    //这里需要放入有无wifi的判断
+            my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+            if(wifi_handle && my_wifi_get_state(wifi_handle) == WIFI_STATE_CONNECTED){    //这里需要放入有无wifi的判断
                 ret = FM_MEMU_WIFI_SC;
             }
             else{
@@ -749,7 +756,10 @@ void fsm_main_wifi_reconn(void *arg, uint8_t last_state, uint8_t next_state) {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_Connecting);
     lvgl_port_unlock();
-    my_wifi_auto_connect();
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (wifi_handle) {
+        my_wifi_auto_connect(wifi_handle);
+    }
 }
 
 void fsm_main_wifi_forget(void *arg, uint8_t last_state, uint8_t next_state) {

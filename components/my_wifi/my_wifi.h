@@ -1,5 +1,4 @@
-#ifndef MY_WIFI_H
-#define MY_WIFI_H
+#pragma once
 
 #include <stdbool.h>
 #include "esp_err.h"
@@ -9,6 +8,8 @@
 extern "C" {
 #endif
 
+typedef struct my_wifi_impl* my_wifi_handle_t;
+
 typedef enum {
     WIFI_STATE_IDLE,
     WIFI_STATE_CONNECTING,
@@ -17,91 +18,38 @@ typedef enum {
     WIFI_STATE_FAILED
 } wifi_state_t;
 
-typedef void (*wifi_event_callback_t)(wifi_state_t state, void *context);
+typedef void (*wifi_event_callback_t)(wifi_state_t state, void *context, my_wifi_handle_t self);
 
-/**
- * @brief 初始化 WiFi
- * 
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t my_wifi_init(void);
+/// 初始化 WiFi，返回实例句柄
+int my_wifi_init(my_wifi_handle_t *self_out);
 
-/**
- * @brief 连接到 WiFi 网络
- * 
- * @param ssid WiFi SSID
- * @param password WiFi 密码
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t my_wifi_connect(const char *ssid, const char *password);
+/// 连接到 WiFi 网络
+int my_wifi_connect(my_wifi_handle_t self, const char *ssid, const char *password);
 
-/**
- * @brief 断开 WiFi 连接
- * 
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t my_wifi_disconnect(void);
+/// 断开 WiFi 连接
+int my_wifi_disconnect(my_wifi_handle_t self);
 
-/**
- * @brief 获取当前 WiFi 状态
- * 
- * @return wifi_state_t 当前状态
- */
-wifi_state_t my_wifi_get_state(void);
+/// 获取当前 WiFi 状态
+wifi_state_t my_wifi_get_state(my_wifi_handle_t self);
 
-/**
- * @brief 检查是否已连接
- * 
- * @return true 已连接
- * @return false 未连接
- */
-bool my_wifi_is_connected(void);
+/// 是否已连接
+bool my_wifi_is_connected(my_wifi_handle_t self);
 
-/**
- * @brief 设置 WiFi 事件回调
- * 
- * @param callback 回调函数
- * @param context 用户上下文，会传递给回调函数
- */
-void my_wifi_set_event_callback(wifi_event_callback_t callback, void *context);
+/// 设置 WiFi 事件回调
+int my_wifi_set_event_callback(my_wifi_handle_t self, wifi_event_callback_t callback, void *context);
 
-/**
- * @brief 获取 IP 地址
- * 
- * @param ip_str 输出的 IP 字符串缓冲区
- * @param len 缓冲区长度
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t my_wifi_get_ip(char *ip_str, size_t len);
+/// 获取 IP 地址
+int my_wifi_get_ip(my_wifi_handle_t self, char *ip_str, size_t len);
 
-/**
- * @brief 保存WiFi凭据到NVS (保存后自动连接)
- * 
- * @param ssid WiFi SSID
- * @param password WiFi 密码
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t my_wifi_save_credentials(const char *ssid, const char *password);
+/// 保存 WiFi 凭据到 NVS
+int my_wifi_save_credentials(my_wifi_handle_t self, const char *ssid, const char *password);
 
-/**
- * @brief 开机自动连接WiFi (从NVS读取凭据)
- *        只要保存过WiFi凭据就会自动连接
- * 
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t my_wifi_auto_connect(void);
+/// 开机自动连接 WiFi（从 NVS 读取凭据）
+int my_wifi_auto_connect(my_wifi_handle_t self);
 
-/**
- * @brief 清除保存的WiFi凭据
- * 
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t my_wifi_clear_credentials(void);
+/// 清除保存的 WiFi 凭据
+int my_wifi_clear_credentials(my_wifi_handle_t self);
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif // MY_WIFI_H
-
-
