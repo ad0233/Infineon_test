@@ -30,40 +30,19 @@
 static uint32_t s_fail_start_time = 0;  // 失败状态开始的时间戳（ms）
 #define FIND_TIMEOUT_MS 15000  // 15秒超时
 
-// 静态变量：动画期间是否找到人的标志位
-static bool s_person_found_during_anim = false;  // 在找人动画期间是否找到人
-
-// 设置动画期间找到人的标志位（供外部调用）
-void fsm_main_set_person_found_during_anim(bool found) {
-    s_person_found_during_anim = found;
-    if (found) {
-        ESP_LOGI(TAG, "Person found during animation, flag set");
-    }
-}
-
 // 静态变量：闹钟开关状态
 static bool s_alarm_enabled = true;  // true=有闹钟, false=无闹钟
 static bool s_alarm_state_initialized = false;  // 状态是否已初始化
 
 //找人
 uint8_t fm_has_h_fd_state(void) {
-    // 如果动画期间已经找到人，直接返回成功
-    if (s_person_found_during_anim) {
-        return FM_H_F_SUC;
-    }
-    
-    radar_latest_data_t radar_data;
+
     my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
-    if(lidar_handle != NULL && my_lidar_get_latest_data(lidar_handle, &radar_data) == ESP_OK) {
-        ESP_LOGI(TAG, "movement_param: %d", radar_data.movement_param);
-        // 挥挥手就识别成功了
-        if(radar_data.movement_param >15) {
-            return FM_H_F_SUC;
-        }
-        // TODO: 心率检测更合理些,因为如果没人,就不会有心率更新,但是甲方要求体动判断先
-        if(esp_log_timestamp() - radar_data.heart_rate_system_timestamp < 5) {
-            return FM_H_F_SUC;
-        }
+    if(my_lidar_have_human(lidar_handle)) {
+        ESP_LOGI(TAG, "person found");
+        return FM_H_F_SUC;
+    } else {
+        ESP_LOGI(TAG, "person not found");
     }
 
     if(esp_log_timestamp() - s_fail_start_time > FIND_TIMEOUT_MS) {
@@ -646,7 +625,6 @@ void fsm_main_lidar_find_boot(void *arg, uint8_t last_state, uint8_t next_state)
 void fsm_main_lidar_find_playing(void *arg, uint8_t last_state, uint8_t next_state){
     // 重置失败时间戳，开始新的检测周期
     // 清除找到人的标志位，开始新的检测
-    s_person_found_during_anim = false;
 
     my_h264_start(MY_H264_ANIM_PROCESSING,100);
 
@@ -657,13 +635,11 @@ void fsm_main_lidar_find_playing(void *arg, uint8_t last_state, uint8_t next_sta
 //找到人动画
 void fsm_main_find_someone(void *arg, uint8_t last_state, uint8_t next_state){
     // 清除标志位，因为已经进入成功流程
-    s_person_found_during_anim = false;
     my_h264_start(MY_H264_ANIM_HUMAN_RECOGNIZED,100);
 }
 //没找到人动画
 void fsm_main_no_find_someone(void *arg, uint8_t last_state, uint8_t next_state){
     // 清除标志位，因为已经进入失败流程
-    s_person_found_during_anim = false;
     my_h264_start(MY_H264_ANIM_FAIL2,100);
 }
 

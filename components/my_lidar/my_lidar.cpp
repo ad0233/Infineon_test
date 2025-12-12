@@ -22,6 +22,7 @@ static const char *TAG = "my_lidar";
 struct my_lidar_impl {
     bool initialized;
     bool started;
+    bool have_human;
     // 回调函数和上下文
     my_lidar_human_presence_callback_t human_presence_cb;
     void *human_presence_context;
@@ -33,6 +34,9 @@ struct my_lidar_impl {
     void *heart_rate_context;
     // flush 相关
     uint32_t last_flush_time;  // 上次flush执行时间（毫秒）
+    // 灵敏度参数
+    uint8_t movement_threshold;      // 体动参数阈值（默认20）
+    uint32_t heart_rate_timeout_ms;  // 心率数据超时时间（默认5秒=5000ms）
 };
 
 // 内部回调包装函数
@@ -102,6 +106,10 @@ int my_lidar_init(my_lidar_handle_t *self_out) {
     }
     
     memset(self, 0, sizeof(struct my_lidar_impl));
+    
+    // 设置默认灵敏度参数
+    self->movement_threshold = 20;        // 默认体动参数阈值
+    self->heart_rate_timeout_ms = 5000;   // 默认心率数据超时5秒
     
     // 初始化底层雷达
 #ifdef USE_AIRTOUCH_RADAR
@@ -244,6 +252,14 @@ bool my_lidar_is_connected(my_lidar_handle_t self) {
 #endif
 }
 
+// 查询是否有人体存在
+bool my_lidar_have_human(my_lidar_handle_t self) {
+    if (self == NULL) {
+        return false;
+    }
+    return self->have_human;
+}
+
 // 数据获取函数
 int my_lidar_get_human_data(my_lidar_handle_t self, radar_human_data_t *data) {
     if (self == NULL || data == NULL) {
@@ -337,8 +353,32 @@ int my_lidar_flush(my_lidar_handle_t self, uint32_t interval_ms) {
 #ifndef USE_AIRTOUCH_RADAR
     // R60ABD1雷达需要 flush
     r60abd1_flush();
+
+    radar_latest_data_t data;
+    if (r60abd1_get_latest_data(&data)) {
+        uint32_t current_time = esp_log_timestamp();
+        uint32_t heart_rate_age = current_time - data.heart_rate_timestamp;
+        
+        if (data.movement_param > self->movement_threshold || 
+            heart_rate_age < self->heart_rate_timeout_ms) {
+            self->have_human = true;
+        } else if (heart_rate_age > self->heart_rate_timeout_ms) {
+            self->have_human = false;
+        }
+    }
 #endif
+
     
+    return ESP_OK;
+}
+
+// 灵敏度参数设置
+int my_lidar_set_sensitivity(my_lidar_handle_t self, uint8_t movement_threshold, uint32_t heart_rate_timeout_ms) {
+    if (self == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    self->movement_threshold = movement_threshold;
+    self->heart_rate_timeout_ms = heart_rate_timeout_ms;
     return ESP_OK;
 }
 

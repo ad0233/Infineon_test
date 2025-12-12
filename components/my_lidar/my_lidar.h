@@ -108,6 +108,8 @@ int my_lidar_reg_cb_heart_rate(my_lidar_handle_t self, my_lidar_heart_rate_callb
 
 // 查询连接状态
 bool my_lidar_is_connected(my_lidar_handle_t self);
+// 查询是否有人体存在
+bool my_lidar_have_human(my_lidar_handle_t self);
 
 // 数据获取函数
 int my_lidar_get_human_data(my_lidar_handle_t self, radar_human_data_t *data);
@@ -120,6 +122,9 @@ int my_lidar_get_latest_data(my_lidar_handle_t self, radar_latest_data_t *data);
 
 // 用于节省内存，定时刷新函数，可以让一个线程运行多个组件的 flush，减少线程数量
 int my_lidar_flush(my_lidar_handle_t self, uint32_t interval_ms);
+
+// 设置灵敏度参数（movement_threshold: 体动参数阈值0-100，默认20；heart_rate_timeout_ms: 心率数据超时时间毫秒，默认5000）
+int my_lidar_set_sensitivity(my_lidar_handle_t self, uint8_t movement_threshold, uint32_t heart_rate_timeout_ms);
 
 // ============================================================================
 // 特定雷达功能（仅当使用对应雷达时可用）

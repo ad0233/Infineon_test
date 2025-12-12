@@ -255,6 +255,13 @@ extern "C" void app_main()
         nullptr
     );
     
+    my_lidar_init(&s_lidar_handle);
+    my_lidar_set_sensitivity(s_lidar_handle, 20, 5 * 1000);
+    my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
+    my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
+    my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
+    my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
+    
     // 初始化FSM，传入上下文
     fsm_main_context_t fsm_ctx = {
         .rtc_handle = s_rtc_handle,
@@ -300,11 +307,6 @@ extern "C" void app_main()
     );
     
     print_mem_info();
-    my_lidar_init(&s_lidar_handle);
-    my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
-    my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
-    my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
-    my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
 
     gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
     gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
@@ -506,64 +508,7 @@ void encoder_test(void *arg)
                     break;
             }
         }
-        
-        // 定时刷新雷达数据（每100ms）
-        if ((current_tick - last_radar_flush) >= radar_flush_interval) {
-            my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
-            if (lidar_handle != NULL) {
-                my_lidar_flush(lidar_handle, 100);
-            }
-            
-            // 只在 MENU_UNWIND 状态且雷达检测使能时检查雷达并触发事件
-            uint8_t current_state = fsm_main_get_current_state();
-            if(current_state == F_MAIN_S_MENU_UNWIND && fsm_main_get_radar_detect_enabled()) {
-                // 检查雷达是否找到人，如果找到则触发事件
-                radar_latest_data_t radar_data;
-                my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
-                if(lidar_handle != NULL && my_lidar_get_latest_data(lidar_handle, &radar_data) == ESP_OK) {
-                    bool current_radar_found = false;
-                    // 挥挥手就识别成功了
-                    if(radar_data.movement_param > 20) {
-                        current_radar_found = true;
-                    }                    
-                    // 如果从没找到变为找到，再次确认状态后触发事件
-                    if(current_radar_found && !last_radar_found) {
-                        // 再次确认当前状态，避免状态在检测和触发之间发生变化
-                        uint8_t verify_state = fsm_main_get_current_state();
-                        if(verify_state == F_MAIN_S_MENU_UNWIND && fsm_main_get_radar_detect_enabled()) {
-                            fsm_main_event_trig(F_MAIN_E_LIDAR_FIND, nullptr);
-                            ESP_LOGI(TAG, "Radar found person, triggering F_MAIN_E_LIDAR_FIND event");
-                        } else {
-                            ESP_LOGW(TAG, "State changed during radar detection, state=%d, enabled=%d", verify_state, fsm_main_get_radar_detect_enabled());
-                        }
-                    }
-                    last_radar_found = current_radar_found;
-                }
-            } else {
-                // 不在 MENU_UNWIND 状态或雷达检测被禁用时，重置雷达检测状态
-                last_radar_found = false;
-            }
-            
-            // 在找人动画状态时，定时检测是否找到人
-            if(current_state == F_MAIN_S_FINDPERSONC_ANIM) {
-                radar_latest_data_t radar_data;
-                my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
-                if(lidar_handle != NULL && my_lidar_get_latest_data(lidar_handle, &radar_data) == ESP_OK) {
-                    // 挥挥手就识别成功了
-                    if(radar_data.movement_param > 15) {
-                        fsm_main_set_person_found_during_anim(true);
-                        ESP_LOGI(TAG, "Person found during find animation (movement_param: %d)", radar_data.movement_param);
-                    }
-                    // 心率检测：如果最近5秒内有心率更新，说明有人
-                    else if(esp_log_timestamp() - radar_data.heart_rate_system_timestamp < 5) {
-                        fsm_main_set_person_found_during_anim(true);
-                        ESP_LOGI(TAG, "Person found during find animation (heart rate detected)");
-                    }
-                }
-            }
-            
-            last_radar_flush = current_tick;
-        }
+        my_lidar_flush(s_lidar_handle, 100);
         
         // 定时刷新FSM超时（每100ms）
         if ((current_tick - last_fsm_flush) >= fsm_flush_interval) {
