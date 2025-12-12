@@ -210,6 +210,16 @@ extern "C" void app_main()
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
 
+    my_rtc_init();
+    pcf8574_set_pin(0, true);
+    pcf8574_set_pin(1, true);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    pcf8574_set_pin(0, false);
+    pcf8574_set_pin(1, false);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    pcf8574_set_pin(0, true);
+    pcf8574_set_pin(1, true);
+
     // ========== LCD 初始化 ==========
     ESP_LOGI(TAG, "Initializing LCD...");
     my_lcd_init();

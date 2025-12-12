@@ -14,6 +14,8 @@
 i2c_bus_handle_t my_rtc_i2c = NULL; 
 static const char *TAG = "my_rtc";
 
+#define PCF8574_I2C_ADDR 0x40
+
 static int i2c_init()
 {
     int ret = 0;
@@ -47,6 +49,13 @@ int my_rtc_init() {
     } else {
         ESP_LOGE(TAG, "PCF8563 not found at address 0x%02X", PCF8563_I2C_ADDR);
         return ESP_ERR_NOT_FOUND;
+    }
+
+    // 检查PCF8574是否在预期地址
+    if (i2c_bus_probe_addr(my_rtc_i2c, PCF8574_I2C_ADDR) == ESP_OK) {
+        ESP_LOGI(TAG, "PCF8574 found at address 0x%02X", PCF8574_I2C_ADDR);
+    } else {
+        ESP_LOGW(TAG, "PCF8574 not found at address 0x%02X", PCF8574_I2C_ADDR);
     }
 
     // setup datetime: 2020-04-03 12:35, Sunday
@@ -155,4 +164,74 @@ void my_rtc_set_ntp_synced(bool synced) {
 
 bool my_rtc_is_ntp_synced(void) {
     return s_ntp_synced;
+}
+
+// PCF8574 IO扩展芯片驱动
+static uint8_t pcf8574_port_value = 0xFF;  // 默认全为高电平（输入模式）
+
+int pcf8574_write(uint8_t data) {
+    if (my_rtc_i2c == NULL) {
+        ESP_LOGE(TAG, "I2C bus not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    uint8_t write_data = data;
+    esp_err_t ret = i2c_bus_write_data(my_rtc_i2c, PCF8574_I2C_ADDR, &write_data, 1);
+    if (ret == ESP_OK) {
+        pcf8574_port_value = data;
+    } else {
+        ESP_LOGE(TAG, "PCF8574 write failed: %s", esp_err_to_name(ret));
+    }
+    return ret;
+}
+
+int pcf8574_read(uint8_t *data) {
+    if (my_rtc_i2c == NULL) {
+        ESP_LOGE(TAG, "I2C bus not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+    if (data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // PCF8574读取不需要寄存器地址，使用空指针和长度为0表示不发送寄存器地址
+    esp_err_t ret = i2c_bus_read_bytes(my_rtc_i2c, PCF8574_I2C_ADDR, NULL, 0, data, 1);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "PCF8574 read failed: %s", esp_err_to_name(ret));
+    }
+    return ret;
+}
+
+int pcf8574_set_pin(uint8_t pin, bool level) {
+    if (pin > 7) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    uint8_t port = pcf8574_port_value;
+    if (level) {
+        port |= (1 << pin);
+    } else {
+        port &= ~(1 << pin);
+    }
+    
+    return pcf8574_write(port);
+}
+
+int pcf8574_get_pin(uint8_t pin, bool *level) {
+    if (pin > 7 || level == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    uint8_t data;
+    int ret = pcf8574_read(&data);
+    if (ret == ESP_OK) {
+        *level = (data & (1 << pin)) != 0;
+    }
+    return ret;
+}
+
+int pcf8574_set_port(uint8_t mask, uint8_t value) {
+    uint8_t port = pcf8574_port_value;
+    port = (port & ~mask) | (value & mask);
+    return pcf8574_write(port);
 }
