@@ -1,74 +1,70 @@
 #include "cmd_parse.h"
 #include "cmd_handlers.h"
 #include "esp_log.h"
-#include "cJSON.h"
 #include <string.h>
+#include <string>
+#define JSON_NOEXCEPTION
+#include <nlohmann/json.hpp>
 
 static const char *TAG = "cmd_parse";
 
 // JSON 命令解析
 static int parse_json_cmd(const char *json_str) {
-    cJSON *cmd_item = NULL;
-    cJSON *type_item = NULL;
-    cJSON *root = cJSON_Parse(json_str);
-    if (!root) {
-        ESP_LOGE(TAG, "JSON parse failed");
+    if (!nlohmann::json::accept(json_str)) {
+        ESP_LOGE(TAG, "JSON parse failed: invalid JSON");
         return -1;
     }
+    
+    nlohmann::json root = nlohmann::json::parse(json_str);
     
     int ret = -1;
     
     // 尝试新格式: {"type": "xxx", "data": {...}}
-    type_item = cJSON_GetObjectItem(root, "type");
-    if (cJSON_IsString(type_item)) {
-        const char *type = type_item->valuestring;
-        cJSON *data = cJSON_GetObjectItem(root, "data");
+    if (root.contains("type") && root["type"].is_string()) {
+        std::string type = root["type"].get<std::string>();
+        nlohmann::json data = root.value("data", nlohmann::json::object());
         
-        ESP_LOGI(TAG, "Type: %s", type);
+        ESP_LOGI(TAG, "Type: %s", type.c_str());
         
-        if (strcmp(type, "wifi_config") == 0) {
+        if (type == "wifi_config") {
             ret = cmd_handle_wifi_config(data);
-        } else if (strcmp(type, "iot_config") == 0) {
+        } else if (type == "iot_config") {
             ret = cmd_handle_iot_config(data);
-        } else if (strcmp(type, "private_key_config") == 0) {
+        } else if (type == "private_key_config") {
             ret = cmd_handle_private_key_config(data);
         } else {
-            ESP_LOGW(TAG, "Unknown type: %s", type);
+            ESP_LOGW(TAG, "Unknown type: %s", type.c_str());
             ret = -1;
         }
-        goto cleanup;
+        return ret;
     }
     
     // 旧格式: {"cmd": "xxx", "params": {...}}
-    cmd_item = cJSON_GetObjectItem(root, "cmd");
-    if (cJSON_IsString(cmd_item)) {
-        const char *cmd = cmd_item->valuestring;
-        cJSON *params = cJSON_GetObjectItem(root, "params");
+    if (root.contains("cmd") && root["cmd"].is_string()) {
+        std::string cmd = root["cmd"].get<std::string>();
+        nlohmann::json params = root.value("params", nlohmann::json::object());
         
-        ESP_LOGI(TAG, "Command: %s", cmd);
+        ESP_LOGI(TAG, "Command: %s", cmd.c_str());
         
-        if (strcmp(cmd, "wifi_connect") == 0) {
+        if (cmd == "wifi_connect") {
             ret = cmd_handle_wifi_connect(params);
-        } else if (strcmp(cmd, "test_forget_wifi") == 0) {
+        } else if (cmd == "test_forget_wifi") {
             ret = cmd_handle_forget_wifi(params);
-        } else if (strcmp(cmd, "test_conn_ota") == 0) {
+        } else if (cmd == "test_conn_ota") {
             ret = cmd_handle_test_conn_ota(params);
-        } else if (strcmp(cmd, "set_binding_jwt") == 0) {
+        } else if (cmd == "set_binding_jwt") {
             ret = cmd_handle_set_binding_jwt(params);
-        } else if (strcmp(cmd, "test_set_time") == 0) {
+        } else if (cmd == "test_set_time") {
             ret = cmd_handle_test_set_time(params);
         } else {
-            ESP_LOGW(TAG, "Unknown command: %s", cmd);
+            ESP_LOGW(TAG, "Unknown command: %s", cmd.c_str());
             ret = -1;
         }
-        goto cleanup;
+        return ret;
     }
     
     ESP_LOGE(TAG, "Invalid JSON format (no 'type' or 'cmd' field)");
-    
-cleanup:
-    cJSON_Delete(root);
-    return ret;
+    return -1;
 }
 
 int cmd_parse(const uint8_t *data, int len) {
