@@ -177,11 +177,11 @@ void my_h264_init(my_h264_callback_t callback, void *context, my_h264_done_callb
     }
     
     s_frame_interval_ticks = fps_to_ticks(s_target_fps);
-    if (my_task_create_pinned_psram(playback_thread, "h264_play_thread", 1024 * 6, NULL, 5, NULL, 1) != ESP_OK) {
+    if (my_task_create_pinned_psram(playback_thread, "h264_play_thread", 1024 * 6, NULL, 5, NULL, 0) != ESP_OK) {
         ESP_LOGE("h264", "Failed to create playback task");
         return;
     }
-    if (my_task_create_pinned_psram(i420_decode_thread, "i420_decode_thread", 1024 * 10, NULL, 5, NULL, 0) != ESP_OK) {
+    if (my_task_create_pinned_psram(i420_decode_thread, "i420_decode_thread", 1024 * 10, NULL, 5, NULL, 1) != ESP_OK) {
         ESP_LOGE("h264", "Failed to create decode task");
     }
 }
@@ -409,30 +409,76 @@ static void ConvertYUV420SPToRGB565_LUT(const unsigned char *src,
 
     const int half_src_width = src_width >> 1;
 
+    // 优化：使用指针而非索引，减少计算
     for (int i = 0; i < dst_height; ++i) {
-        const int y_row_offset = i * src_width;
-        const int uv_row_offset = (i >> 1) * half_src_width;
-        const int dst_row_offset = i * dst_width;
-        for (int j = 0; j < dst_width; ++j) {
-            const int yIdx = y_row_offset + j;
-            const int uvIdx = uv_row_offset + (j >> 1);
+        const unsigned char *y_row = yData + i * src_width;
+        const int uv_row_idx = (i >> 1) * half_src_width;
+        const unsigned char *u_row = uData + uv_row_idx;
+        const unsigned char *v_row = vData + uv_row_idx;
+        uint16_t *dst_row = (uint16_t *)(dst + i * dst_width * 2);
 
-            const int y_component = s_y_table[yData[yIdx]];
-            const int u_value = uData[uvIdx];
-            const int v_value = vData[uvIdx];
+        // 优化：展开循环，一次处理2个像素（共享UV）
+        int j = 0;
+        for (; j < dst_width - 1; j += 2) {
+            const int uv_idx = j >> 1;
+            const int u_val = u_row[uv_idx];
+            const int v_val = v_row[uv_idx];
 
-            const int r_val = (y_component + s_v_r_table[v_value] + 128) >> 8;
-            const int g_val = (y_component + s_u_g_table[u_value] + s_v_g_table[v_value] + 128) >> 8;
-            const int b_val = (y_component + s_u_b_table[u_value] + 128) >> 8;
+            // 预计算UV查找表值，减少重复访问
+            const int32_t u_b = s_u_b_table[u_val];
+            const int32_t u_g = s_u_g_table[u_val];
+            const int32_t v_r = s_v_r_table[v_val];
+            const int32_t v_g = s_v_g_table[v_val];
+
+            // 处理第一个像素
+            {
+                const int y_idx = j;
+                const int32_t y_comp = s_y_table[y_row[y_idx]];
+                const int r_val = (y_comp + v_r + 128) >> 8;
+                const int g_val = (y_comp + u_g + v_g + 128) >> 8;
+                const int b_val = (y_comp + u_b + 128) >> 8;
+
+                const uint8_t r = s_clip_table[r_val + CLIP_TABLE_OFFSET];
+                const uint8_t g = s_clip_table[g_val + CLIP_TABLE_OFFSET];
+                const uint8_t b = s_clip_table[b_val + CLIP_TABLE_OFFSET];
+
+                dst_row[j] = (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
+            }
+
+            // 处理第二个像素（共享UV）
+            {
+                const int y_idx = j + 1;
+                const int32_t y_comp = s_y_table[y_row[y_idx]];
+                const int r_val = (y_comp + v_r + 128) >> 8;
+                const int g_val = (y_comp + u_g + v_g + 128) >> 8;
+                const int b_val = (y_comp + u_b + 128) >> 8;
+
+                const uint8_t r = s_clip_table[r_val + CLIP_TABLE_OFFSET];
+                const uint8_t g = s_clip_table[g_val + CLIP_TABLE_OFFSET];
+                const uint8_t b = s_clip_table[b_val + CLIP_TABLE_OFFSET];
+
+                dst_row[j + 1] = (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
+            }
+        }
+
+        // 处理剩余像素
+        for (; j < dst_width; ++j) {
+            const int uv_idx = j >> 1;
+            const int32_t y_comp = s_y_table[y_row[j]];
+            const int32_t u_b = s_u_b_table[u_row[uv_idx]];
+            const int32_t u_g = s_u_g_table[u_row[uv_idx]];
+            const int32_t v_r = s_v_r_table[v_row[uv_idx]];
+            const int32_t v_g = s_v_g_table[v_row[uv_idx]];
+
+            const int r_val = (y_comp + v_r + 128) >> 8;
+            const int g_val = (y_comp + u_g + v_g + 128) >> 8;
+            const int b_val = (y_comp + u_b + 128) >> 8;
 
             const uint8_t r = s_clip_table[r_val + CLIP_TABLE_OFFSET];
             const uint8_t g = s_clip_table[g_val + CLIP_TABLE_OFFSET];
             const uint8_t b = s_clip_table[b_val + CLIP_TABLE_OFFSET];
 
-            const uint16_t color = (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
-            const size_t dst_pos = ((size_t)dst_row_offset + j) << 1;
-            dst[dst_pos] = (uint8_t)(color & 0xFF);
-            dst[dst_pos + 1] = (uint8_t)(color >> 8);
+            dst_row[j] = (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
         }
     }
 }
