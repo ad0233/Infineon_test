@@ -403,7 +403,7 @@ extern "C" void app_main()
 
     fsm_main_event_trig(F_MAIN_E_INIT, nullptr);
     xTaskCreate(encoder_test, "encoder_test", 1024 * 6, nullptr, 10, nullptr);
-    my_lidar_start(s_lidar_handle);
+    // my_lidar_start(s_lidar_handle); //TOTD: 雷达好像不需要启动命令，默认启动，确认好就删除这个代码
 
     print_mem_info();
     return;

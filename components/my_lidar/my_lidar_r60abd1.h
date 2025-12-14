@@ -21,6 +21,9 @@
 #define RADAR_CTRL_WORK_STATUS  0x05  // 工作状态
 #define RADAR_CTRL_RANGE        0x07  // 雷达检测范围
 #define RADAR_CTRL_HUMAN        0x80  // 人体存在
+#define RADAR_CTRL_RESPIRATORY  0x81  // 呼吸监测
+#define RADAR_CTRL_SLEEP        0x84  // 睡眠监测
+#define RADAR_CTRL_HEART_RATE   0x85  // 心率监测
 
 // 系统功能命令字
 #define RADAR_CMD_HEARTBEAT_REPORT  0x01  // 心跳包上报
@@ -60,6 +63,47 @@
 #define RADAR_CMD_HEART_RATE_SWITCH     0x00  // 心率监测开关
 #define RADAR_CMD_HEART_RATE_VALUE      0x02  // 心率数值
 #define RADAR_CMD_HEART_RATE_WAVEFORM   0x05  // 心率波形
+
+// 睡眠监测命令字 (控制字固定为0x84)
+// 主动上报和设置
+#define RADAR_CMD_SLEEP_SWITCH          0x00  // 睡眠监测开关
+#define RADAR_CMD_SLEEP_BED_STATUS      0x01  // 入床/离床状态主动上报
+#define RADAR_CMD_SLEEP_STATUS          0x02  // 睡眠状态主动上报
+#define RADAR_CMD_SLEEP_AWAKE_DURATION  0x03  // 清醒时长主动上报
+#define RADAR_CMD_SLEEP_LIGHT_DURATION  0x04  // 浅睡时长主动上报
+#define RADAR_CMD_SLEEP_DEEP_DURATION   0x05  // 深睡时长主动上报
+#define RADAR_CMD_SLEEP_QUALITY_SCORE   0x06  // 睡眠质量评分主动上报
+#define RADAR_CMD_SLEEP_COMPREHENSIVE   0x0C  // 睡眠综合状态主动上报
+#define RADAR_CMD_SLEEP_QUALITY_ANALYSIS 0x0D // 睡眠质量分析主动上报
+#define RADAR_CMD_SLEEP_ABNORMAL        0x0E  // 睡眠异常主动上报
+#define RADAR_CMD_SLEEP_QUALITY_RATING  0x10  // 睡眠质量评级主动上报
+#define RADAR_CMD_SLEEP_STRUGGLE_STATUS 0x11  // 异常挣扎状态主动上报
+#define RADAR_CMD_SLEEP_NO_PERSON_STATUS 0x12 // 无人计时状态主动上报
+#define RADAR_CMD_SLEEP_STRUGGLE_SWITCH 0x13  // 异常挣扎状态开关设置
+#define RADAR_CMD_SLEEP_NO_PERSON_SWITCH 0x14 // 无人计时功能开关设置
+#define RADAR_CMD_SLEEP_NO_PERSON_TIME  0x15  // 无人计时时长设置
+#define RADAR_CMD_SLEEP_CUTOFF_TIME     0x16  // 睡眠截止时长设置
+#define RADAR_CMD_SLEEP_STRUGGLE_SENSITIVITY 0x1A // 挣扎状态判读设置
+
+// 睡眠监测查询命令字 (查询回复)
+#define RADAR_CMD_SLEEP_QUERY_SWITCH    0x80  // 查询睡眠监测开关
+#define RADAR_CMD_SLEEP_QUERY_BED_STATUS 0x81 // 入床/离床状态查询
+#define RADAR_CMD_SLEEP_QUERY_STATUS    0x82  // 睡眠状态查询
+#define RADAR_CMD_SLEEP_QUERY_AWAKE_DURATION 0x83 // 清醒时长查询
+#define RADAR_CMD_SLEEP_QUERY_LIGHT_DURATION 0x84 // 浅睡时长查询
+#define RADAR_CMD_SLEEP_QUERY_DEEP_DURATION  0x85 // 深睡时长查询
+#define RADAR_CMD_SLEEP_QUERY_QUALITY_SCORE  0x86 // 睡眠质量评分查询
+#define RADAR_CMD_SLEEP_QUERY_COMPREHENSIVE  0x8D // 睡眠综合状态查询
+#define RADAR_CMD_SLEEP_QUERY_ABNORMAL       0x8E // 睡眠异常查询
+#define RADAR_CMD_SLEEP_QUERY_STATISTICS     0x8F // 睡眠统计查询
+#define RADAR_CMD_SLEEP_QUERY_QUALITY_RATING 0x90 // 睡眠质量评级查询
+#define RADAR_CMD_SLEEP_QUERY_STRUGGLE_STATUS 0x91 // 异常挣扎状态查询
+#define RADAR_CMD_SLEEP_QUERY_NO_PERSON_STATUS 0x92 // 无人计时状态查询
+#define RADAR_CMD_SLEEP_QUERY_STRUGGLE_SWITCH 0x93 // 异常挣扎状态开关查询
+#define RADAR_CMD_SLEEP_QUERY_NO_PERSON_SWITCH 0x94 // 无人计时功能开关查询
+#define RADAR_CMD_SLEEP_QUERY_NO_PERSON_TIME  0x95 // 无人计时时长查询
+#define RADAR_CMD_SLEEP_QUERY_CUTOFF_TIME     0x96 // 睡眠截止时间查询
+#define RADAR_CMD_SLEEP_QUERY_STRUGGLE_SENSITIVITY 0x9A // 挣扎状态判读查询
 
 // 雷达数据包结构
 typedef struct {
