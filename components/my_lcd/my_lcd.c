@@ -40,6 +40,7 @@
 #define EXAMPLE_LCD_H_RES           (360)
 #define EXAMPLE_LCD_V_RES           (360)
 #define EXAMPLE_LCD_BIT_PER_PIXEL   (16)
+#define LCD_BUFFER_SIZE (EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES / 10)
 
 // 亮度映射表（10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%）
 static const uint16_t bl_map[10] = {
@@ -85,22 +86,22 @@ int my_lcd_init() {
     const lvgl_port_display_cfg_t disp_cfg = {
         .io_handle = io_handle,
         .panel_handle = panel_handle,
-        .buffer_size = EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES / 10,
-        .double_buffer = 1,
+        .buffer_size = LCD_BUFFER_SIZE,
+        .double_buffer = 0,
         .hres = EXAMPLE_LCD_H_RES,
         .vres = EXAMPLE_LCD_V_RES,
         .color_format = LV_COLOR_FORMAT_RGB565,
         .monochrome = false,
         /* Rotation values must be same as used in esp_lcd for initial settings of the screen */
         .rotation = {
-            .swap_xy = true,   // 交换X和Y轴
+            .swap_xy = false,   // 交换X和Y轴
             .mirror_x = false,
-            .mirror_y = true,  // 镜像Y轴实现逆时针90°旋转
+            .mirror_y = false,  // 镜像Y轴实现逆时针90°旋转
         },
         .flags = {
             .swap_bytes = true,
             .buff_dma = false,
-            .buff_spiram = true,
+            .buff_spiram = false,
         }
     };
     lvgl_disp = lvgl_port_add_disp(&disp_cfg);
@@ -129,7 +130,7 @@ void bsp_lcd_init(void)
                                                                                  LCD_DA1,
                                                                                  LCD_DA2,
                                                                                  LCD_DA3,
-                                                                                 EXAMPLE_LCD_H_RES * 80 * sizeof(uint16_t));
+                                                                                 LCD_BUFFER_SIZE * sizeof(uint16_t));
     ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &bus_config, SPI_DMA_CH_AUTO));
 
     ESP_LOGI(TAG, "Install panel IO");
