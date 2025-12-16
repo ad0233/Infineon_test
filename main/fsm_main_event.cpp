@@ -142,7 +142,7 @@ uint8_t fm_has_memu_state(void){
     // 根据当前索引返回对应的菜单状态
     uint8_t ret = 0;
     switch(current_index) {
-        case 0: // Wi-Fi
+        case 0: {// Wi-Fi
             my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
             if(wifi_handle && my_wifi_get_state(wifi_handle) == WIFI_STATE_CONNECTED){    //这里需要放入有无wifi的判断
                 ret = FM_MEMU_WIFI_SC;
@@ -151,6 +151,7 @@ uint8_t fm_has_memu_state(void){
                 ret = FM_MEMU_WIFI_FA;
             }
             break;
+        }
         case 1: // Wake Mode
             ret = FM_MEMU_WAKE_MOD;
             break;

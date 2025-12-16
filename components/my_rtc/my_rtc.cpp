@@ -20,14 +20,6 @@
 #include "board_pins_config.h"
 #include "audio_error.h"
 
-i2c_bus_handle_t my_rtc_get_i2c_bus(my_rtc_handle_t self)
-{
-    if (self == NULL) {
-        return NULL;
-    }
-    return self->i2c;
-}
-
 static const char *TAG = "my_rtc";
 
 struct my_rtc_impl {
@@ -47,6 +39,14 @@ struct my_rtc_impl {
     int ntp_retry_count;   // 重试次数
     uint32_t ntp_last_check_time;  // 上次检查时间（毫秒）
 };
+
+i2c_bus_handle_t my_rtc_get_i2c_bus(my_rtc_handle_t self)
+{
+    if (self == NULL) {
+        return NULL;
+    }
+    return self->i2c;
+}
 
 static int i2c_init(my_rtc_handle_t self)
 {

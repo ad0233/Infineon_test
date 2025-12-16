@@ -8,6 +8,7 @@
 
 // 低复用要求, 函数入参一定要用到环境相关的声明（主要用在单一环境）
 #include <esp_err.h>
+#include "i2c_bus.h"
 
 // 句柄声明 struct my_rtc_impl* 是在源文件内部实现，这里隐式声明，避免使用空指针
 typedef struct my_rtc_impl* my_rtc_handle_t;

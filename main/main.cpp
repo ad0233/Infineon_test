@@ -158,7 +158,7 @@ void heart_rate_data_callback(const radar_heart_rate_data_t *data, void *context
 // #define ENABLE_TASK_MONITOR
 
 static const char *TAG = "main";
-static audio_board_handle_t board_handle;
+// static audio_board_handle_t board_handle;
 static my_rtc_handle_t s_rtc_handle = NULL;  // RTC句柄，仅在main.cpp中使用
 static my_lidar_handle_t s_lidar_handle = NULL;  // 雷达句柄，仅在main.cpp中使用
 static my_wifi_handle_t s_wifi_handle = NULL;  // WiFi句柄
@@ -221,16 +221,6 @@ extern "C" void app_main()
     ESP_LOGI(TAG, "Initialize board peripherals");
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
-
-    my_rtc_init();
-    pcf8574_set_pin(0, true);
-    pcf8574_set_pin(1, true);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    pcf8574_set_pin(0, false);
-    pcf8574_set_pin(1, false);
-    vTaskDelay(pdMS_TO_TICKS(500));
-    pcf8574_set_pin(0, true);
-    pcf8574_set_pin(1, true);
 
     // ========== LCD 初始化 ==========
     ESP_LOGI(TAG, "Initializing LCD...");
