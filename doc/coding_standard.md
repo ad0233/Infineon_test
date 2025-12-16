@@ -52,7 +52,7 @@ extern "C" {
 
 /// 初始化，入参是句柄指针的指针,用于返回句柄指针
 // 返回最好是 int，表示运行结果，可以参考下常规 Linux 对错误的定义，esp_err_t 本质也是 int，esp-idf/components/esp_common/include/esp_err.h
-int <组件名称>_init(<组件名称>_handle_t *self_out);
+int <组件名称>_init(<组件名称>_handle_t *self_out, ...);
 
 // 一般不写这个也行，基本都是初始化之后一直用，很少组件需要考虑释放问题
 int <组件名称>_deinit(<组件名称>_handle_t self);
@@ -60,8 +60,8 @@ int <组件名称>_deinit(<组件名称>_handle_t self);
 //******** 功能函数 ********
 
 // 注册回调函数，建议只允许被注册一次，不然会有很多异步冲突的问题导致异常
-int <组件名称>_reg_cb_<事件1名称>(<组件名称>_<事件1名称>_callback_t func, void *context);
-int <组件名称>_reg_cb_<事件2名称>(<组件名称>_<事件2名称>_callback_t func, void *context);
+int <组件名称>_reg_cb_<事件1名称>(<组件名称>_handle_t self, <组件名称>_<事件1名称>_callback_t func, void *context);
+int <组件名称>_reg_cb_<事件2名称>(<组件名称>_handle_t self, <组件名称>_<事件2名称>_callback_t func, void *context);
 
 //******** 功能函数 ********
 
@@ -127,10 +127,13 @@ struct <组件名称>_impl {
     ...
 };
 
+// 内部静态函数声明
+int s_<功能名称>(...);
+
 // 初始化
 // 失败处理部分只是给个例子，单片机不用太严格，因为大多数如果能跑了，就一直都能跑，不释放内存也无所谓的
 // 但前面申请内存部分的报错还是要的，内存不足的问题很常见
-int <组件名称>_init(<组件名称>_handle_t *self_out) {
+int <组件名称>_init(<组件名称>_handle_t *self_out, ...) {
     if(self_out == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
@@ -148,6 +151,16 @@ int <组件名称>_init(<组件名称>_handle_t *self_out) {
     // 配置外部芯片...
     
     *self_out = self;
+    return 0;
+}
+
+//...
+
+//...
+
+// 内部静态函数实现
+int s_<功能名称>(...) {
+    ...
     return 0;
 }
 ```

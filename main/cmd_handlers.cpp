@@ -1,8 +1,11 @@
 #include "cmd_handlers.h"
 #include "esp_log.h"
 #include <string.h>
+#include <string>
 #include <time.h>
 #include <sys/time.h>
+#define JSON_NOEXCEPTION
+#include <nlohmann/json.hpp>
 
 #include "my_wifi.h"
 #include "my_ota.h"
@@ -10,9 +13,9 @@
 #include "my_nvs.h"
 #include "my_ble.h"
 #include "ble_protocol.h"
-#include "cJSON.h"
 #include "my_rtc.h"
 #include "my_ui_behavior.h"
+#include "fsm_main.h"
 
 static const char *TAG = "cmd_handlers";
 
@@ -22,43 +25,41 @@ static const char *get_mac_no_colon() {
 }
 
 // 处理 WiFi 连接命令
-int cmd_handle_wifi_connect(cJSON *params) {
-    if (!params) {
-        ESP_LOGE(TAG, "wifi_connect: params is NULL");
-        return -1;
-    }
-    
-    cJSON *ssid_item = cJSON_GetObjectItem(params, "ssid");
-    cJSON *password_item = cJSON_GetObjectItem(params, "password");
-    
-    if (!cJSON_IsString(ssid_item)) {
+int cmd_handle_wifi_connect(const nlohmann::json &params) {
+    if (params.is_null() || !params.contains("ssid") || !params["ssid"].is_string()) {
         ESP_LOGE(TAG, "wifi_connect: ssid not found or invalid");
         return -1;
     }
     
-    const char *ssid = ssid_item->valuestring;
-    const char *password = cJSON_IsString(password_item) ? password_item->valuestring : "";
+    std::string ssid = params["ssid"].get<std::string>();
+    std::string password = params.value("password", std::string(""));
     
-    ESP_LOGI(TAG, "WiFi connect: ssid=%s", ssid);
+    ESP_LOGI(TAG, "WiFi connect: ssid=%s", ssid.c_str());
     
-    esp_err_t ret = my_wifi_connect(ssid, password);
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (!wifi_handle) {
+        ESP_LOGE(TAG, "WiFi handle is NULL");
+        return -1;
+    }
+    
+    esp_err_t ret = my_wifi_connect(wifi_handle, ssid.c_str(), password.c_str());
     bool wifi_connected = false;
     char ip_str[16] = "";
     
     if (ret == ESP_OK) {
-        my_wifi_save_credentials(ssid, password);
+        my_wifi_save_credentials(wifi_handle, ssid.c_str(), password.c_str());
         ESP_LOGI(TAG, "WiFi connected and saved");
         
         // 等待连接完成并获取 IP
         int wait_count = 0;
-        while (!my_wifi_is_connected() && wait_count < 50) {
+        while (!my_wifi_is_connected(wifi_handle) && wait_count < 50) {
             vTaskDelay(pdMS_TO_TICKS(100));
             wait_count++;
         }
         
-        if (my_wifi_is_connected()) {
+        if (my_wifi_is_connected(wifi_handle)) {
             wifi_connected = true;
-            if (my_wifi_get_ip(ip_str, sizeof(ip_str)) != ESP_OK) {
+            if (my_wifi_get_ip(wifi_handle, ip_str, sizeof(ip_str)) != ESP_OK) {
                 ip_str[0] = '\0';
             }
         }
@@ -69,38 +70,36 @@ int cmd_handle_wifi_connect(cJSON *params) {
     fsm_main_event_trig(F_MAIN_E_WIFI_CMD_TRIG, NULL);
     
     // 发送响应
-    cJSON *response = cJSON_CreateObject();
-    cJSON *data = cJSON_CreateObject();
-    if (!response || !data) {
-        ESP_LOGE(TAG, "Failed to create JSON objects for response");
-        if (response) cJSON_Delete(response);
-        if (data) cJSON_Delete(data);
-    } else {
-        cJSON_AddStringToObject(response, "type", "provision_result");
-        cJSON_AddStringToObject(data, "status", wifi_connected ? "success" : "failed");
-        cJSON_AddBoolToObject(data, "wifi_connected", wifi_connected);
-        if (wifi_connected && ip_str[0] != '\0') {
-            cJSON_AddStringToObject(data, "ip_address", ip_str);
-        }
-        cJSON_AddItemToObject(response, "data", data);
-        
-        char *json_str = cJSON_Print(response);
-        if (json_str) {
-            ble_send_response(json_str);
-            free(json_str);
-        }
-        cJSON_Delete(response);
+    nlohmann::json response = {
+        {"type", "provision_result"},
+        {"data", {
+            {"status", wifi_connected ? "success" : "failed"},
+            {"wifi_connected", wifi_connected}
+        }}
+    };
+    
+    if (wifi_connected && ip_str[0] != '\0') {
+        response["data"]["ip_address"] = ip_str;
     }
+    
+    std::string json_str = response.dump();
+    ble_send_response(json_str.c_str());
     
     ESP_LOGI(TAG, "WiFi connect completed");
     return 0;
 }
 
 // 处理忘记WiFi命令
-int cmd_handle_forget_wifi(cJSON *params) {
+int cmd_handle_forget_wifi(const nlohmann::json &params) {
     ESP_LOGI(TAG, "Forget WiFi credentials");
     
-    esp_err_t ret = my_wifi_clear_credentials();
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (!wifi_handle) {
+        ESP_LOGE(TAG, "WiFi handle is NULL");
+        return -1;
+    }
+    
+    esp_err_t ret = my_wifi_clear_credentials(wifi_handle);
     bool success = (ret == ESP_OK);
     
     if (success) {
@@ -110,52 +109,41 @@ int cmd_handle_forget_wifi(cJSON *params) {
     }
     
     // 发送响应
-    cJSON *response = cJSON_CreateObject();
-    cJSON *data = cJSON_CreateObject();
-    if (!response || !data) {
-        ESP_LOGE(TAG, "Failed to create JSON objects for response");
-        if (response) cJSON_Delete(response);
-        if (data) cJSON_Delete(data);
-    } else {
-        cJSON_AddStringToObject(response, "type", "forget_wifi_result");
-        cJSON_AddStringToObject(data, "status", success ? "success" : "failed");
-        cJSON_AddItemToObject(response, "data", data);
-        
-        char *json_str = cJSON_Print(response);
-        if (json_str) {
-            ble_send_response(json_str);
-            free(json_str);
-        }
-        cJSON_Delete(response);
-    }
+    nlohmann::json response = {
+        {"type", "forget_wifi_result"},
+        {"data", {
+            {"status", success ? "success" : "failed"}
+        }}
+    };
+    
+    std::string json_str = response.dump();
+    ble_send_response(json_str.c_str());
     
     ESP_LOGI(TAG, "WiFi forget completed");
     return 0;
 }
 
 // 处理 WiFi 配置命令（新格式，复用 wifi_connect 逻辑）
-int cmd_handle_wifi_config(cJSON *data) {
-    if (!data) {
-        ESP_LOGE(TAG, "wifi_config: data is NULL");
-        return -1;
-    }
-    
-    cJSON *ssid_item = cJSON_GetObjectItem(data, "ssid");
-    cJSON *password_item = cJSON_GetObjectItem(data, "password");
-    
-    if (!cJSON_IsString(ssid_item)) {
+int cmd_handle_wifi_config(const nlohmann::json &data) {
+    if (data.is_null() || !data.contains("ssid") || !data["ssid"].is_string()) {
         ESP_LOGE(TAG, "wifi_config: ssid not found or invalid");
         return -1;
     }
     
-    const char *ssid = ssid_item->valuestring;
-    const char *password = cJSON_IsString(password_item) ? password_item->valuestring : "";
+    std::string ssid = data["ssid"].get<std::string>();
+    std::string password = data.value("password", std::string(""));
     
-    ESP_LOGI(TAG, "WiFi config: ssid=%s", ssid);
+    ESP_LOGI(TAG, "WiFi config: ssid=%s", ssid.c_str());
     
-    esp_err_t ret = my_wifi_connect(ssid, password);
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (!wifi_handle) {
+        ESP_LOGE(TAG, "WiFi handle is NULL");
+        return -1;
+    }
+    
+    esp_err_t ret = my_wifi_connect(wifi_handle, ssid.c_str(), password.c_str());
     if (ret == ESP_OK) {
-        my_wifi_save_credentials(ssid, password);
+        my_wifi_save_credentials(wifi_handle, ssid.c_str(), password.c_str());
         ESP_LOGI(TAG, "WiFi connected and saved");
     } else {
         ESP_LOGE(TAG, "WiFi connect failed: %s", esp_err_to_name(ret));
@@ -168,45 +156,36 @@ int cmd_handle_wifi_config(cJSON *data) {
 }
 
 // 处理 IoT 配置命令
-int cmd_handle_iot_config(cJSON *data) {
-    if (!data) {
-        ESP_LOGE(TAG, "iot_config: data is NULL");
-        return -1;
-    }
-    
-    cJSON *endpoint_item = cJSON_GetObjectItem(data, "iot_endpoint");
-    cJSON *port_item = cJSON_GetObjectItem(data, "iot_port");
-    cJSON *thing_name_item = cJSON_GetObjectItem(data, "thing_name");
-    cJSON *root_ca_item = cJSON_GetObjectItem(data, "root_ca");
-    cJSON *cert_pem_item = cJSON_GetObjectItem(data, "certificate_pem");
-    cJSON *cert_id_item = cJSON_GetObjectItem(data, "certificate_id");
-    
-    if (!cJSON_IsString(endpoint_item) || !cJSON_IsString(root_ca_item) || 
-        !cJSON_IsString(cert_pem_item)) {
+int cmd_handle_iot_config(const nlohmann::json &data) {
+    if (data.is_null() || !data.contains("iot_endpoint") || !data["iot_endpoint"].is_string() ||
+        !data.contains("root_ca") || !data["root_ca"].is_string() ||
+        !data.contains("certificate_pem") || !data["certificate_pem"].is_string()) {
         ESP_LOGE(TAG, "iot_config: missing required fields");
         return -1;
     }
     
-    const char *endpoint = endpoint_item->valuestring;
-    uint16_t port = cJSON_IsNumber(port_item) ? port_item->valueint : 8883;
-    const char *root_ca = root_ca_item->valuestring;
-    const char *cert_pem = cert_pem_item->valuestring;
-    const char *cert_id = cJSON_IsString(cert_id_item) ? cert_id_item->valuestring : "";
+    std::string endpoint = data["iot_endpoint"].get<std::string>();
+    uint16_t port = data.value("iot_port", 8883);
+    std::string root_ca = data["root_ca"].get<std::string>();
+    std::string cert_pem = data["certificate_pem"].get<std::string>();
+    std::string cert_id = data.value("certificate_id", std::string(""));
     
     // thing_name: 优先用 JSON 提供的，否则自动用 MAC 地址
-    const char *thing_name;
-    if (cJSON_IsString(thing_name_item) && strlen(thing_name_item->valuestring) > 0) {
-        thing_name = thing_name_item->valuestring;
+    std::string thing_name;
+    if (data.contains("thing_name") && data["thing_name"].is_string() && 
+        !data["thing_name"].get<std::string>().empty()) {
+        thing_name = data["thing_name"].get<std::string>();
     } else {
-        thing_name = get_mac_no_colon();
-        if (!thing_name) {
+        const char *mac = get_mac_no_colon();
+        if (!mac) {
             ESP_LOGE(TAG, "Failed to get MAC address");
             return -1;
         }
-        ESP_LOGI(TAG, "thing_name auto-filled with MAC: %s", thing_name);
+        thing_name = mac;
+        ESP_LOGI(TAG, "thing_name auto-filled with MAC: %s", thing_name.c_str());
     }
     
-    ESP_LOGI(TAG, "IoT config: endpoint=%s, port=%d, thing=%s", endpoint, port, thing_name);
+    ESP_LOGI(TAG, "IoT config: endpoint=%s, port=%d, thing=%s", endpoint.c_str(), port, thing_name.c_str());
     
     // 创建配置结构体
     struct iot_config cfg;
@@ -217,11 +196,11 @@ int cmd_handle_iot_config(cJSON *data) {
     cfg.iot_port = port;
     cfg.enable = 1;  // 默认启用
     
-    snprintf(cfg.iot_endpoint, sizeof(cfg.iot_endpoint), "%s", endpoint);
-    snprintf(cfg.thing_name, sizeof(cfg.thing_name), "%s", thing_name);
-    snprintf(cfg.certificate_id, sizeof(cfg.certificate_id), "%s", cert_id);
-    snprintf(cfg.root_ca, sizeof(cfg.root_ca), "%s", root_ca);
-    snprintf(cfg.certificate_pem, sizeof(cfg.certificate_pem), "%s", cert_pem);
+    snprintf(cfg.iot_endpoint, sizeof(cfg.iot_endpoint), "%s", endpoint.c_str());
+    snprintf(cfg.thing_name, sizeof(cfg.thing_name), "%s", thing_name.c_str());
+    snprintf(cfg.certificate_id, sizeof(cfg.certificate_id), "%s", cert_id.c_str());
+    snprintf(cfg.root_ca, sizeof(cfg.root_ca), "%s", root_ca.c_str());
+    snprintf(cfg.certificate_pem, sizeof(cfg.certificate_pem), "%s", cert_pem.c_str());
     
     // 保存到 NVS
     if (my_nvs_update_iot_config(&cfg)) {
@@ -235,20 +214,13 @@ int cmd_handle_iot_config(cJSON *data) {
 }
 
 // 处理私钥配置命令
-int cmd_handle_private_key_config(cJSON *data) {
-    if (!data) {
-        ESP_LOGE(TAG, "private_key_config: data is NULL");
-        return -1;
-    }
-    
-    cJSON *private_key_item = cJSON_GetObjectItem(data, "private_key_pem");
-    
-    if (!cJSON_IsString(private_key_item)) {
+int cmd_handle_private_key_config(const nlohmann::json &data) {
+    if (data.is_null() || !data.contains("private_key_pem") || !data["private_key_pem"].is_string()) {
         ESP_LOGE(TAG, "private_key_config: private_key_pem not found or invalid");
         return -1;
     }
     
-    const char *private_key = private_key_item->valuestring;
+    std::string private_key = data["private_key_pem"].get<std::string>();
     
     ESP_LOGI(TAG, "Private key config");
     
@@ -260,7 +232,7 @@ int cmd_handle_private_key_config(cJSON *data) {
     cfg.magic = PRIVATE_KEY_CONFIG_MAGIC;
     cfg.enable = 1;
     
-    snprintf(cfg.private_key_pem, sizeof(cfg.private_key_pem), "%s", private_key);
+    snprintf(cfg.private_key_pem, sizeof(cfg.private_key_pem), "%s", private_key.c_str());
     
     // 保存到 NVS
     if (my_nvs_update_private_key_config(&cfg)) {
@@ -283,29 +255,22 @@ struct test_conn_ota_params {
 
 
 // 处理测试连接并OTA更新命令
-int cmd_handle_test_conn_ota(cJSON *params) {
-    if (!params) {
-        ESP_LOGE(TAG, "test_conn_ota: params is NULL");
-        return -1;
-    }
-    
-    cJSON *ota_url_item = cJSON_GetObjectItem(params, "ota_url");
-    cJSON *ota_size_item = cJSON_GetObjectItem(params, "ota_size");
-    
-    if (!cJSON_IsString(ota_url_item)) {
+int cmd_handle_test_conn_ota(const nlohmann::json &params) {
+    if (params.is_null() || !params.contains("ota_url") || !params["ota_url"].is_string()) {
         ESP_LOGE(TAG, "test_conn_ota: missing required fields (ota_url)");
         return -1;
     }
     
-    const char *ota_url = ota_url_item->valuestring;
-    int ota_size = cJSON_IsNumber(ota_size_item) ? ota_size_item->valueint : 0;
+    std::string ota_url = params["ota_url"].get<std::string>();
+    int ota_size = params.value("ota_size", 0);
     
-    if(my_wifi_is_connected()) {
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (wifi_handle && my_wifi_is_connected(wifi_handle)) {
         ESP_LOGI(TAG, "WiFi already connected");
     }
     
     // 启动 OTA 更新
-    int ota_ret = my_ota_begin_v1(ota_url, ota_size);
+    int ota_ret = my_ota_begin_v1(ota_url.c_str(), ota_size);
     if (ota_ret != 0) {
         ESP_LOGE(TAG, "OTA start failed: %d", ota_ret);
     } else {
@@ -315,96 +280,63 @@ int cmd_handle_test_conn_ota(cJSON *params) {
     ESP_LOGI(TAG, "Test conn OTA task created");
     
     // 发送响应
-    cJSON *response = cJSON_CreateObject();
-    cJSON *data = cJSON_CreateObject();
-    if (!response || !data) {
-        ESP_LOGE(TAG, "Failed to create JSON objects for response");
-        if (response) cJSON_Delete(response);
-        if (data) cJSON_Delete(data);
-    } else {
-        cJSON_AddStringToObject(response, "type", "test_conn_ota_result");
-        cJSON_AddStringToObject(data, "status", "started");
-        cJSON_AddItemToObject(response, "data", data);
-        
-        char *json_str = cJSON_Print(response);
-        if (json_str) {
-            ble_send_response(json_str);
-            free(json_str);
-        }
-        cJSON_Delete(response);
-    }
+    nlohmann::json response = {
+        {"type", "test_conn_ota_result"},
+        {"data", {
+            {"status", "started"}
+        }}
+    };
+    
+    std::string json_str = response.dump();
+    ble_send_response(json_str.c_str());
     
     return 0;
 }
 
 // 处理设置绑定 JWT 命令
-int cmd_handle_set_binding_jwt(cJSON *params) {
-    if (!params) {
-        ESP_LOGE(TAG, "set_binding_jwt: params is NULL");
-        return -1;
-    }
-    
-    cJSON *binding_jwt_item = cJSON_GetObjectItem(params, "binding_jwt");
-    
-    if (!cJSON_IsString(binding_jwt_item)) {
+int cmd_handle_set_binding_jwt(const nlohmann::json &params) {
+    if (params.is_null() || !params.contains("binding_jwt") || !params["binding_jwt"].is_string()) {
         ESP_LOGE(TAG, "set_binding_jwt: binding_jwt not found or invalid");
         return -1;
     }
     
-    const char *binding_jwt = binding_jwt_item->valuestring;
+    std::string binding_jwt = params["binding_jwt"].get<std::string>();
     
-    ESP_LOGI(TAG, "Set binding JWT (length: %d)", strlen(binding_jwt));
+    ESP_LOGI(TAG, "Set binding JWT (length: %d)", binding_jwt.length());
     
     // TODO: 保存 binding_jwt 到 NVS 或其他存储
     // 目前只返回成功
     bool success = true;
     
     // 发送响应
-    cJSON *response = cJSON_CreateObject();
-    cJSON *data = cJSON_CreateObject();
-    if (!response || !data) {
-        ESP_LOGE(TAG, "Failed to create JSON objects for response");
-        if (response) cJSON_Delete(response);
-        if (data) cJSON_Delete(data);
-    } else {
-        cJSON_AddStringToObject(response, "type", "set_binding_jwt");
-        cJSON_AddStringToObject(data, "status", success ? "success" : "failed");
-        cJSON_AddItemToObject(response, "data", data);
-        
-        char *json_str = cJSON_Print(response);
-        if (json_str) {
-            ble_send_response(json_str);
-            free(json_str);
-        }
-        cJSON_Delete(response);
-    }
+    nlohmann::json response = {
+        {"type", "set_binding_jwt"},
+        {"data", {
+            {"status", success ? "success" : "failed"}
+        }}
+    };
+    
+    std::string json_str = response.dump();
+    ble_send_response(json_str.c_str());
     
     ESP_LOGI(TAG, "Set binding JWT completed");
     return 0;
 }
 
 // 处理设置时间命令
-int cmd_handle_test_set_time(cJSON *params) {
-    if (!params) {
-        ESP_LOGE(TAG, "test_set_time: params is NULL");
-        return -1;
-    }
-    
-    cJSON *timestamp_item = cJSON_GetObjectItem(params, "timestamp");
-    cJSON *timezone_item = cJSON_GetObjectItem(params, "timezone");
-    
-    if (!cJSON_IsNumber(timestamp_item)) {
+int cmd_handle_test_set_time(const nlohmann::json &params) {
+    if (params.is_null() || !params.contains("timestamp") || !params["timestamp"].is_number()) {
         ESP_LOGE(TAG, "test_set_time: timestamp not found or invalid");
         return -1;
     }
     
-    time_t timestamp = (time_t)timestamp_item->valueint;
-    const char *timezone = cJSON_IsString(timezone_item) ? timezone_item->valuestring : "CST-8";
+    time_t timestamp = params["timestamp"].get<time_t>();
+    std::string timezone = params.value("timezone", std::string("CST-8"));
     
-    ESP_LOGI(TAG, "Set time: timestamp=%lld, timezone=%s", timestamp, timezone);
+    ESP_LOGI(TAG, "Set time: timestamp=%lld, timezone=%s", timestamp, timezone.c_str());
     
     // 设置时区
-    setenv("TZ", timezone, 1);
+    setenv("TZ", timezone.c_str(), 1);
     tzset();
     
     // 设置系统时间
@@ -415,21 +347,16 @@ int cmd_handle_test_set_time(cJSON *params) {
         ESP_LOGE(TAG, "Failed to set system time");
         
         // 发送失败响应
-        cJSON *response = cJSON_CreateObject();
-        cJSON *data = cJSON_CreateObject();
-        if (response && data) {
-            cJSON_AddStringToObject(response, "type", "test_set_time_result");
-            cJSON_AddStringToObject(data, "status", "failed");
-            cJSON_AddStringToObject(data, "error", "settimeofday failed");
-            cJSON_AddItemToObject(response, "data", data);
-            
-            char *json_str = cJSON_Print(response);
-            if (json_str) {
-                ble_send_response(json_str);
-                free(json_str);
-            }
-            cJSON_Delete(response);
-        }
+        nlohmann::json response = {
+            {"type", "test_set_time_result"},
+            {"data", {
+                {"status", "failed"},
+                {"error", "settimeofday failed"}
+            }}
+        };
+        
+        std::string json_str = response.dump();
+        ble_send_response(json_str.c_str());
         return -1;
     }
     
@@ -437,26 +364,22 @@ int cmd_handle_test_set_time(cJSON *params) {
     struct tm timeinfo;
     localtime_r(&timestamp, &timeinfo);
     
-    int rtc_ret = my_rtc_set_time(&timeinfo);
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    int rtc_ret = (rtc_handle != NULL) ? my_rtc_set_time(rtc_handle, &timeinfo) : ESP_ERR_INVALID_STATE;
     if (rtc_ret != 0) {
         ESP_LOGE(TAG, "Failed to set RTC time (err=%d)", rtc_ret);
         
         // 发送部分成功响应（系统时间已设置，但RTC失败）
-        cJSON *response = cJSON_CreateObject();
-        cJSON *data = cJSON_CreateObject();
-        if (response && data) {
-            cJSON_AddStringToObject(response, "type", "test_set_time_result");
-            cJSON_AddStringToObject(data, "status", "partial");
-            cJSON_AddStringToObject(data, "error", "RTC write failed");
-            cJSON_AddItemToObject(response, "data", data);
-            
-            char *json_str = cJSON_Print(response);
-            if (json_str) {
-                ble_send_response(json_str);
-                free(json_str);
-            }
-            cJSON_Delete(response);
-        }
+        nlohmann::json response = {
+            {"type", "test_set_time_result"},
+            {"data", {
+                {"status", "partial"},
+                {"error", "RTC write failed"}
+            }}
+        };
+        
+        std::string json_str = response.dump();
+        ble_send_response(json_str.c_str());
         return -1;
     }
     
@@ -471,24 +394,15 @@ int cmd_handle_test_set_time(cJSON *params) {
     }
     
     // 发送成功响应
-    cJSON *response = cJSON_CreateObject();
-    cJSON *data = cJSON_CreateObject();
-    if (!response || !data) {
-        ESP_LOGE(TAG, "Failed to create JSON objects for response");
-        if (response) cJSON_Delete(response);
-        if (data) cJSON_Delete(data);
-    } else {
-        cJSON_AddStringToObject(response, "type", "test_set_time_result");
-        cJSON_AddStringToObject(data, "status", "success");
-        cJSON_AddItemToObject(response, "data", data);
-        
-        char *json_str = cJSON_Print(response);
-        if (json_str) {
-            ble_send_response(json_str);
-            free(json_str);
-        }
-        cJSON_Delete(response);
-    }
+    nlohmann::json response = {
+        {"type", "test_set_time_result"},
+        {"data", {
+            {"status", "success"}
+        }}
+    };
+    
+    std::string json_str = response.dump();
+    ble_send_response(json_str.c_str());
     
     ESP_LOGI(TAG, "Set time completed");
     return 0;

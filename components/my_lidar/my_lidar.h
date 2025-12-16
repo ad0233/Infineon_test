@@ -1,7 +1,12 @@
 #pragma once
 
+// 高复用要求，主要用于协议代码，方便多端使用（单片机，电脑，后端服务）
+// 只添加 std 库，什么环境下都不会错误
 #include <stdint.h>
 #include <stdbool.h>
+
+// 低复用要求, 函数入参一定要用到环境相关的声明（主要用在单一环境）
+#include <esp_err.h>
 
 // ============================================================================
 // 雷达协议选择
@@ -64,56 +69,64 @@ typedef struct {
     uint32_t movement_system_timestamp;   // 体动系统时间戳 (s)
 } radar_latest_data_t;
 
-// ============================================================================
-// 回调函数类型定义
-// ============================================================================
+// 句柄声明 struct my_lidar_impl* 是在源文件内部实现，这里隐式声明，避免使用空指针
+typedef struct my_lidar_impl* my_lidar_handle_t;
 
+// 旧的回调类型定义（用于底层实现兼容）
 typedef void (*radar_human_callback_t)(const radar_human_data_t *data);
 typedef void (*radar_respiratory_callback_t)(const radar_respiratory_data_t *data);
 typedef void (*radar_heart_rate_callback_t)(const radar_heart_rate_data_t *data);
 
+// 事件回调声明，context 是用于传递上下文
+typedef void (*my_lidar_human_presence_callback_t)(const radar_human_data_t *data, void *context, my_lidar_handle_t self);
+typedef void (*my_lidar_human_movement_callback_t)(const radar_human_data_t *data, void *context, my_lidar_handle_t self);
+typedef void (*my_lidar_respiratory_callback_t)(const radar_respiratory_data_t *data, void *context, my_lidar_handle_t self);
+typedef void (*my_lidar_heart_rate_callback_t)(const radar_heart_rate_data_t *data, void *context, my_lidar_handle_t self);
+typedef void (*my_lidar_move_trig_callback_t)(void *context, my_lidar_handle_t self);
+
+// CPP 文件兼容声明，很多时候还是需要用到 cpp 一些特性来简化代码
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// ============================================================================
-// 通用雷达接口（统一API）
-// ============================================================================
+/// 初始化，入参是句柄指针的指针,用于返回句柄指针
+// 返回最好是 int，表示运行结果，可以参考下常规 Linux 对错误的定义，esp_err_t 本质也是 int
+int my_lidar_init(my_lidar_handle_t *self_out);
 
-// 初始化雷达
-void my_radar_init(void);
+//******** 功能函数 ********
 
 // 启动雷达
-void my_radar_start(void);
+int my_lidar_start(my_lidar_handle_t self);
 
 // 停止雷达
-void my_radar_stop(void);
+int my_lidar_stop(my_lidar_handle_t self);
 
-// 设置回调函数
-void my_radar_set_human_presence_callback(radar_human_callback_t callback);
-void my_radar_set_human_movement_callback(radar_human_callback_t callback);
-void my_radar_set_respiratory_callback(radar_respiratory_callback_t callback);
-void my_radar_set_heart_rate_callback(radar_heart_rate_callback_t callback);
+// 注册回调函数，建议只允许被注册一次，不然会有很多异步冲突的问题导致异常
+int my_lidar_reg_cb_human_presence(my_lidar_handle_t self, my_lidar_human_presence_callback_t func, void *context);
+int my_lidar_reg_cb_human_movement(my_lidar_handle_t self, my_lidar_human_movement_callback_t func, void *context);
+int my_lidar_reg_cb_respiratory(my_lidar_handle_t self, my_lidar_respiratory_callback_t func, void *context);
+int my_lidar_reg_cb_heart_rate(my_lidar_handle_t self, my_lidar_heart_rate_callback_t func, void *context);
+int my_lidar_reg_cb_move_trig(my_lidar_handle_t self, my_lidar_move_trig_callback_t func, void *context);   //FIXME:编译说没有这个函数
 
 // 查询连接状态
-bool my_radar_is_connected(void);
+bool my_lidar_is_connected(my_lidar_handle_t self);
+// 查询是否有人体存在
+bool my_lidar_have_human(my_lidar_handle_t self);
 
 // 数据获取函数
-bool my_radar_get_human_data(radar_human_data_t *data);
-bool my_radar_get_respiratory_data(radar_respiratory_data_t *data);
-bool my_radar_get_heart_rate_data(radar_heart_rate_data_t *data);
-bool my_radar_get_product_info(radar_product_info_t *info);
+int my_lidar_get_human_data(my_lidar_handle_t self, radar_human_data_t *data);
+int my_lidar_get_respiratory_data(my_lidar_handle_t self, radar_respiratory_data_t *data);
+int my_lidar_get_heart_rate_data(my_lidar_handle_t self, radar_heart_rate_data_t *data);
+int my_lidar_get_product_info(my_lidar_handle_t self, radar_product_info_t *info);
 
 // 获取最近的体动、呼吸、心率数据
-bool my_radar_get_latest_data(radar_latest_data_t *data);
+int my_lidar_get_latest_data(my_lidar_handle_t self, radar_latest_data_t *data);
 
-// 将雷达数据转换为 JSON 字符串
-// 返回 JSON 字符串长度，失败返回 -1
-// 注意：调用者需要释放返回的字符串（使用 free）
-int my_radar_data_to_json(const radar_latest_data_t *data, uint32_t timestamp, char **json_str);
+// 用于节省内存，定时刷新函数，可以让一个线程运行多个组件的 flush，减少线程数量
+int my_lidar_flush(my_lidar_handle_t self, uint32_t interval_ms);
 
-// 刷新函数（由主线程定时调用，仅R60ABD1雷达需要）
-void my_radar_flush(void);
+// 设置灵敏度参数（movement_threshold: 体动参数阈值0-100，默认20；heart_rate_timeout_ms: 心率数据超时时间毫秒，默认5000）
+int my_lidar_set_sensitivity(my_lidar_handle_t self, uint8_t movement_threshold, uint32_t heart_rate_timeout_ms);
 
 // ============================================================================
 // 特定雷达功能（仅当使用对应雷达时可用）
@@ -121,13 +134,13 @@ void my_radar_flush(void);
 
 #ifndef USE_AIRTOUCH_RADAR
 // R60ABD1特有的命令接口
-bool my_radar_send_command(uint8_t control, uint8_t command, const uint8_t *data, uint16_t length);
-bool my_radar_query_product_info(void);
-bool my_radar_query_human_presence(void);
-bool my_radar_set_human_switch(bool enable);
-bool my_radar_set_respiratory_switch(bool enable);
-bool my_radar_set_heart_rate_switch(bool enable);
-bool my_radar_query_human_switch_status(void);
+int my_lidar_send_command(my_lidar_handle_t self, uint8_t control, uint8_t command, const uint8_t *data, uint16_t length);
+int my_lidar_query_product_info(my_lidar_handle_t self);
+int my_lidar_query_human_presence(my_lidar_handle_t self);
+int my_lidar_set_human_switch(my_lidar_handle_t self, bool enable);
+int my_lidar_set_respiratory_switch(my_lidar_handle_t self, bool enable);
+int my_lidar_set_heart_rate_switch(my_lidar_handle_t self, bool enable);
+int my_lidar_query_human_switch_status(my_lidar_handle_t self);
 #endif
 
 #ifdef __cplusplus

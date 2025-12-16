@@ -7,6 +7,8 @@
 #include "my_ui_behavior.h"
 #include "esp_log.h"
 
+static board_bs814_pin_t bs814_pins;
+
 // ---- 兼容新旧 IDF 的 delay 头文件 ----
 #if __has_include("esp_rom/esp_rom_sys.h")
     #include "esp_rom/esp_rom_sys.h"
@@ -45,20 +47,23 @@ static void btn_adjust_volume(int step)
 // ---------- 初始化 ----------
 void bs814_init(void)
 {
+    // 获取BS814引脚配置
+    ESP_ERROR_CHECK(get_bs814_pins(&bs814_pins));
+    
     // CLK 输出
     gpio_config_t clk_conf = {
-        .pin_bit_mask = 1ULL << BS814_CLK_PIN,
+        .pin_bit_mask = 1ULL << bs814_pins.clk_pin,
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = 0,
         .pull_down_en = 0,
         .intr_type = GPIO_INTR_DISABLE,
     };
     gpio_config(&clk_conf);
-    gpio_set_level(BS814_CLK_PIN, 0);
+    gpio_set_level(bs814_pins.clk_pin, 0);
 
     // DATA 输入
     gpio_config_t data_conf = {
-        .pin_bit_mask = 1ULL << BS814_DATA_PIN,
+        .pin_bit_mask = 1ULL << bs814_pins.data_pin,
         .mode = GPIO_MODE_INPUT,
         .pull_up_en = 0,
         .pull_down_en = 0,
@@ -79,19 +84,19 @@ uint8_t bs814_read_raw(void)
 
     for (int i = 0; i < 8; i++)
     {
-        gpio_set_level(BS814_CLK_PIN, 0);
+        gpio_set_level(bs814_pins.clk_pin, 0);
         esp_rom_delay_us(25);
 
-        gpio_set_level(BS814_CLK_PIN, 1);
+        gpio_set_level(bs814_pins.clk_pin, 1);
         esp_rom_delay_us(5);
 
-        int d = gpio_get_level(BS814_DATA_PIN);
+        int d = gpio_get_level(bs814_pins.data_pin);
         if (d) result |= (1 << i);
 
         esp_rom_delay_us(25);
     }
 
-    gpio_set_level(BS814_CLK_PIN, 0);
+    gpio_set_level(bs814_pins.clk_pin, 0);
 
     g_last_raw = result;
     return result;

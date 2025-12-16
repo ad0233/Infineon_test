@@ -3,12 +3,31 @@
 #include <stdint.h>
 
 #include "fsm_lib.h"
+#include "my_rtc.h"
+#include "my_lidar.h"
+#include "my_wifi.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int fsm_main_init(void);
+// FSM上下文结构体
+typedef struct {
+    my_rtc_handle_t rtc_handle;
+    my_lidar_handle_t lidar_handle;
+    my_wifi_handle_t wifi_handle;
+} fsm_main_context_t;
+
+int fsm_main_init(const fsm_main_context_t *ctx);
+
+// 获取RTC句柄
+my_rtc_handle_t fsm_main_get_rtc_handle(void);
+
+// 获取雷达句柄
+my_lidar_handle_t fsm_main_get_lidar_handle(void);
+
+// 获取WiFi句柄
+my_wifi_handle_t fsm_main_get_wifi_handle(void);
 
 enum fm_wifi_conn_state {
     FM_W_N_CFG,
@@ -105,7 +124,7 @@ void fsm_main_in_OTA(void *arg, uint8_t last_state, uint8_t next_state);
 enum fsm_main_event_enum {
     F_MAIN_E_INIT,              // 初始化事件
     F_MAIN_E_ANIM_PLAY_SUC,     //播放结束
-    F_MAIN_E_LIDAR_FIND,        // 雷达找到人事件
+    F_MAIN_E_LIDAR_MOVE_TRIG,   // 雷达找到人事件
     F_MAIN_E_LIDAR_UPDATE,      // 雷达数据更新事件
     F_MAIN_E_LIDAR_NOT_FOUND,   // 雷达未找到人事件
     F_MAIN_E_DEV_MOVE,          // 设备移动事件
@@ -120,7 +139,6 @@ enum fsm_main_event_enum {
     F_MAIN_E_RTC_EXIST,        // RTC有（检测到RTC模块存在且正常）
     F_MAIN_E_RTC_NOT_EXIST,     // RTC无（未检测到RTC模块，或模块故障无法识别）
 
-    F_MAIN_E_OTA_UPDATE, //OTA更新事件 
     F_MAIN_E_BOYA_DATA_UPDATE, //睡眠数据更新事件 
     F_MAIN_E_RadarInfo_UPDATE , //雷达数据更新事件 
 

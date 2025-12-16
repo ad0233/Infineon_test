@@ -55,6 +55,41 @@
 #define TOUCH_PANEL_INVERSE_Y      (0)
 
 /**
+ * @brief LCD Function Definition
+ */
+#define FUNC_LCD_EN                (1)
+#define LCD_BL_PWM                 GPIO_NUM_3
+#define LCD_RESET                  -1
+#define LCD_CS                     GPIO_NUM_39
+#define LCD_SCK                    GPIO_NUM_9
+#define LCD_DA0                     GPIO_NUM_6
+#define LCD_DA1                     GPIO_NUM_2
+#define LCD_DA2                     GPIO_NUM_4
+#define LCD_DA3                     GPIO_NUM_7
+
+/**
+ * @brief Encoder Function Definition
+ */
+#define FUNC_ENCODER_EN            (1)
+#define ENCODER_PIN_A               GPIO_NUM_14
+#define ENCODER_PIN_B               GPIO_NUM_1
+#define ENCODER_PIN_BTN             GPIO_NUM_38
+
+/**
+ * @brief BS814 Button Chip Function Definition
+ */
+#define FUNC_BS814_EN               (1)
+#define BS814_CLK_PIN               GPIO_NUM_5
+#define BS814_DATA_PIN              GPIO_NUM_38
+
+/**
+ * @brief PCF8574RGTR I2C IO Expander Function Definition
+ */
+#define FUNC_PCF8574_EN             (1)
+#define PCF8574_I2C_ADDR            (0x20)  /* I2C address (A0=A1=A2=0) */
+#define PCF8574_P1_LCD_RESET        (1)     /* P1 pin controls LCD_RESET */
+
+/**
  * @brief  Audio Codec Chip Function Definition
  */
 #define FUNC_AUDIO_CODEC_EN       (1)
@@ -62,7 +97,7 @@
 #define CODEC_ADC_BITS_PER_SAMPLE ((i2s_data_bit_width_t)16)  /* 32bit */
 #define CODEC_ADC_SAMPLE_RATE     (16000)
 #define RECORD_HARDWARE_AEC       (true)
-#define BOARD_PA_GAIN             (6)  /* Power amplifier gain defined by board (dB) */
+// #define BOARD_PA_GAIN             (6)  /* Power amplifier gain defined by board (dB) */
 #define HEADPHONE_DETECT          (-1)
 // #define PA_ENABLE_GPIO            GPIO_NUM_48
 #define ES8311_MCLK_SOURCE        (0)  /* 0 From MCLK of esp32   1 From BCLK */

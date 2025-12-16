@@ -23,19 +23,18 @@
 #include "freertos/task.h"  // 添加这个头文件
 
 #include "my_ui_canvas.h"
+#include "board_pins_config.h"
+#include "pcf8574.h"
+#include "i2c_bus.h"
 
 #define TAG __FILE__
 
-#define LCD_BL_PWM GPIO_NUM_3
-#define LCD_RESET -1  // 使用软件复位
-
 #define LCD_HOST            (SPI2_HOST)
-#define LCD_CS GPIO_NUM_39
-#define LCD_SCK GPIO_NUM_8
-#define LCD_DA0 GPIO_NUM_6
-#define LCD_DA1 GPIO_NUM_2
-#define LCD_DA2 GPIO_NUM_4
-#define LCD_DA3 GPIO_NUM_7
+
+static board_lcd_pin_t lcd_pins;
+static pcf8574_handle_t pcf8574_handle;
+static bool pcf8574_initialized = false;
+i2c_bus_handle_t lcd_i2c_bus = NULL;  // LCD创建的I2C总线句柄，供RTC复用（非static以便RTC访问）
 
 #define EXAMPLE_LCD_H_RES           (360)
 #define EXAMPLE_LCD_V_RES           (360)
@@ -71,6 +70,23 @@ static void lcd_flush_wait_cb(lv_display_t *disp)
 
 void bsp_lcd_init(void);
 void bsp_lcd_bl_init(void);
+
+void bsp_lcd_reset(void)
+{
+    if (pcf8574_initialized) {
+        // 通过PCF8574的P1脚进行硬件复位
+        ESP_LOGI(TAG, "LCD_RESET via PCF8574 P1");
+        pcf8574_set_pin(&pcf8574_handle, 1, 0);  // P1拉低（LCD_RESET低电平）
+        vTaskDelay(pdMS_TO_TICKS(10));
+        pcf8574_set_pin(&pcf8574_handle, 1, 1);  // P1拉高（LCD_RESET高电平）
+        vTaskDelay(pdMS_TO_TICKS(120));  // 等待LCD复位完成（参考ST77916驱动要求120ms）
+    } else if (panel_handle != NULL) {
+        // 使用ESP LCD驱动的复位功能（硬件GPIO或软件复位）
+        esp_lcd_panel_reset(panel_handle);
+    } else {
+        ESP_LOGW(TAG, "LCD panel not initialized, cannot reset");
+    }
+}
 
 int my_lcd_init() {
     int ram_dma = heap_caps_get_free_size(MALLOC_CAP_DMA);
@@ -124,18 +140,50 @@ int my_lcd_init() {
 
 void bsp_lcd_init(void)
 {
+    // 获取LCD引脚配置
+    ESP_ERROR_CHECK(get_lcd_pins(&lcd_pins));
+    
+    // 如果LCD_RESET通过PCF8574控制，初始化PCF8574
+    // 使用与RTC相同的I2C配置创建I2C总线（RTC、ES8311、ES7210会复用）
+    if (lcd_pins.reset == -1) {
+        board_pcf8574_config_t pcf8574_config;
+        if (get_pcf8574_config(&pcf8574_config) == ESP_OK && pcf8574_config.p1_lcd_reset) {
+            // 创建I2C总线（使用与RTC相同的配置）
+            i2c_config_t i2c_cfg = {0};
+            i2c_cfg.mode = I2C_MODE_MASTER;
+            i2c_cfg.sda_pullup_en = GPIO_PULLUP_ENABLE;
+            i2c_cfg.scl_pullup_en = GPIO_PULLUP_ENABLE;
+            i2c_cfg.master.clk_speed = 100000;
+            
+            esp_err_t ret = get_i2c_pins(I2C_NUM_0, &i2c_cfg);
+            if (ret == ESP_OK) {
+                lcd_i2c_bus = i2c_bus_create(I2C_NUM_0, &i2c_cfg);
+                if (lcd_i2c_bus != NULL) {
+                    if (pcf8574_init(&pcf8574_handle, lcd_i2c_bus, pcf8574_config.i2c_addr) == ESP_OK) {
+                        pcf8574_initialized = true;
+                        ESP_LOGI(TAG, "PCF8574 initialized for LCD_RESET control");
+                    } else {
+                        ESP_LOGW(TAG, "Failed to initialize PCF8574");
+                    }
+                } else {
+                    ESP_LOGW(TAG, "Failed to create I2C bus for PCF8574");
+                }
+            }
+        }
+    }
+    
     ESP_LOGI(TAG, "Initialize QSPI bus");
-    const spi_bus_config_t bus_config = ST77916_PANEL_BUS_QSPI_CONFIG(LCD_SCK,
-                                                                                 LCD_DA0,
-                                                                                 LCD_DA1,
-                                                                                 LCD_DA2,
-                                                                                 LCD_DA3,
-                                                                                 LCD_BUFFER_SIZE * sizeof(uint16_t));
+    const spi_bus_config_t bus_config = ST77916_PANEL_BUS_QSPI_CONFIG(lcd_pins.sck,
+                                                                                 lcd_pins.da0,
+                                                                                 lcd_pins.da1,
+                                                                                 lcd_pins.da2,
+                                                                                 lcd_pins.da3,
+                                                                                 EXAMPLE_LCD_H_RES * 80 * sizeof(uint16_t));
     ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &bus_config, SPI_DMA_CH_AUTO));
 
     ESP_LOGI(TAG, "Install panel IO");
     
-    const esp_lcd_panel_io_spi_config_t io_config = ST77916_PANEL_IO_QSPI_CONFIG(LCD_CS, NULL, NULL);
+    const esp_lcd_panel_io_spi_config_t io_config = ST77916_PANEL_IO_QSPI_CONFIG(lcd_pins.cs, NULL, NULL);
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &io_config, &io_handle));
 
     ESP_LOGI(TAG, "Install ST77916 panel driver");
@@ -146,13 +194,16 @@ void bsp_lcd_init(void)
         },
     };
     const esp_lcd_panel_dev_config_t panel_config = {
-        .reset_gpio_num = (LCD_RESET == -1) ? GPIO_NUM_NC : LCD_RESET,  // 如果为-1则使用软件复位
+        .reset_gpio_num = lcd_pins.reset,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,     // Implemented by LCD command `36h`
         .bits_per_pixel = EXAMPLE_LCD_BIT_PER_PIXEL,    // Implemented by LCD command `3Ah` (16/18)
         .vendor_config = &vendor_config,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_st77916(io_handle, &panel_config, &panel_handle));
 
+    // 执行LCD复位（通过PCF8574或硬件GPIO）
+    bsp_lcd_reset();
+    
     // 复位LCD（如果reset_gpio_num为-1，驱动会自动使用软件复位）
     if (LCD_RESET == -1) {
         ESP_LOGI(TAG, "Using software reset (reset_gpio_num = -1)");
@@ -188,7 +239,7 @@ void bsp_lcd_bl_on(void)
 void bsp_lcd_bl_init(void)
 {
     const ledc_channel_config_t LCD_backlight_channel = {
-        .gpio_num = LCD_BL_PWM,
+        .gpio_num = lcd_pins.bl_pwm,
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .channel = LEDC_CHANNEL_0,
         .intr_type = LEDC_INTR_DISABLE,

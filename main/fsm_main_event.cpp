@@ -18,6 +18,7 @@
 #include "my_rtc.h"
 #include "my_lidar.h"
 #include "my_lcd.h"
+#include "fsm_main.h"
 
 #define TAG "fsm_main"
 
@@ -29,39 +30,19 @@
 static uint32_t s_fail_start_time = 0;  // 失败状态开始的时间戳（ms）
 #define FIND_TIMEOUT_MS 15000  // 15秒超时
 
-// 静态变量：动画期间是否找到人的标志位
-static bool s_person_found_during_anim = false;  // 在找人动画期间是否找到人
-
-// 设置动画期间找到人的标志位（供外部调用）
-void fsm_main_set_person_found_during_anim(bool found) {
-    s_person_found_during_anim = found;
-    if (found) {
-        ESP_LOGI(TAG, "Person found during animation, flag set");
-    }
-}
-
 // 静态变量：闹钟开关状态
 static bool s_alarm_enabled = true;  // true=有闹钟, false=无闹钟
 static bool s_alarm_state_initialized = false;  // 状态是否已初始化
 
 //找人
 uint8_t fm_has_h_fd_state(void) {
-    // 如果动画期间已经找到人，直接返回成功
-    if (s_person_found_during_anim) {
+
+    my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
+    if(my_lidar_have_human(lidar_handle)) {
+        ESP_LOGI(TAG, "person found");
         return FM_H_F_SUC;
-    }
-    
-    radar_latest_data_t radar_data;
-    if(my_radar_get_latest_data(&radar_data)) {
-        ESP_LOGI(TAG, "movement_param: %d", radar_data.movement_param);
-        // 挥挥手就识别成功了
-        if(radar_data.movement_param >15) {
-            return FM_H_F_SUC;
-        }
-        // TODO: 心率检测更合理些,因为如果没人,就不会有心率更新,但是甲方要求体动判断先
-        if(esp_log_timestamp() - radar_data.heart_rate_system_timestamp < 5) {
-            return FM_H_F_SUC;
-        }
+    } else {
+        ESP_LOGI(TAG, "person not found");
     }
 
     if(esp_log_timestamp() - s_fail_start_time > FIND_TIMEOUT_MS) {
@@ -80,11 +61,18 @@ uint8_t fm_has_w_c_state(void) {
         ESP_LOGI(TAG, "wifi not configured");
         return FM_W_N_CFG;
     }
-    switch (my_wifi_get_state())
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (!wifi_handle) {
+        ESP_LOGI(TAG, "wifi not initialized");
+        return FM_W_FAI;
+    }
+    
+    switch (my_wifi_get_state(wifi_handle))
     {
     case WIFI_STATE_CONNECTED: {
         // WiFi连接成功，检查NTP是否已同步
-        if (my_rtc_is_ntp_synced()) {
+        my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+        if (rtc_handle != NULL && my_rtc_is_ntp_synced(rtc_handle)) {
             ESP_LOGI(TAG, "wifi is connected and NTP synced");
             return FM_W_SUC;
         } else {
@@ -118,7 +106,8 @@ uint8_t fsm_has_wifi_config(void) {
 /*----------------------------------------------------------------------rtc-----------------------------------------------------------------------------------------------*/
 uint8_t fm_has_rtc_state(void) {
     // my_rtc_is_time_valid() 返回 bool 类型：true(1) 表示有效，false(0) 表示无效
-    bool rtc_valid = my_rtc_is_time_valid();
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    bool rtc_valid = (rtc_handle != NULL) ? my_rtc_is_time_valid(rtc_handle) : false;
     
     if (rtc_valid) {
         ESP_LOGI(TAG, "RTC connected");
@@ -154,7 +143,8 @@ uint8_t fm_has_memu_state(void){
     uint8_t ret = 0;
     switch(current_index) {
         case 0: // Wi-Fi
-            if(my_wifi_get_state() == WIFI_STATE_CONNECTED){    //这里需要放入有无wifi的判断
+            my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+            if(wifi_handle && my_wifi_get_state(wifi_handle) == WIFI_STATE_CONNECTED){    //这里需要放入有无wifi的判断
                 ret = FM_MEMU_WIFI_SC;
             }
             else{
@@ -208,7 +198,8 @@ void fsm_main_set_time(void *arg, uint8_t last_state, uint8_t next_state) {
     bool valid = false;
 
     // 检查 RTC 是否有效
-    if (my_rtc_get_time(&t, &valid) == 0 && valid) {
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    if (rtc_handle != NULL && my_rtc_get_time(rtc_handle, &t, &valid) == 0 && valid) {
         // RTC 已设置，使用 RTC 时间
         s_editing_hour   = t.tm_hour;
         s_editing_minute = t.tm_min;
@@ -297,7 +288,8 @@ void fsm_main_rtc_save_and_exit(void *arg, uint8_t last_state, uint8_t next_stat
     bool valid = false;
 
     //---- 1. 尝试从 RTC 获取当前日期 ----
-    if (my_rtc_get_time(&t, &valid) != 0) {
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    if (rtc_handle == NULL || my_rtc_get_time(rtc_handle, &t, &valid) != 0) {
         ESP_LOGW(TAG, "RTC read failed, using default date.");
 
         t.tm_year = 124;  // 2024 = 1900 + 124
@@ -312,7 +304,7 @@ void fsm_main_rtc_save_and_exit(void *arg, uint8_t last_state, uint8_t next_stat
     t.tm_sec  = 0;
 
     //---- 3. 写入 RTC ----
-    int ret = my_rtc_set_time(&t);
+    int ret = my_rtc_set_time(rtc_handle, &t);
 
     if (ret == 0) {
         ESP_LOGI(TAG, "RTC saved successfully: %02d:%02d",
@@ -336,7 +328,8 @@ void fsm_main_to_clock(void *arg, uint8_t last_state, uint8_t next_state) {
     uint8_t hour = 7;
     uint8_t minute = 30;
     
-    if (my_rtc_get_time(&time, &valid) == 0) {
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    if (rtc_handle != NULL && my_rtc_get_time(rtc_handle, &time, &valid) == 0) {
         hour = time.tm_hour;
         minute = time.tm_min;
     }
@@ -616,7 +609,8 @@ void fsm_light_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
 }
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 uint8_t fsm_clock_need_cfg(void) {
-    return my_rtc_is_time_valid();
+    my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
+    return (rtc_handle != NULL) ? my_rtc_is_time_valid(rtc_handle) : false;
 }
 
 void fsm_main_lidar_clock_update(void *arg, uint8_t last_state, uint8_t next_state) {
@@ -638,7 +632,6 @@ void fsm_main_lidar_find_boot(void *arg, uint8_t last_state, uint8_t next_state)
 void fsm_main_lidar_find_playing(void *arg, uint8_t last_state, uint8_t next_state){
     // 重置失败时间戳，开始新的检测周期
     // 清除找到人的标志位，开始新的检测
-    s_person_found_during_anim = false;
 
     my_h264_start(MY_H264_ANIM_PROCESSING,100);
 
@@ -649,13 +642,11 @@ void fsm_main_lidar_find_playing(void *arg, uint8_t last_state, uint8_t next_sta
 //找到人动画
 void fsm_main_find_someone(void *arg, uint8_t last_state, uint8_t next_state){
     // 清除标志位，因为已经进入成功流程
-    s_person_found_during_anim = false;
     my_h264_start(MY_H264_ANIM_HUMAN_RECOGNIZED,100);
 }
 //没找到人动画
 void fsm_main_no_find_someone(void *arg, uint8_t last_state, uint8_t next_state){
     // 清除标志位，因为已经进入失败流程
-    s_person_found_during_anim = false;
     my_h264_start(MY_H264_ANIM_FAIL2,100);
 }
 
@@ -765,7 +756,10 @@ void fsm_main_wifi_reconn(void *arg, uint8_t last_state, uint8_t next_state) {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_Connecting);
     lvgl_port_unlock();
-    my_wifi_auto_connect();
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (wifi_handle) {
+        my_wifi_auto_connect(wifi_handle);
+    }
 }
 
 void fsm_main_wifi_forget(void *arg, uint8_t last_state, uint8_t next_state) {

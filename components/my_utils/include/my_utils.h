@@ -29,7 +29,7 @@ extern "C" {
  * @param pvCreatedTask Handle to the created task (can be NULL)
  * @return ESP_OK on success, ESP_FAIL on failure
  */
-esp_err_t my_thread_create(
+esp_err_t my_task_create_psram(
     TaskFunction_t pvTaskCode,
     const char *pcName,
     uint32_t usStackDepth,
@@ -49,7 +49,7 @@ esp_err_t my_thread_create(
  * @param xCoreID Core ID (0 or 1, or tskNO_AFFINITY)
  * @return ESP_OK on success, ESP_FAIL on failure
  */
-esp_err_t my_thread_create_pinned(
+esp_err_t my_task_create_pinned_psram(
     TaskFunction_t pvTaskCode,
     const char *pcName,
     uint32_t usStackDepth,
@@ -59,7 +59,7 @@ esp_err_t my_thread_create_pinned(
     BaseType_t xCoreID);
 
 /**
- * @brief Delete a task created with my_thread_create or my_thread_create_pinned
+ * @brief Delete a task created with my_task_create_psram or my_task_create_pinned_psram
  * 
  * Safely deletes the task and frees associated PSRAM and internal memory.
  * Uses a background cleanup manager to ensure resources are properly freed.

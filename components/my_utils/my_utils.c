@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <inttypes.h>
 
 static const char *TAG = "MY_UTILS";
 
@@ -83,7 +84,7 @@ static esp_err_t ensure_cleanup_manager(void) {
     return ESP_OK;
 }
 
-esp_err_t my_thread_create(
+esp_err_t my_task_create_psram(
     TaskFunction_t pvTaskCode,
     const char *pcName,
     uint32_t usStackDepth,
@@ -135,11 +136,11 @@ esp_err_t my_thread_create(
         *pvCreatedTask = handle;
     }
 
-    ESP_LOGI(TAG, "Created task %s with %lu bytes stack in PSRAM", pcName ? pcName : "unnamed", usStackDepth);
+    ESP_LOGI(TAG, "Created task %s with %" PRIu32 " bytes stack in PSRAM", pcName ? pcName : "unnamed", usStackDepth);
     return ESP_OK;
 }
 
-esp_err_t my_thread_create_pinned(
+esp_err_t my_task_create_pinned_psram(
     TaskFunction_t pvTaskCode,
     const char *pcName,
     uint32_t usStackDepth,
@@ -193,7 +194,7 @@ esp_err_t my_thread_create_pinned(
         *pvCreatedTask = handle;
     }
 
-    ESP_LOGI(TAG, "Created task %s with %lu bytes stack in PSRAM on core %d", 
+    ESP_LOGI(TAG, "Created task %s with %" PRIu32 " bytes stack in PSRAM on core %d", 
              pcName ? pcName : "unnamed", usStackDepth, xCoreID);
     return ESP_OK;
 }

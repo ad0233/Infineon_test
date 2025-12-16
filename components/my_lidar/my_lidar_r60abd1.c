@@ -279,13 +279,13 @@ bool r60abd1_set_human_switch(bool enable)
 bool r60abd1_set_respiratory_switch(bool enable)
 {
     uint8_t data = enable ? 0x01 : 0x00;
-    return r60abd1_send_command(0x81, RADAR_CMD_RESPIRATORY_SWITCH, &data, 1);
+    return r60abd1_send_command(RADAR_CTRL_RESPIRATORY, RADAR_CMD_RESPIRATORY_SWITCH, &data, 1);
 }
 
 bool r60abd1_set_heart_rate_switch(bool enable)
 {
     uint8_t data = enable ? 0x01 : 0x00;
-    return r60abd1_send_command(0x82, RADAR_CMD_HEART_RATE_SWITCH, &data, 1);
+    return r60abd1_send_command(RADAR_CTRL_HEART_RATE, RADAR_CMD_HEART_RATE_SWITCH, &data, 1);
 }
 
 // ============================================================================

@@ -41,6 +41,7 @@
 #include "driver/sdmmc_defs.h"
 #include "sdmmc_cmd.h"
 #include "esp_vfs_fat.h"
+#include "board_pins_config.h"
 
 #include "my_lcd.h"
 #include "encoder.h"
@@ -98,15 +99,19 @@ static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
 }
 
 // 人体存在检测数据回调函数
-void human_presence_callback(const radar_human_data_t *data)
+void human_presence_callback(const radar_human_data_t *data, void *context, my_lidar_handle_t self)
 {
+    (void)context;
+    (void)self;
     // 有人没人 - 状态变化时上报
     // ESP_LOGI("HUMAN", "有人: %s", data->presence ? "是" : "否");
 }
 
 // 体动参数数据回调函数（已不使用，保留接口）
-void human_movement_callback(const radar_human_data_t *data)
+void human_movement_callback(const radar_human_data_t *data, void *context, my_lidar_handle_t self)
 {
+    (void)context;
+    (void)self;
     // ESP_LOGI("HUMAN", "体动参数: %d", data->movement_param);
     // 体动参数可用于更新图表曲线
     if (ui_RadarInfoChart != NULL && lvgl_port_lock(0)) {
@@ -119,8 +124,10 @@ void human_movement_callback(const radar_human_data_t *data)
 }
 
 // 呼吸监测数据回调函数
-void respiratory_data_callback(const radar_respiratory_data_t *data)
+void respiratory_data_callback(const radar_respiratory_data_t *data, void *context, my_lidar_handle_t self)
 {
+    (void)context;
+    (void)self;
     // ESP_LOGI("RESPIRATORY", "呼吸: %d 次/min", data->respiratory_value);
     if (ui_RadarInfoBreathingX != NULL && lvgl_port_lock(0)) {
         char text[16];
@@ -131,8 +138,10 @@ void respiratory_data_callback(const radar_respiratory_data_t *data)
 }
 
 // 心率监测数据回调函数
-void heart_rate_data_callback(const radar_heart_rate_data_t *data)
+void heart_rate_data_callback(const radar_heart_rate_data_t *data, void *context, my_lidar_handle_t self)
 {
+    (void)context;
+    (void)self;
     // ESP_LOGI("HEART_RATE", "心率: %d 次/min", data->heart_rate_value);
     if (ui_RadarInfoHeartX != NULL && lvgl_port_lock(0)) {
         char text[16];
@@ -149,7 +158,10 @@ void heart_rate_data_callback(const radar_heart_rate_data_t *data)
 // #define ENABLE_TASK_MONITOR
 
 static const char *TAG = "main";
-// static audio_board_handle_t board_handle; // 已注释，音频功能已禁用
+static audio_board_handle_t board_handle;
+static my_rtc_handle_t s_rtc_handle = NULL;  // RTC句柄，仅在main.cpp中使用
+static my_lidar_handle_t s_lidar_handle = NULL;  // 雷达句柄，仅在main.cpp中使用
+static my_wifi_handle_t s_wifi_handle = NULL;  // WiFi句柄
 
 #if defined(ENABLE_TASK_MONITOR)
 static void monitor_task(void *arg)
@@ -254,89 +266,98 @@ extern "C" void app_main()
 
     print_mem_info();
 
-    if (fsm_main_init() != 0) {
-        ESP_LOGE(TAG, "fsm_main_init failed");
-        vTaskDelete(nullptr);
+    // 初始化RTC
+    if (my_rtc_init(&s_rtc_handle) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init RTC");
     }
+
+    my_rtc_reg_cb_second(s_rtc_handle, 
+        [](uint8_t hour, uint8_t minute, void *context, my_rtc_handle_t self) {
+            my_ui_clock_set_now_time(hour, minute);
+        },
+        nullptr
+    );
+
+    my_lidar_init(&s_lidar_handle);
+    my_lidar_set_sensitivity(s_lidar_handle, 20, 5 * 1000);
+    my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
+    my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
+    my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
+    my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
+    my_lidar_reg_cb_move_trig(s_lidar_handle, [](void *context, my_lidar_handle_t self){
+        (void)context;
+        (void)self;
+        fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
+    }, nullptr);
+    
     print_mem_info();
     my_ui_generate_qr_code("https://lunawake.ai", iot_config_view->thing_name);
     my_ble_init(iot_config_view->thing_name);
     print_mem_info();
     ble_protocol_init();
     print_mem_info();
-    my_wifi_init();
-    my_wifi_auto_connect();
-    my_wifi_set_event_callback([](wifi_state_t state, void *context){
+    if (my_wifi_init(&s_wifi_handle) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init WiFi");
+    }
+    
+    // 初始化FSM，传入上下文
+    fsm_main_context_t fsm_ctx = {
+        .rtc_handle = s_rtc_handle,
+        .lidar_handle = s_lidar_handle,
+        .wifi_handle = s_wifi_handle
+    };
+    if (fsm_main_init(&fsm_ctx) != 0) {
+        ESP_LOGE(TAG, "fsm_main_init failed");
+        vTaskDelete(nullptr);
+    }
+    // bs814_init();
+    my_wifi_auto_connect(s_wifi_handle);
+    // WiFi事件改为轮询方式，在encoder_test中处理
+    // my_wifi_set_event_callback 保留用于其他用途（如NTP同步任务）
+    my_wifi_set_event_callback(s_wifi_handle, [](wifi_state_t state, void *context, my_wifi_handle_t self){
+        // WiFi连接成功后，开始NTP同步
         if (state == WIFI_STATE_CONNECTED) {
-            xTaskCreate([](void *arg) {
-                vTaskDelay(pdMS_TO_TICKS(500));
-                setenv("TZ", "CST-8", 1);
-                tzset();
-                esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("cn.pool.ntp.org");
-                esp_err_t init_ret = esp_netif_sntp_init(&config);
-                if (init_ret != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to init SNTP: %s", esp_err_to_name(init_ret));
-                    my_rtc_set_ntp_synced(false);
-                    vTaskDelete(nullptr);
-                    return;
-                }
-                ESP_LOGI(TAG, "SNTP initialized with cn.pool.ntp.org");
-                int retry = 0;
-                const int retry_count = 5;
-                esp_err_t ret = ESP_ERR_TIMEOUT;
-                ret = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(8000));
-                if (ret == ESP_ERR_TIMEOUT) {
-                    retry++;
-                    ESP_LOGI(TAG, "Waiting for NTP sync... (%d/%d)", retry, retry_count);
-                    while (ret == ESP_ERR_TIMEOUT && retry < retry_count) {
-                        ret = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(3000));
-                        if (ret == ESP_ERR_TIMEOUT) {
-                            retry++;
-                            ESP_LOGI(TAG, "Waiting for NTP sync... (%d/%d)", retry, retry_count);
-                        }
-                    }
-                }
-                if (ret == ESP_OK) {
-                    ESP_LOGI(TAG, "NTP sync successful");
-                    my_rtc_set_ntp_synced(true);
-                    if (my_rtc_sync_from_ntp() == ESP_OK) {
-                        ESP_LOGI(TAG, "RTC synced from NTP");
-                    } else {
-                        ESP_LOGE(TAG, "Failed to sync RTC from NTP");
-                    }
-                } else {
-                    ESP_LOGE(TAG, "NTP sync failed: %s", esp_err_to_name(ret));
-                    my_rtc_set_ntp_synced(false);
-                }
-                vTaskDelete(nullptr);
-            }, "ntp_sync_task", 4096, nullptr, 5, nullptr);
+            if (s_rtc_handle != NULL) {
+                my_rtc_start_ntp_sync(s_rtc_handle);
+            }
         }
     }, nullptr);
 
     my_ota_register_progress_callback(
         [](int bytes_read, int total_bytes, void *user_ctx) {
             int ota_progress = (total_bytes > 0) ? (bytes_read * 100 / total_bytes) : 0;
-            fsm_main_event_trig(F_MAIN_E_OTA_UPDATE, (void *)(size_t)(ota_progress));
+            lvgl_port_lock(0);
+            lv_disp_load_scr(ui_OTA);
+            char progress_str[10];
+            snprintf(progress_str, sizeof(progress_str), "%d%%", ota_progress);
+            lv_label_set_text(ui_OTALabel2, progress_str);
+            lv_slider_set_range(ui_OTASlider, 0, 100);
+            lv_slider_set_value(ui_OTASlider, ota_progress, LV_ANIM_OFF);
+            lvgl_port_unlock();
         },
         nullptr
     );
     
     print_mem_info();
-    my_rtc_init();
-    my_radar_init();
-    my_radar_set_human_presence_callback(human_presence_callback);
-    my_radar_set_human_movement_callback(human_movement_callback);
-    my_radar_set_respiratory_callback(respiratory_data_callback);
-    my_radar_set_heart_rate_callback(heart_rate_data_callback);
-    */
 
-    // ========== 音频初始化（已注释）==========
-    /*
+    // gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
+    // gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
     board_handle = audio_board_init();
     audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
     audio_hal_set_volume(board_handle->audio_hal, 25);
 
-    // SPIFFS 初始化（音频文件存储位置）
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    // gpio_set_level(PA_ENABLE_GPIO, 0); // Enable PA
+
+    print_mem_info();
+
+    // NTP初始化移到WiFi连接成功后，确保网络就绪
+    // esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+    // esp_netif_sntp_init(&config);
+    print_mem_info();
+
     periph_spiffs_cfg_t spiffs_cfg = {
         .root = "/spiffs",
         .partition_label = "spiffs_data",
@@ -511,7 +532,7 @@ extern "C" void app_main()
 
     fsm_main_event_trig(F_MAIN_E_INIT, nullptr);
     xTaskCreate(encoder_test, "encoder_test", 1024 * 6, nullptr, 10, nullptr);
-    my_radar_start();
+    // my_lidar_start(s_lidar_handle); //TOTD: 雷达好像不需要启动命令，默认启动，确认好就删除这个代码
 
     print_mem_info();
     */
@@ -530,9 +551,6 @@ void tone_play_callback(audio_element_status_t evt) {
 static QueueHandle_t event_queue;
 static rotary_encoder_t re;
 
-#define RE_A_GPIO   GPIO_NUM_20
-#define RE_B_GPIO   GPIO_NUM_39
-#define RE_BTN_GPIO GPIO_NUM_38
 #define EV_QUEUE_LEN 5
 
 static void alarm_set_tips();
@@ -548,10 +566,12 @@ void encoder_test(void *arg)
     ESP_ERROR_CHECK(rotary_encoder_init(event_queue));
 
     // Add one encoder
+    board_encoder_pin_t encoder_pins;
+    ESP_ERROR_CHECK(get_encoder_pins(&encoder_pins));
     memset(&re, 0, sizeof(rotary_encoder_t));
-    re.pin_a = RE_A_GPIO;
-    re.pin_b = RE_B_GPIO;
-    re.pin_btn = RE_BTN_GPIO;
+    re.pin_a = (gpio_num_t)encoder_pins.pin_a;
+    re.pin_b = (gpio_num_t)encoder_pins.pin_b;
+    re.pin_btn = (gpio_num_t)encoder_pins.pin_btn;
     ESP_ERROR_CHECK(rotary_encoder_add(&re));
 
     rotary_encoder_event_t e;
@@ -562,23 +582,16 @@ void encoder_test(void *arg)
     while(xQueueReceive(event_queue, &e, 1) == pdTRUE) {}
 
     // 定时刷新相关变量
-    TickType_t last_radar_flush = 0;
     TickType_t last_fsm_flush = 0;
     TickType_t last_ble_flush = 0;
     TickType_t last_lidar_flush = 0;
     TickType_t last_ota_flush = 0;
     TickType_t last_wifi_flush = 0;
-    TickType_t last_time_update = 0;
-    const TickType_t radar_flush_interval = pdMS_TO_TICKS(100);  // 100ms
     const TickType_t fsm_flush_interval = pdMS_TO_TICKS(100);    // 100ms
     const TickType_t ble_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t lidar_flush_interval = pdMS_TO_TICKS(1000);      // 1000ms
     const TickType_t ota_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t wifi_flush_interval = pdMS_TO_TICKS(200);    // 200ms
-    const TickType_t time_update_interval = pdMS_TO_TICKS(1000); // 1s
-    
-    // 雷达检测状态（用于避免重复触发）
-    static bool last_radar_found = false;
     
     // WiFi状态检测（用于避免重复触发）
     static wifi_state_t last_wifi_state = WIFI_STATE_IDLE;
@@ -631,70 +644,7 @@ void encoder_test(void *arg)
                     break;
             }
         }
-
-        // 定时刷新时钟
-        if ((current_tick - last_time_update) >= time_update_interval) {
-            struct tm timeinfo;
-            bool valid = false;
-            my_rtc_get_time(&timeinfo, &valid);
-            if (valid) {
-                my_ui_clock_set_now_time(timeinfo.tm_hour, timeinfo.tm_min);
-            }
-            last_time_update = current_tick;
-        }
-        
-        // 定时刷新雷达数据（每100ms）
-        if ((current_tick - last_radar_flush) >= radar_flush_interval) {
-            my_radar_flush();
-            
-            // 只在 MENU_UNWIND 状态且雷达检测使能时检查雷达并触发事件
-            uint8_t current_state = fsm_main_get_current_state();
-            if(current_state == F_MAIN_S_MENU_UNWIND && fsm_main_get_radar_detect_enabled()) {
-                // 检查雷达是否找到人，如果找到则触发事件
-                radar_latest_data_t radar_data;
-                if(my_radar_get_latest_data(&radar_data)) {
-                    bool current_radar_found = false;
-                    // 挥挥手就识别成功了
-                    if(radar_data.movement_param > 20) {
-                        current_radar_found = true;
-                    }                    
-                    // 如果从没找到变为找到，再次确认状态后触发事件
-                    if(current_radar_found && !last_radar_found) {
-                        // 再次确认当前状态，避免状态在检测和触发之间发生变化
-                        uint8_t verify_state = fsm_main_get_current_state();
-                        if(verify_state == F_MAIN_S_MENU_UNWIND && fsm_main_get_radar_detect_enabled()) {
-                            fsm_main_event_trig(F_MAIN_E_LIDAR_FIND, nullptr);
-                            ESP_LOGI(TAG, "Radar found person, triggering F_MAIN_E_LIDAR_FIND event");
-                        } else {
-                            ESP_LOGW(TAG, "State changed during radar detection, state=%d, enabled=%d", verify_state, fsm_main_get_radar_detect_enabled());
-                        }
-                    }
-                    last_radar_found = current_radar_found;
-                }
-            } else {
-                // 不在 MENU_UNWIND 状态或雷达检测被禁用时，重置雷达检测状态
-                last_radar_found = false;
-            }
-            
-            // 在找人动画状态时，定时检测是否找到人
-            if(current_state == F_MAIN_S_FINDPERSONC_ANIM) {
-                radar_latest_data_t radar_data;
-                if(my_radar_get_latest_data(&radar_data)) {
-                    // 挥挥手就识别成功了
-                    if(radar_data.movement_param > 15) {
-                        fsm_main_set_person_found_during_anim(true);
-                        ESP_LOGI(TAG, "Person found during find animation (movement_param: %d)", radar_data.movement_param);
-                    }
-                    // 心率检测：如果最近5秒内有心率更新，说明有人
-                    else if(esp_log_timestamp() - radar_data.heart_rate_system_timestamp < 5) {
-                        fsm_main_set_person_found_during_anim(true);
-                        ESP_LOGI(TAG, "Person found during find animation (heart rate detected)");
-                    }
-                }
-            }
-            
-            last_radar_flush = current_tick;
-        }
+        my_lidar_flush(s_lidar_handle, 100);
         
         // 定时刷新FSM超时（每100ms）
         if ((current_tick - last_fsm_flush) >= fsm_flush_interval) {
@@ -712,10 +662,12 @@ void encoder_test(void *arg)
         // 定时发送mqtt LIDAR数据（每1000ms）
         if ((current_tick - last_lidar_flush) >= lidar_flush_interval) {
             radar_latest_data_t data;
-            my_radar_get_latest_data(&data);
-            if(esp_log_timestamp() - data.heart_rate_system_timestamp < 10 * 1000) {
-                protocol_publish_radar_data(PROTOCOL_TYPE_MQTT, &data, t_radar);
-                protocol_publish_radar_data(PROTOCOL_TYPE_BLE, &data, t_radar);
+            my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
+            if (lidar_handle != NULL && my_lidar_get_latest_data(lidar_handle, &data) == ESP_OK) {
+                if(esp_log_timestamp() - data.heart_rate_system_timestamp < 10 * 1000) {
+                    protocol_publish_radar_data(PROTOCOL_TYPE_MQTT, &data, t_radar);
+                    protocol_publish_radar_data(PROTOCOL_TYPE_BLE, &data, t_radar);
+                }
             }
             last_lidar_flush = current_tick;
         }
@@ -725,10 +677,14 @@ void encoder_test(void *arg)
             my_ota_flush_v1();
             last_ota_flush = current_tick;
         }
+        
+        // 定时刷新RTC（每100ms）
+        my_rtc_flush(s_rtc_handle, 100);
+        
         //FIXME: 好像wifi没有定时。
         // 定时检查WiFi状态（每200ms）
         if ((current_tick - last_wifi_flush) >= wifi_flush_interval) {
-            wifi_state_t current_wifi_state = my_wifi_get_state();
+            wifi_state_t current_wifi_state = my_wifi_get_state(s_wifi_handle);
             
             // 检测状态变化并触发相应事件
             if (current_wifi_state != last_wifi_state) {
@@ -762,7 +718,9 @@ static void alarm_set_tips() {
     struct tm time;
     memset(&time, 0, sizeof(time));
     bool valid = false;
-    my_rtc_get_time(&time, &valid);
+    if (s_rtc_handle != NULL) {
+        my_rtc_get_time(s_rtc_handle, &time, &valid);
+    }
     if(alarm_hour < time.tm_hour ||
         (alarm_hour == time.tm_hour && alarm_minute <= time.tm_min)) {
         my_ui_alarm_set_title("TOMORROW");

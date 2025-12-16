@@ -7,6 +7,7 @@
 #include "my_h264.h"
 #include "esp_lvgl_port.h"
 #include "my_ui_behavior.h"
+#include <string.h>
 
 static const char *TAG = "fsm_main";
 
@@ -56,7 +57,7 @@ static const char* fsm_event_to_str(uint8_t event) {
     static const char* names[] = {
         "INIT",                      // F_MAIN_E_INIT
         "ANIM_PLAY_SUC",             // F_MAIN_E_ANIM_PLAY_SUC
-        "LIDAR_FIND",                // F_MAIN_E_LIDAR_FIND
+        "LIDAR_MOVE_TRIG",           // F_MAIN_E_LIDAR_MOVE_TRIG
         "LIDAR_UPDATE",              // F_MAIN_E_LIDAR_UPDATE
         "LIDAR_NOT_FOUND",           // F_MAIN_E_LIDAR_NOT_FOUND
         "DEV_MOVE",                  // F_MAIN_E_DEV_MOVE
@@ -146,7 +147,7 @@ static struct StateTable fsm_user_table[] = {
     //UNWIND 
     { fm_has_memu_state    ,FM_MEMU_UNWIND            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//菜单---歌曲选择
     { nullptr              ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_unwind_next_item},//切换歌曲
-    { fm_has_h_fd_state     ,FM_H_F_SUC               ,F_MAIN_E_LIDAR_FIND           , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
+    { fm_has_h_fd_state     ,FM_H_F_SUC               ,F_MAIN_E_LIDAR_MOVE_TRIG     , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
     { nullptr              ,0                         ,F_MAIN_E_ANIM_PLAY_SUC     , F_MAIN_S_MENU_UNWIND_PLAYING  , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//动画---歌曲切换
     { nullptr              ,0                         ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU              ,10    ,true       , fsm_main_in_memu},//歌曲--菜单
     //声音
@@ -184,40 +185,12 @@ static struct StateTable fsm_user_table[] = {
     {nullptr             ,0                     , F_MAIN_E_RadarInfo_UPDATE    ,F_MAIN_S_RadarInfo              ,F_MAIN_S_RadarInfo     ,0  ,false    ,  nullptr},//雷达数据的更新函数
 
     // 其他状态 
-    //TODO:ota  更新行为
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_UNINIT_PLAYING                   ,F_MAIN_S_OTA     ,0  ,false    ,    fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_FINDSUC_ANIM                   ,F_MAIN_S_OTA     ,0  ,false    ,      fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_FINDFAIL_ANIM                   ,F_MAIN_S_OTA     ,0  ,false    ,     fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_FINDSUC                   ,F_MAIN_S_OTA     ,0  ,false    ,           fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_FINDFAIL                   ,F_MAIN_S_OTA     ,0  ,false    ,          fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_FINDPERSON                   ,F_MAIN_S_OTA     ,0  ,false    ,        fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_WIFI_GUIDE                   ,F_MAIN_S_OTA     ,0  ,false    ,        fsm_main_in_OTA},//ota 
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_WIFI_CONN                   ,F_MAIN_S_OTA     ,0  ,false    ,         fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_CLOCK                   ,F_MAIN_S_OTA     ,0  ,false    ,             fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_WIFI_CONN_SUC                   ,F_MAIN_S_OTA     ,0  ,false    ,     fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_RTC_DETECT_CLK                   ,F_MAIN_S_OTA     ,0  ,false    ,    fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_MENU                   ,F_MAIN_S_OTA     ,0  ,false    ,              fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_MEMU_WIFI_SUC                   ,F_MAIN_S_OTA     ,0  ,false    ,     fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_MEMU_WIFI_FAILE                  ,F_MAIN_S_OTA     ,0  ,false    ,    fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_MENU_SLEEP_MODE                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota 
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_MENU_ALARM                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_NO_MENU_ALARM                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_MENU_UNWIND                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_MENU_VOLUME                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_MENU_BRIGHTNESS                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_MEMU_FINDPERSONC_ANIM                  ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_BOYA_DATA                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_RadarInfo                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota 
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_GoodMorning_DEMO                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_REMINDER                   ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
-    {nullptr             ,0                     ,F_MAIN_E_OTA_UPDATE      ,F_MAIN_S_OTA                        ,F_MAIN_S_OTA     ,0  ,false    ,  fsm_main_in_OTA},//ota
-
-
 };
 
 
 static uint32_t timeout_ms_tick = 0;
 static fsm_handle_t s_fsm_handle = nullptr;
+static fsm_main_context_t s_fsm_context = {NULL};
 
 static void fsm_set_timeout_s(uint16_t sec) {
     if (sec) {
@@ -245,10 +218,18 @@ void fsm_main_timeout_flush(void) {
         fsm_timeout_trig(s_fsm_handle);
     }
 }
-int fsm_main_init(void) {
+int fsm_main_init(const fsm_main_context_t *ctx) {
     if (s_fsm_handle != nullptr) {
         return 0;
     }
+    
+    // 保存上下文
+    if (ctx != NULL) {
+        s_fsm_context = *ctx;
+    } else {
+        memset(&s_fsm_context, 0, sizeof(fsm_main_context_t));
+    }
+    
     s_fsm_handle =
         fsm_init(fsm_user_table, 
             F_MAIN_S_UNINIT, 
@@ -261,6 +242,18 @@ int fsm_main_init(void) {
 
     // 不再创建独立线程，改为在主线程中调用 fsm_main_timeout_flush()
     return 0;
+}
+
+my_rtc_handle_t fsm_main_get_rtc_handle(void) {
+    return s_fsm_context.rtc_handle;
+}
+
+my_lidar_handle_t fsm_main_get_lidar_handle(void) {
+    return s_fsm_context.lidar_handle;
+}
+
+my_wifi_handle_t fsm_main_get_wifi_handle(void) {
+    return s_fsm_context.wifi_handle;
 }
 
 void fsm_main_event_trig(enum fsm_main_event_enum event, void *arg) {

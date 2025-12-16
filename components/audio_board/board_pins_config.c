@@ -22,10 +22,12 @@
  *
  */
 
+#include "board_pins_config.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include <string.h>
 #include "board.h"
+#include "board_def.h"
 #include "audio_error.h"
 #include "audio_mem.h"
 #include "soc/soc_caps.h"
@@ -164,4 +166,59 @@ int8_t get_blue_led_gpio(void)
 int8_t get_es8311_mclk_src(void)
 {
     return ES8311_MCLK_SOURCE;
+}
+
+// lcd pins
+
+esp_err_t get_lcd_pins(board_lcd_pin_t *lcd_config)
+{
+    AUDIO_NULL_CHECK(TAG, lcd_config, return ESP_FAIL);
+    
+    lcd_config->bl_pwm = LCD_BL_PWM;
+    lcd_config->reset = LCD_RESET;
+    lcd_config->cs = LCD_CS;
+    lcd_config->sck = LCD_SCK;
+    lcd_config->da0 = LCD_DA0;
+    lcd_config->da1 = LCD_DA1;
+    lcd_config->da2 = LCD_DA2;
+    lcd_config->da3 = LCD_DA3;
+    
+    return ESP_OK;
+}
+
+// encoder pins
+
+esp_err_t get_encoder_pins(board_encoder_pin_t *encoder_config)
+{
+    AUDIO_NULL_CHECK(TAG, encoder_config, return ESP_FAIL);
+    
+    encoder_config->pin_a = ENCODER_PIN_A;
+    encoder_config->pin_b = ENCODER_PIN_B;
+    encoder_config->pin_btn = ENCODER_PIN_BTN;
+    
+    return ESP_OK;
+}
+
+// bs814 button chip pins
+
+esp_err_t get_bs814_pins(board_bs814_pin_t *bs814_config)
+{
+    AUDIO_NULL_CHECK(TAG, bs814_config, return ESP_FAIL);
+    
+    bs814_config->clk_pin = BS814_CLK_PIN;
+    bs814_config->data_pin = BS814_DATA_PIN;
+    
+    return ESP_OK;
+}
+
+// pcf8574rgtr i2c io expander config
+
+esp_err_t get_pcf8574_config(board_pcf8574_config_t *pcf8574_config)
+{
+    AUDIO_NULL_CHECK(TAG, pcf8574_config, return ESP_FAIL);
+    
+    pcf8574_config->i2c_addr = PCF8574_I2C_ADDR;
+    pcf8574_config->p1_lcd_reset = PCF8574_P1_LCD_RESET;
+    
+    return ESP_OK;
 }

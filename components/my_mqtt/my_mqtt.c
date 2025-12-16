@@ -14,6 +14,7 @@
 #include "my_mqtt.h"
 #include "my_nvs.h"
 #include "my_wifi.h"
+#include "fsm_main.h"
 
 static const char *TAG = "mqtts_example";
 
@@ -177,7 +178,8 @@ int my_mqtt_init(const char *broker_uri,
 
 int my_mqtt_publish(const char *topic, const char *payload, int payload_len, int qos, int retain)
 {
-    if(!my_wifi_is_connected()) {
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if(!wifi_handle || !my_wifi_is_connected(wifi_handle)) {
         return -1;
     }
     if (!s_client) {
