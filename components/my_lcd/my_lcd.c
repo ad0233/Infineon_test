@@ -126,7 +126,7 @@ void bsp_lcd_init(void)
                                                                                  lcd_pins.da1,
                                                                                  lcd_pins.da2,
                                                                                  lcd_pins.da3,
-                                                                                 EXAMPLE_LCD_H_RES * 80 * sizeof(uint16_t));
+                                                                                 LCD_BUFFER_SIZE * sizeof(uint16_t));
     ESP_ERROR_CHECK(spi_bus_initialize(LCD_HOST, &bus_config, SPI_DMA_CH_AUTO));
 
     ESP_LOGI(TAG, "Install panel IO");
@@ -142,7 +142,7 @@ void bsp_lcd_init(void)
         },
     };
     const esp_lcd_panel_dev_config_t panel_config = {
-        .reset_gpio_num = lcd_pins.reset,
+        .reset_gpio_num = (lcd_pins.reset == -1) ? GPIO_NUM_NC : lcd_pins.reset,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,     // Implemented by LCD command `36h`
         .bits_per_pixel = EXAMPLE_LCD_BIT_PER_PIXEL,    // Implemented by LCD command `3Ah` (16/18)
         .vendor_config = &vendor_config,

@@ -61,7 +61,7 @@
 #define LCD_BL_PWM                 GPIO_NUM_3
 #define LCD_RESET                  -1
 #define LCD_CS                     GPIO_NUM_39
-#define LCD_SCK                    GPIO_NUM_9
+#define LCD_SCK                    GPIO_NUM_8
 #define LCD_DA0                     GPIO_NUM_6
 #define LCD_DA1                     GPIO_NUM_2
 #define LCD_DA2                     GPIO_NUM_4
