@@ -52,6 +52,9 @@ bool my_rtc_is_ntp_synced(my_rtc_handle_t self);
 // 用于节省内存，定时刷新函数，可以让一个线程运行多个组件的 flush，减少线程数量
 int my_rtc_flush(my_rtc_handle_t self, uint32_t interval_ms);
 
+// 获取I2C总线句柄（用于与其他设备共享I2C总线）
+i2c_bus_handle_t my_rtc_get_i2c_bus(my_rtc_handle_t self);
+
 #ifdef __cplusplus
 }
 #endif

@@ -28,6 +28,7 @@
 #include "periph_sdcard.h"
 #include "periph_adc_button.h"
 #include "esp_lcd_ili9341.h"
+#include "my_lcd.h"
 #include "tca9554.h"
 
 static const char *TAG = "AUDIO_BOARD";
@@ -67,11 +68,8 @@ audio_hal_handle_t audio_board_codec_init(void)
 
 esp_err_t _lcd_rest(esp_periph_handle_t self, void *ctx)
 {
-    // Reset the LCD
-    // tca9554_set_output_state(LCD_RST_GPIO, TCA9554_IO_LOW);
-    // vTaskDelay(100 / portTICK_PERIOD_MS);
-    // tca9554_set_output_state(LCD_RST_GPIO, TCA9554_IO_HIGH);
-    // vTaskDelay(200 / portTICK_PERIOD_MS);
+    // Reset the LCD via PCF8574 or hardware GPIO
+    bsp_lcd_reset();
     return ESP_OK;
 }
 

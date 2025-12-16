@@ -11,6 +11,7 @@ extern "C" {
 
 int my_lcd_init();
 void bsp_lcd_bl_set(int brightness_percent);
+void bsp_lcd_reset(void);
 
 #ifdef __cplusplus
 }

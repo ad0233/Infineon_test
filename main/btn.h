@@ -1,13 +1,11 @@
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
+#include "board_pins_config.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define BS814_CLK_PIN   5
-#define BS814_DATA_PIN  38
 
 void bs814_init(void);
 uint8_t bs814_read_raw(void);

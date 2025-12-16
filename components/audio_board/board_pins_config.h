@@ -46,6 +46,45 @@ typedef struct {
 } board_i2s_pin_t;
 
 /**
+ * @brief                  Board lcd pin definition
+ */
+typedef struct {
+    int bl_pwm;             /*!< Backlight PWM pin */
+    int reset;               /*!< Reset pin */
+    int cs;                   /*!< Chip select pin */
+    int sck;                  /*!< Clock pin */
+    int da0;                  /*!< Data line 0 */
+    int da1;                  /*!< Data line 1 */
+    int da2;                  /*!< Data line 2 */
+    int da3;                  /*!< Data line 3 */
+} board_lcd_pin_t;
+
+/**
+ * @brief                  Board encoder pin definition
+ */
+typedef struct {
+    int pin_a;               /*!< Encoder A pin */
+    int pin_b;               /*!< Encoder B pin */
+    int pin_btn;             /*!< Encoder button pin */
+} board_encoder_pin_t;
+
+/**
+ * @brief                  Board BS814 button chip pin definition
+ */
+typedef struct {
+    int clk_pin;             /*!< BS814 clock pin */
+    int data_pin;            /*!< BS814 data pin */
+} board_bs814_pin_t;
+
+/**
+ * @brief                  Board PCF8574RGTR I2C IO expander configuration
+ */
+typedef struct {
+    uint8_t i2c_addr;        /*!< I2C address */
+    int p1_lcd_reset;        /*!< P1 pin function: 1=LCD_RESET */
+} board_pcf8574_config_t;
+
+/**
  * @brief                  Get i2c pins configuration
  *
  * @param      port        i2c port number to get configuration
@@ -232,6 +271,50 @@ int8_t get_green_led_gpio(void);
  *         Others   gpio number
  */
 int8_t get_blue_led_gpio(void);
+
+/**
+ * @brief                  Get lcd pins configuration
+ *
+ * @param      lcd_config  lcd configuration parameters
+ *
+ * @return
+ *     - ESP_OK
+ *     - ESP_FAIL
+ */
+esp_err_t get_lcd_pins(board_lcd_pin_t *lcd_config);
+
+/**
+ * @brief                  Get encoder pins configuration
+ *
+ * @param      encoder_config  encoder configuration parameters
+ *
+ * @return
+ *     - ESP_OK
+ *     - ESP_FAIL
+ */
+esp_err_t get_encoder_pins(board_encoder_pin_t *encoder_config);
+
+/**
+ * @brief                  Get BS814 button chip pins configuration
+ *
+ * @param      bs814_config  BS814 configuration parameters
+ *
+ * @return
+ *     - ESP_OK
+ *     - ESP_FAIL
+ */
+esp_err_t get_bs814_pins(board_bs814_pin_t *bs814_config);
+
+/**
+ * @brief                  Get PCF8574RGTR I2C IO expander configuration
+ *
+ * @param      pcf8574_config  PCF8574RGTR configuration parameters
+ *
+ * @return
+ *     - ESP_OK
+ *     - ESP_FAIL
+ */
+esp_err_t get_pcf8574_config(board_pcf8574_config_t *pcf8574_config);
 
 #ifdef __cplusplus
 }

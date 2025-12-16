@@ -35,6 +35,7 @@
 #include "portmacro.h"
 #include "pwm_control.h"
 #include "board.h"
+#include "board_pins_config.h"
 
 #include "my_lcd.h"
 #include "encoder.h"
@@ -318,8 +319,8 @@ extern "C" void app_main()
     
     print_mem_info();
 
-    gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
-    gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
+    // gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
+    // gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
     board_handle = audio_board_init();
@@ -327,7 +328,7 @@ extern "C" void app_main()
     audio_hal_set_volume(board_handle->audio_hal, 25);
 
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    gpio_set_level(PA_ENABLE_GPIO, 0); // Enable PA
+    // gpio_set_level(PA_ENABLE_GPIO, 0); // Enable PA
 
     print_mem_info();
 
@@ -419,9 +420,6 @@ void tone_play_callback(audio_element_status_t evt) {
 static QueueHandle_t event_queue;
 static rotary_encoder_t re;
 
-#define RE_A_GPIO   GPIO_NUM_20
-#define RE_B_GPIO   GPIO_NUM_39
-#define RE_BTN_GPIO GPIO_NUM_38
 #define EV_QUEUE_LEN 5
 
 static void alarm_set_tips();
@@ -437,10 +435,12 @@ void encoder_test(void *arg)
     ESP_ERROR_CHECK(rotary_encoder_init(event_queue));
 
     // Add one encoder
+    board_encoder_pin_t encoder_pins;
+    ESP_ERROR_CHECK(get_encoder_pins(&encoder_pins));
     memset(&re, 0, sizeof(rotary_encoder_t));
-    re.pin_a = RE_A_GPIO;
-    re.pin_b = RE_B_GPIO;
-    re.pin_btn = RE_BTN_GPIO;
+    re.pin_a = (gpio_num_t)encoder_pins.pin_a;
+    re.pin_b = (gpio_num_t)encoder_pins.pin_b;
+    re.pin_btn = (gpio_num_t)encoder_pins.pin_btn;
     ESP_ERROR_CHECK(rotary_encoder_add(&re));
 
     rotary_encoder_event_t e;
