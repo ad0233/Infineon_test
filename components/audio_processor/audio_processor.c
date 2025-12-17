@@ -88,6 +88,8 @@ struct player_pipeline_t {
     audio_element_handle_t  i2s_stream_writer;
     audio_element_handle_t  player_rsp;
     pipe_player_state_e     player_state;
+    uint64_t                played_bytes;      // 已播放字节数
+    audio_element_info_t    audio_info;        // 音频格式信息
 };
 
 typedef struct {
@@ -99,6 +101,8 @@ typedef struct {
     bool                    running;
     tone_play_callback_t    tone_cb;
     bool                    is_switching;  // 标志位：是否正在切换音频
+    audio_element_info_t    audio_info;     // 音频格式信息
+    int64_t                 start_time_us;  // 播放开始时间（微秒）
 } audio_player_t;
 
 static audio_player_t             *s_audio_player      = NULL;
@@ -214,7 +218,11 @@ int recorder_pipeline_read(recorder_pipeline_handle_t pipeline,char *buffer, int
 }
 
 static esp_err_t _player_i2s_write_cb(audio_element_handle_t self, char *buffer, int len, TickType_t ticks_to_wait, void *context)
-{    
+{
+    // 累加已播放字节数
+    if (s_player_pipeline && len > 0) {
+        s_player_pipeline->played_bytes += len;
+    }
     return audio_element_output(s_player_pipeline->i2s_stream_writer, buffer, len);
 }
 
@@ -223,12 +231,15 @@ static esp_err_t _player_write_nop_cb(audio_element_handle_t self, char *buffer,
     return len;
 }
 
+
 player_pipeline_handle_t player_pipeline_open(void) 
 {
     ESP_LOGI(TAG, "%s", __func__);
     player_pipeline_handle_t player_pipeline = audio_calloc(1, sizeof(struct player_pipeline_t));
     AUDIO_MEM_CHECK(TAG, player_pipeline, goto _exit_open);
     player_pipeline->player_state = PIPE_STATE_IDLE;
+    player_pipeline->played_bytes = 0;
+    memset(&player_pipeline->audio_info, 0, sizeof(audio_element_info_t));
     s_player_pipeline = player_pipeline;
 
     ESP_LOGI(TAG, "Create audio pipeline for playback");
@@ -295,6 +306,10 @@ esp_err_t player_pipeline_run(player_pipeline_handle_t player_pipeline)
         return ESP_OK;
     }
     ESP_LOGI(TAG, "player pipe start running");
+    // 重置播放进度
+    player_pipeline->played_bytes = 0;
+    // 尝试获取音频格式信息
+    audio_element_getinfo(player_pipeline->audio_decoder, &player_pipeline->audio_info);
     audio_element_set_write_cb(player_pipeline->player_rsp, _player_i2s_write_cb, NULL);
     player_pipeline->player_state = PIPE_STATE_RUNNING;
     return ESP_OK;
@@ -318,6 +333,43 @@ esp_err_t player_pipeline_get_state(player_pipeline_handle_t player_pipeline, pi
     ESP_RETURN_ON_FALSE(player_pipeline != NULL, ESP_FAIL, TAG, "player pipeline not initialized");
     *state = player_pipeline->player_state;
     return ESP_OK;
+}
+
+esp_err_t player_pipeline_get_progress(uint32_t *played_ms)
+{
+    if (played_ms == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // 失败时设置为 0
+    *played_ms = 0;
+    
+    // 优先使用 audio_tone (s_audio_player)
+    if (s_audio_player != NULL) {
+        // 使用基于时间的估算（因为无法安全地拦截 I2S 写入）
+        if (s_audio_player->start_time_us > 0 && s_audio_player->player_state == PIPE_STATE_RUNNING) {
+            int64_t elapsed_us = esp_timer_get_time() - s_audio_player->start_time_us;
+            *played_ms = (uint32_t)(elapsed_us / 1000);
+        }
+        return ESP_OK;
+    }
+    
+    // 其次使用 player_pipeline
+    if (s_player_pipeline != NULL) {
+        // 计算播放时间（毫秒）
+        if (s_player_pipeline->audio_info.sample_rates > 0) {
+            int bytes_per_sample = (s_player_pipeline->audio_info.bits / 8);
+            int channels = s_player_pipeline->audio_info.channels;
+            int bytes_per_second = s_player_pipeline->audio_info.sample_rates * bytes_per_sample * channels;
+            if (bytes_per_second > 0) {
+                *played_ms = (uint32_t)((s_player_pipeline->played_bytes * 1000ULL) / bytes_per_second);
+            }
+        }
+        return ESP_OK;
+    }
+    
+    ESP_LOGE(TAG, "player pipeline not initialized");
+    return ESP_FAIL;
 }
 
 esp_err_t player_pipeline_close(player_pipeline_handle_t player_pipeline)
@@ -428,6 +480,9 @@ static void audio_player_state_task(void *arg)
             ESP_LOGI(TAG, "[ * ] Receive music info from wav decoder, sample_rates=%d, bits=%d, ch=%d",
                      music_info.sample_rates, music_info.bits, music_info.channels);
 
+            // 保存音频格式信息
+            s_audio_player->audio_info = music_info;
+
             // 设置I2S流的采样率、位数和声道数，使其与解码器输出匹配
             audio_element_setinfo(s_audio_player->i2s_stream_writer, &music_info);
             i2s_stream_set_clk(s_audio_player->i2s_stream_writer, 
@@ -455,6 +510,8 @@ esp_err_t audio_tone_init(tone_play_callback_t callback)
     s_audio_player = (audio_player_t *)audio_calloc(1, sizeof(audio_player_t));
     AUDIO_MEM_CHECK(TAG, s_audio_player, goto _exit_open);
     s_audio_player->is_switching = false;  // 初始化切换标志
+    s_audio_player->start_time_us = 0;
+    memset(&s_audio_player->audio_info, 0, sizeof(audio_element_info_t));
 
     ESP_LOGI(TAG, "Create audio pipeline for audio player");
     audio_pipeline_cfg_t pipeline_cfg = DEFAULT_AUDIO_PIPELINE_CONFIG();
@@ -550,6 +607,10 @@ esp_err_t audio_tone_play(const char *uri)
     
     ESP_LOGI(TAG, "audio_tone_play: %s", uri);
     
+    // 重置播放进度
+    memset(&s_audio_player->audio_info, 0, sizeof(audio_element_info_t));
+    s_audio_player->start_time_us = 0;  // 在 pipeline 真正启动后设置
+    
     // 设置新的URI
     audio_element_set_uri(s_audio_player->spiffs_stream, uri);
     
@@ -585,6 +646,7 @@ esp_err_t audio_tone_play(const char *uri)
     esp_err_t ret = audio_pipeline_run(s_audio_player->pipeline);
     if (ret == ESP_OK) {
         s_audio_player->player_state = PIPE_STATE_RUNNING;
+        s_audio_player->start_time_us = esp_timer_get_time();  // 记录开始时间
         ESP_LOGI(TAG, "Audio pipeline started successfully");
     } else {
         ESP_LOGE(TAG, "Failed to run audio pipeline: %s", esp_err_to_name(ret));

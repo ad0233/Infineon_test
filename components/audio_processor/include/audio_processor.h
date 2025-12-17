@@ -168,6 +168,16 @@ esp_err_t player_pipeline_stop(player_pipeline_handle_t player_pipeline);
 esp_err_t player_pipeline_get_state(player_pipeline_handle_t player_pipeline, pipe_player_state_e *state);
 
 /**
+ * @brief  Get the playback progress of the player pipeline
+ *
+ * @param[out]  played_ms       A pointer to store the playback time in milliseconds
+ * @return
+ *      - ESP_OK   if the operation is successful
+ *      - ESP_FAIL if the operation fails
+ */
+esp_err_t player_pipeline_get_progress(uint32_t *played_ms);
+
+/**
  * @brief Gets the default buffer size for writing data to the player pipeline
  *
  * @param[in]  player_pipeline  The handle to the player pipeline

@@ -253,6 +253,12 @@ extern "C" void app_main()
     vTaskDelay(500 / portTICK_PERIOD_MS); // 等待音频系统完全初始化
     audio_tone_play("spiffs://spiffs/water-fountain.mp3");
 
+    while (1) {
+        uint32_t played_ms;
+        player_pipeline_get_progress(&played_ms);
+        ESP_LOGI(TAG, "played_ms: %" PRIu32, played_ms);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
     return;
 
     // ========== 以下代码已注释，仅保留音频相关 ==========
