@@ -95,7 +95,7 @@
 #define FUNC_AUDIO_CODEC_EN       (1)
 #define CODEC_ADC_I2S_PORT        ((i2s_port_t)0)
 #define CODEC_ADC_BITS_PER_SAMPLE ((i2s_data_bit_width_t)16)  /* 32bit */
-#define CODEC_ADC_SAMPLE_RATE     (16000)
+#define CODEC_ADC_SAMPLE_RATE     (44100)
 #define RECORD_HARDWARE_AEC       (true)
 #define BOARD_PA_GAIN             (-1)  /* Power amplifier gain defined by board (dB) */
 #define HEADPHONE_DETECT          (-1)
@@ -118,7 +118,7 @@ extern audio_hal_func_t AUDIO_CODEC_ES7210_DEFAULT_HANDLE;
         .i2s_iface = {                                  \
             .mode = AUDIO_HAL_MODE_SLAVE,               \
             .fmt = AUDIO_HAL_I2S_NORMAL,                \
-            .samples = AUDIO_HAL_16K_SAMPLES,           \
+            .samples = AUDIO_HAL_44K_SAMPLES,           \
             .bits = AUDIO_HAL_BIT_LENGTH_16BITS,        \
         },                                              \
 };

@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <string>
 
+#include "board.h"
 #include "esp_log_timestamp.h"
 #include "freertos/idf_additions.h"
 #include "freertos/projdefs.h"
@@ -158,7 +159,7 @@ void heart_rate_data_callback(const radar_heart_rate_data_t *data, void *context
 // #define ENABLE_TASK_MONITOR
 
 static const char *TAG = "main";
-// static audio_board_handle_t board_handle;
+static audio_board_handle_t board_handle;
 static my_rtc_handle_t s_rtc_handle = NULL;  // RTC句柄，仅在main.cpp中使用
 static my_lidar_handle_t s_lidar_handle = NULL;  // 雷达句柄，仅在main.cpp中使用
 static my_wifi_handle_t s_wifi_handle = NULL;  // WiFi句柄
@@ -226,6 +227,33 @@ extern "C" void app_main()
     ESP_LOGI(TAG, "Initializing LCD...");
     my_lcd_init();
     ESP_LOGI(TAG, "LCD initialized successfully");
+
+    board_handle = audio_board_init();
+    audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
+    audio_hal_set_volume(board_handle->audio_hal, 25);
+
+    periph_spiffs_cfg_t spiffs_cfg = {
+        .root = "/spiffs",
+        .partition_label = "spiffs_data",
+        .max_files = 5,
+        .format_if_mount_failed = true};
+    esp_periph_handle_t spiffs_handle = periph_spiffs_init(&spiffs_cfg);
+    esp_periph_start(set, spiffs_handle);
+
+    // 等待 SPIFFS 挂载完成
+    while (!periph_spiffs_is_mounted(spiffs_handle)) {
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+    }
+
+    // 初始化音频播放器
+    void tone_play_callback(audio_element_status_t evt);
+    audio_tone_init(tone_play_callback);
+    
+    // 播放音频
+    vTaskDelay(500 / portTICK_PERIOD_MS); // 等待音频系统完全初始化
+    audio_tone_play("spiffs://spiffs/water-fountain.mp3");
+
+    return;
 
     // ========== 以下代码已注释，仅保留音频相关 ==========
     /*

@@ -18,6 +18,7 @@
 #include "recorder_sr.h"
 #include "recorder_encoder.h"
 #include "audio_element.h"
+#include "i2s_stream.h"
 #include "raw_stream.h"
 #include "filter_resample.h"
 #include "audio_mem.h"
@@ -426,6 +427,13 @@ static void audio_player_state_task(void *arg)
 
             ESP_LOGI(TAG, "[ * ] Receive music info from wav decoder, sample_rates=%d, bits=%d, ch=%d",
                      music_info.sample_rates, music_info.bits, music_info.channels);
+
+            // 设置I2S流的采样率、位数和声道数，使其与解码器输出匹配
+            audio_element_setinfo(s_audio_player->i2s_stream_writer, &music_info);
+            i2s_stream_set_clk(s_audio_player->i2s_stream_writer, 
+                               music_info.sample_rates, 
+                               music_info.bits, 
+                               music_info.channels);
             continue;
         }
         /* Stop when the last pipeline element (i2s_stream_writer in this case) receives stop event */
@@ -519,19 +527,19 @@ esp_err_t audio_tone_play(const char *uri)
     if (s_audio_player->player_state == PIPE_STATE_RUNNING) {
         ESP_LOGW(TAG, "Audio is still running, stopping first...");
         audio_pipeline_stop(s_audio_player->pipeline);
-    }
-    
-    // 等待管道停止（使用阻塞等待，确保完全停止）
-    esp_err_t wait_ret = audio_pipeline_wait_for_stop(s_audio_player->pipeline);
-    if (wait_ret != ESP_OK) {
-        ESP_LOGW(TAG, "Pipeline stop wait failed or timeout, force terminate");
-        // 如果等待失败，强制终止
-        audio_pipeline_terminate(s_audio_player->pipeline);
-        // 等待终止完成
-        vTaskDelay(pdMS_TO_TICKS(100));
-    } else {
-        // 等待成功，再等待一小段时间确保完全停止
-        vTaskDelay(pdMS_TO_TICKS(50));
+        
+        // 等待管道停止（使用阻塞等待，确保完全停止）
+        esp_err_t wait_ret = audio_pipeline_wait_for_stop(s_audio_player->pipeline);
+        if (wait_ret != ESP_OK) {
+            ESP_LOGW(TAG, "Pipeline stop wait failed or timeout, force terminate");
+            // 如果等待失败，强制终止（但元素可能还没创建，这是正常的）
+            audio_pipeline_terminate(s_audio_player->pipeline);
+            // 等待终止完成
+            vTaskDelay(pdMS_TO_TICKS(100));
+        } else {
+            // 等待成功，再等待一小段时间确保完全停止
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
     }
     
     // 重置管道（无论之前状态如何）
@@ -552,10 +560,10 @@ esp_err_t audio_tone_play(const char *uri)
         audio_pipeline_stop(s_audio_player->pipeline);
         
         // 等待停止完成（带超时处理）
-        wait_ret = audio_pipeline_wait_for_stop(s_audio_player->pipeline);
+        esp_err_t wait_ret = audio_pipeline_wait_for_stop(s_audio_player->pipeline);
         if (wait_ret != ESP_OK) {
             ESP_LOGW(TAG, "Pipeline wait_for_stop failed: %s, force terminate", esp_err_to_name(wait_ret));
-            // 如果等待失败，强制终止
+            // 如果等待失败，强制终止（元素可能还没创建，这是正常的）
             audio_pipeline_terminate(s_audio_player->pipeline);
             // 等待更长时间确保终止完成
             vTaskDelay(pdMS_TO_TICKS(150));
@@ -563,10 +571,6 @@ esp_err_t audio_tone_play(const char *uri)
             // 等待成功，再等待一小段时间确保完全停止
             vTaskDelay(pdMS_TO_TICKS(100));
         }
-        
-        // 无论等待是否成功，都强制终止一次（清除所有内部状态）
-        audio_pipeline_terminate(s_audio_player->pipeline);
-        vTaskDelay(pdMS_TO_TICKS(100));  // 等待终止完成
         
         // 重置管道状态
         audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
