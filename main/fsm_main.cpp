@@ -182,7 +182,7 @@ static struct StateTable fsm_user_table[] = {
     // {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_CLOCK                    ,F_MAIN_S_MEMU_FINDPERSONC_ANIM    ,0  ,false    ,  fsm_main_lidar_find_playing},//主页面--找人动画
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_CLOCK                     ,F_MAIN_S_BOYA_DATA               ,0  ,false    ,  fsm_main_in_boya_data},//主页面--睡眠数据
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_BOYA_DATA                   ,F_MAIN_S_RadarInfo               ,0  ,false    ,  fsm_main_in_radarinfo},//睡眠数据--雷达数据
-    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_RadarInfo                 ,F_MAIN_S_GoodMorning_DEMO     ,0  ,false    ,  fsm_main_in_GoodMorning_demo},//雷达数据---早报dome
+    {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_RadarInfo                 ,F_MAIN_S_GoodMorning_DEMO     ,0  ,false    ,  fsm_main_in_MorningAnimation},//雷达数据---早报dome
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_GoodMorning_DEMO          ,F_MAIN_S_REMINDER            ,0  ,false    ,  fsm_main_in_reminder_tomorrow},//早报dome---提醒 
     {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_REMINDER                   ,F_MAIN_S_SLEEPMODE     ,0  ,false    ,  fsm_main_in_sleep_mode},//提醒--入睡提示dome
     {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_SLEEPMODE                   ,F_MAIN_S_NIGHTMODE     ,0  ,false    ,  fsm_main_in_night_mode},//入睡提示dome--夜间模式

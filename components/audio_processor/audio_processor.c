@@ -347,9 +347,19 @@ esp_err_t player_pipeline_get_progress(uint32_t *played_ms)
     *played_ms = 0;
     
     // 优先使用 audio_tone (s_audio_player)
-    if (s_audio_player != NULL) {
-        // 使用基于时间的估算（因为无法安全地拦截 I2S 写入）
-        if (s_audio_player->start_time_us > 0 && s_audio_player->player_state == PIPE_STATE_RUNNING) {
+    if (s_audio_player != NULL && s_audio_player->player_state == PIPE_STATE_RUNNING) {
+        audio_element_info_t info;
+        // 尝试从解码器直接获取已处理的字节位置
+        if (audio_element_getinfo(s_audio_player->audio_decoder, &info) == ESP_OK && info.byte_pos > 0) {
+            if (info.sample_rates > 0 && info.channels > 0) {
+                int bytes_per_sample = (info.bits / 8);
+                *played_ms = (uint32_t)((info.byte_pos * 1000ULL) / (info.sample_rates * info.channels * bytes_per_sample));
+                return ESP_OK;
+            }
+        }
+
+        // 如果获取解码信息失败，再回退到时间估算
+        if (s_audio_player->start_time_us > 0) {
             int64_t elapsed_us = esp_timer_get_time() - s_audio_player->start_time_us;
             *played_ms = (uint32_t)(elapsed_us / 1000);
         }

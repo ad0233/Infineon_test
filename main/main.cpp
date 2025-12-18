@@ -231,6 +231,7 @@ extern "C" void app_main()
     
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
+    periph_cfg.extern_stack = true;
 
     esp_err_t ret = audio_board_sdcard_init(set, SD_MODE_4_LINE);
     if (ret != ESP_OK) {
@@ -433,22 +434,6 @@ extern "C" void app_main()
     xTaskCreate(encoder_test, "encoder_test", 1024 * 6, nullptr, 10, nullptr);
     // my_lidar_start(s_lidar_handle); //TOTD: 雷达好像不需要启动命令，默认启动，确认好就删除这个代码
 
-    std::vector<LrcLine> lrcList = loadLrcFile("/sdcard/V001-morning_Voice.lrc");
-
-    if (lrcList.empty()) {
-        ESP_LOGE("TEST", "歌词列表为空，请检查文件路径或格式！");
-        return;
-    }
-
-    // 2. 模拟时间点测试
-    int testTimeMs = 16000; 
-    std::string result = getCurrentLyric(testTimeMs, lrcList);
-    
-    // 4. 测试更多点
-    ESP_LOGI("TEST", "4000ms 结果: %s", getCurrentLyric(4000, lrcList).c_str());
-    ESP_LOGI("TEST", "30000ms 结果: %s", getCurrentLyric(1200, lrcList).c_str());
-    ESP_LOGI("TEST", "--- 测试结束 ---");
-
     print_mem_info();
     return;
 }
@@ -456,7 +441,7 @@ extern "C" void app_main()
 void tone_play_callback(audio_element_status_t evt) {
     ESP_LOGI(__func__, "%d", evt);
     if(AEL_STATUS_STATE_FINISHED == evt) {
-        
+        fsm_main_event_trig(F_MAIN_E_ANIM_PLAY_SUC, NULL);
     }
 }
 
