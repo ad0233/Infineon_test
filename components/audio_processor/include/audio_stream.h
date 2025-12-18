@@ -49,6 +49,15 @@ audio_element_handle_t create_record_i2s_stream(void);
 audio_element_handle_t create_player_decoder_stream(void);
 
 /**
+ * @brief  Create a WAV decoder stream for audio playback
+ *
+ * @return
+ *      - Handle to the audio element representing the WAV decoder stream
+ *      - NULL if the creation fails.
+ */
+audio_element_handle_t create_player_wav_decoder_stream(void);
+
+/**
  * @brief  Create a MP3 decoder stream for audio playback
  *
  * @return
@@ -94,13 +103,13 @@ audio_element_handle_t create_ch1_to_ch2_rsp_stream(void);
 audio_element_handle_t create_8k_ch1_to_16k_ch2_rsp_stream(void);
 
 /**
- * @brief  Create a SPIFFS stream for audio player file input
+ * @brief  Create a FATFS stream for audio player file input
  *
  * @return
- *      - Handle to the audio element representing the SPIFFS stream
-*       - NULL if the creation fails.
+ *      - Handle to the audio element representing the FATFS stream
+ *       - NULL if the creation fails.
  */
-audio_element_handle_t create_audio_player_spiffs_stream(void);
+audio_element_handle_t create_audio_player_fatfs_stream(void);
 
 /**
  * @brief Get the default audio recording configuration.

@@ -223,6 +223,12 @@ extern "C" void app_main()
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
 
+    esp_err_t ret = audio_board_sdcard_init(set, SD_MODE_4_LINE);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init SD card");
+        vTaskDelete(nullptr);
+    }
+    ESP_LOGI(TAG, "SD card initialized successfully");
     // ========== LCD 初始化 ==========
     ESP_LOGI(TAG, "Initializing LCD...");
     my_lcd_init();
@@ -245,19 +251,51 @@ extern "C" void app_main()
         vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 
+    // 复制音频文件从 SPIFFS 到 SD 卡
+    {
+        const char* src_path = "/spiffs/V001-breath.wav";
+        const char* dst_path = "/sdcard/V001-breath.wav";
+        ESP_LOGI(TAG, "Copying %s to %s...", src_path, dst_path);
+        FILE* f_src = fopen(src_path, "rb");
+        if (f_src) {
+            FILE* f_dst = fopen(dst_path, "wb");
+            if (f_dst) {
+                char* buf = (char*)malloc(4096);
+                size_t read_bytes;
+                while ((read_bytes = fread(buf, 1, 4096, f_src)) > 0) {
+                    fwrite(buf, 1, read_bytes, f_dst);
+                }
+                free(buf);
+                fclose(f_dst);
+                ESP_LOGI(TAG, "File copied successfully");
+            } else {
+                ESP_LOGE(TAG, "Failed to open destination file %s", dst_path);
+            }
+            fclose(f_src);
+        } else {
+            ESP_LOGE(TAG, "Failed to open source file %s", src_path);
+        }
+    }
+
     // 初始化音频播放器
     void tone_play_callback(audio_element_status_t evt);
     audio_tone_init(tone_play_callback);
     
     // 播放音频
     vTaskDelay(500 / portTICK_PERIOD_MS); // 等待音频系统完全初始化
-    audio_tone_play("spiffs://spiffs/water-fountain.mp3");
+    audio_tone_play("/sdcard/V001-breath.wav");
 
+    uint8_t c = 0;
     while (1) {
         uint32_t played_ms;
         player_pipeline_get_progress(&played_ms);
         ESP_LOGI(TAG, "played_ms: %" PRIu32, played_ms);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+        c++;
+        if(c > 5) {
+            audio_tone_play("/sdcard/V001-breath.wav");
+            c = 0;
+        }
     }
     return;
 
@@ -436,7 +474,6 @@ extern "C" void app_main()
     };
     
     sdmmc_card_t* card = NULL;
-    esp_err_t ret;
     
     // 先尝试4线模式（更快）
     ESP_LOGI(TAG, "Trying 4-line mode...");
@@ -470,7 +507,7 @@ extern "C" void app_main()
     const char* test_file = "/sdcard/test.txt";
     const char* test_data = "MKDV4GCL-ABB Test - Hello World! 1234567890 ABCDEF";
     const size_t test_data_len = strlen(test_data);
-    
+
     // 写入测试
     ESP_LOGI(TAG, "Writing test data to %s...", test_file);
     FILE* f = fopen(test_file, "w");
@@ -568,7 +605,6 @@ extern "C" void app_main()
 void tone_play_callback(audio_element_status_t evt) {
     ESP_LOGI(__func__, "%d", evt);
     if(AEL_STATUS_STATE_FINISHED == evt) {
-        // audio_tone_play("spiffs://spiffs/on.wav");
     }
 }
 

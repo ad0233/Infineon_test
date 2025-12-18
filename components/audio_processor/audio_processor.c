@@ -15,6 +15,7 @@
 #include "sdkconfig.h"
 
 #include "audio_recorder.h"
+#include "audio_pipeline.h"
 #include "recorder_sr.h"
 #include "recorder_encoder.h"
 #include "audio_element.h"
@@ -94,9 +95,10 @@ struct player_pipeline_t {
 
 typedef struct {
     audio_pipeline_handle_t pipeline;
-    audio_element_handle_t  spiffs_stream;
+    audio_element_handle_t  fatfs_stream;
     audio_element_handle_t  audio_decoder; // only support for wav; 16k, 16bit, double channel
     audio_element_handle_t  i2s_stream_writer;
+    audio_event_iface_handle_t evt;        // 保存事件句柄
     pipe_player_state_e     player_state;
     bool                    running;
     tone_play_callback_t    tone_cb;
@@ -519,36 +521,36 @@ esp_err_t audio_tone_init(tone_play_callback_t callback)
     AUDIO_MEM_CHECK(TAG, s_audio_player->pipeline, goto _exit_open);
 
     ESP_LOGI(TAG, "Create audio player audio stream");
-    s_audio_player->spiffs_stream = create_audio_player_spiffs_stream();
-    AUDIO_MEM_CHECK(TAG, s_audio_player->spiffs_stream, goto _exit_open);
+    s_audio_player->fatfs_stream = create_audio_player_fatfs_stream();
+    AUDIO_MEM_CHECK(TAG, s_audio_player->fatfs_stream, goto _exit_open);
     s_audio_player->i2s_stream_writer = create_player_i2s_stream(true);
     AUDIO_MEM_CHECK(TAG, s_audio_player->i2s_stream_writer, goto _exit_open);
-    s_audio_player->audio_decoder = create_player_mp3_decoder_stream();
+    s_audio_player->audio_decoder = create_player_wav_decoder_stream();
     AUDIO_MEM_CHECK(TAG, s_audio_player->audio_decoder, goto _exit_open);
 
     ESP_LOGI(TAG, "Register all elements to playback pipeline");
-    audio_pipeline_register(s_audio_player->pipeline, s_audio_player->spiffs_stream, "audio_player_spiffs");
+    audio_pipeline_register(s_audio_player->pipeline, s_audio_player->fatfs_stream, "audio_player_fatfs");
     audio_pipeline_register(s_audio_player->pipeline, s_audio_player->audio_decoder, "audio_player_dec");
     audio_pipeline_register(s_audio_player->pipeline, s_audio_player->i2s_stream_writer, "audio_player_i2s");
 
-    ESP_LOGI(TAG, "Link playback element together raw-->audio_decoder-->i2s_stream-->[codec_chip]");
-    const char *link_tag[3] = {"audio_player_spiffs", "audio_player_dec", "audio_player_i2s"};
+    ESP_LOGI(TAG, "Link playback element together fatfs-->audio_decoder-->i2s_stream-->[codec_chip]");
+    const char *link_tag[3] = {"audio_player_fatfs", "audio_player_dec", "audio_player_i2s"};
     audio_pipeline_link(s_audio_player->pipeline, &link_tag[0], 3);
 
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
     audio_event_iface_cfg_t evt_cfg = AUDIO_EVENT_IFACE_DEFAULT_CFG();
-    audio_event_iface_handle_t evt = audio_event_iface_init(&evt_cfg);
-    audio_pipeline_set_listener(s_audio_player->pipeline, evt);
-    audio_event_iface_set_listener(esp_periph_set_get_event_iface(set), evt);
+    s_audio_player->evt = audio_event_iface_init(&evt_cfg);
+    audio_pipeline_set_listener(s_audio_player->pipeline, s_audio_player->evt);
+    audio_event_iface_set_listener(esp_periph_set_get_event_iface(set), s_audio_player->evt);
 
     s_audio_player->tone_cb = callback;
-    audio_thread_create(NULL, "audio_player_state_task", audio_player_state_task, (void *)evt, 5 * 1024, 15, true, 1);
+    audio_thread_create(NULL, "audio_player_state_task", audio_player_state_task, (void *)s_audio_player->evt, 5 * 1024, 15, true, 1);
 
     return ESP_OK;
 
 _exit_open:
-    audio_pipe_safe_free(s_audio_player->spiffs_stream, audio_element_deinit);
+    audio_pipe_safe_free(s_audio_player->fatfs_stream, audio_element_deinit);
     audio_pipe_safe_free(s_audio_player->i2s_stream_writer, audio_element_deinit);
     audio_pipe_safe_free(s_audio_player->audio_decoder, audio_element_deinit);
     audio_pipe_safe_free(s_audio_player->pipeline, audio_pipeline_deinit);
@@ -580,30 +582,22 @@ esp_err_t audio_tone_play(const char *uri)
     // 设置切换标志
     s_audio_player->is_switching = true;
     
-    // 无论状态如何，都先停止并重置管道，确保状态一致
-    if (s_audio_player->player_state == PIPE_STATE_RUNNING) {
-        ESP_LOGW(TAG, "Audio is still running, stopping first...");
-        audio_pipeline_stop(s_audio_player->pipeline);
-        
-        // 等待管道停止（使用阻塞等待，确保完全停止）
-        esp_err_t wait_ret = audio_pipeline_wait_for_stop(s_audio_player->pipeline);
-        if (wait_ret != ESP_OK) {
-            ESP_LOGW(TAG, "Pipeline stop wait failed or timeout, force terminate");
-            // 如果等待失败，强制终止（但元素可能还没创建，这是正常的）
-            audio_pipeline_terminate(s_audio_player->pipeline);
-            // 等待终止完成
-            vTaskDelay(pdMS_TO_TICKS(100));
-        } else {
-            // 等待成功，再等待一小段时间确保完全停止
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
-    }
+    // 无论状态如何，都先停止并强制终止管道，确保 ADF 内部状态机彻底回归初始态
+    audio_pipeline_stop(s_audio_player->pipeline);
+    audio_pipeline_wait_for_stop(s_audio_player->pipeline);
+    audio_pipeline_terminate(s_audio_player->pipeline);
     
-    // 重置管道（无论之前状态如何）
+    // 强制清除事件队列中所有残留消息，必须在 terminate 之后执行
+    audio_event_iface_msg_t msg;
+    while (audio_event_iface_listen(s_audio_player->evt, &msg, 0) == ESP_OK) {
+        // 持续读取直到队列为空
+    }
+
+    // 重置管道
     audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
     audio_pipeline_reset_elements(s_audio_player->pipeline);
     s_audio_player->player_state = PIPE_STATE_IDLE;
-    ESP_LOGI(TAG, "Audio pipeline reset to IDLE");
+    ESP_LOGI(TAG, "Audio pipeline fully reset to IDLE");
     
     ESP_LOGI(TAG, "audio_tone_play: %s", uri);
     
@@ -612,35 +606,10 @@ esp_err_t audio_tone_play(const char *uri)
     s_audio_player->start_time_us = 0;  // 在 pipeline 真正启动后设置
     
     // 设置新的URI
-    audio_element_set_uri(s_audio_player->spiffs_stream, uri);
-    
-    // 在启动前，再次确保管道完全停止（双重保险）
-    // 如果管道状态不是IDLE，说明还没完全重置，需要再次处理
-    if (s_audio_player->player_state != PIPE_STATE_IDLE) {
-        // 先停止（如果还在运行）
-        audio_pipeline_stop(s_audio_player->pipeline);
-        
-        // 等待停止完成（带超时处理）
-        esp_err_t wait_ret = audio_pipeline_wait_for_stop(s_audio_player->pipeline);
-        if (wait_ret != ESP_OK) {
-            ESP_LOGW(TAG, "Pipeline wait_for_stop failed: %s, force terminate", esp_err_to_name(wait_ret));
-            // 如果等待失败，强制终止（元素可能还没创建，这是正常的）
-            audio_pipeline_terminate(s_audio_player->pipeline);
-            // 等待更长时间确保终止完成
-            vTaskDelay(pdMS_TO_TICKS(150));
-        } else {
-            // 等待成功，再等待一小段时间确保完全停止
-            vTaskDelay(pdMS_TO_TICKS(100));
-        }
-        
-        // 重置管道状态
-        audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
-        audio_pipeline_reset_elements(s_audio_player->pipeline);
-        s_audio_player->player_state = PIPE_STATE_IDLE;
-    }
+    audio_element_set_uri(s_audio_player->fatfs_stream, uri);
     
     // 等待一下，确保所有操作完成
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(20));
     
     // 启动新的音频
     esp_err_t ret = audio_pipeline_run(s_audio_player->pipeline);
@@ -652,6 +621,9 @@ esp_err_t audio_tone_play(const char *uri)
         ESP_LOGE(TAG, "Failed to run audio pipeline: %s", esp_err_to_name(ret));
         s_audio_player->player_state = PIPE_STATE_IDLE;
     }
+    
+    // 给系统一点时间处理初始事件
+    vTaskDelay(pdMS_TO_TICKS(10));
     
     // 清除切换标志
     s_audio_player->is_switching = false;

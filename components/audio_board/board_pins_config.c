@@ -99,7 +99,7 @@ int8_t get_sdcard_intr_gpio(void)
 
 int8_t get_sdcard_open_file_num_max(void)
 {
-    return -1;
+    return 5;
 }
 
 int8_t get_sdcard_power_ctrl_gpio(void)

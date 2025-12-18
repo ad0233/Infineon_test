@@ -1,7 +1,7 @@
 set(SRC_FILES "audio_processor.c")
 
 list(APPEND SRC_FILES "audio_stream_dual_microphones.c")
-list(APPEND SRC_FILES "audio_stream_mp3.c")
+# list(APPEND SRC_FILES "audio_stream_mp3.c")
 
 set(COMPONENT_SRCS ${SRC_FILES})
 set(COMPONENT_ADD_INCLUDEDIRS include)

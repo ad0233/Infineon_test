@@ -13,6 +13,8 @@
 #include "filter_resample.h"
 #include "raw_stream.h"
 #include "spiffs_stream.h"
+#include "fatfs_stream.h"
+#include "wav_decoder.h"
 #include "audio_common.h"
 #include "i2s_stream.h"
 #include "es8311.h"
@@ -94,28 +96,16 @@ audio_element_handle_t create_record_i2s_stream(void)
 
 audio_element_handle_t create_player_decoder_stream(void)
 {
-    audio_element_handle_t decoder_stream = NULL;
-#ifdef CONFIG_AUDIO_SUPPORT_OPUS_DECODER
-    ESP_LOGI(TAG, "Create opus decoder");
-    raw_opus_dec_cfg_t opus_dec_cfg = RAW_OPUS_DEC_CONFIG_DEFAULT();
-    opus_dec_cfg.enable_frame_length_prefix = true;
-    opus_dec_cfg.sample_rate = 16000;
-    opus_dec_cfg.channels = 1;
-    opus_dec_cfg.task_core = 1;
-    decoder_stream = raw_opus_decoder_init(&opus_dec_cfg);
-#elif CONFIG_AUDIO_SUPPORT_AAC_DECODER
-    ESP_LOGI(TAG, "Create aac decoder");
-    aac_decoder_cfg_t  aac_dec_cfg  = DEFAULT_AAC_DECODER_CONFIG();
-    aac_dec_cfg.task_core = 1;
-    decoder_stream = aac_decoder_init(&aac_dec_cfg);
-#elif CONFIG_AUDIO_SUPPORT_G711A_DECODER
-    ESP_LOGI(TAG, "Create g711a decoder");
-    g711_decoder_cfg_t g711_dec_cfg = DEFAULT_G711_DECODER_CONFIG();
-    g711_dec_cfg.out_rb_size = 8 * 1024;
-    g711_dec_cfg.task_core = 1;
-    decoder_stream = g711_decoder_init(&g711_dec_cfg);
-#endif
-    return decoder_stream;
+    return create_player_wav_decoder_stream();
+}
+
+audio_element_handle_t create_player_wav_decoder_stream(void)
+{
+    ESP_LOGI(TAG, "Create wav decoder");
+    wav_decoder_cfg_t wav_cfg = DEFAULT_WAV_DECODER_CONFIG();
+    wav_cfg.task_core = 1;
+    wav_cfg.out_rb_size = 8 * 1024;
+    return wav_decoder_init(&wav_cfg);
 }
 
 
@@ -173,13 +163,13 @@ audio_element_handle_t create_8k_ch1_to_16k_ch2_rsp_stream()
     return filter;
 }
 
-audio_element_handle_t create_audio_player_spiffs_stream(void)
+audio_element_handle_t create_audio_player_fatfs_stream(void)
 {
-    audio_element_handle_t spiffs_stream = NULL;
-    spiffs_stream_cfg_t spiffs_cfg = SPIFFS_STREAM_CFG_DEFAULT();
-    spiffs_cfg.type = AUDIO_STREAM_READER;
-    spiffs_stream = spiffs_stream_init(&spiffs_cfg);
-    return spiffs_stream;
+    audio_element_handle_t fatfs_stream = NULL;
+    fatfs_stream_cfg_t fatfs_cfg = FATFS_STREAM_CFG_DEFAULT();
+    fatfs_cfg.type = AUDIO_STREAM_READER;
+    fatfs_stream = fatfs_stream_init(&fatfs_cfg);
+    return fatfs_stream;
 }
 
 recorder_sr_cfg_t get_default_audio_record_config(void)
