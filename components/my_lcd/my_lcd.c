@@ -96,12 +96,14 @@ int my_lcd_init() {
             .swap_bytes = true,
             .buff_dma = false,
             .buff_spiram = false,
+            .sw_rotate = true,
         }
     };
     lvgl_disp = lvgl_port_add_disp(&disp_cfg);
     
     // 设置 flush_wait_cb，避免忙等待阻塞 IDLE 任务
     lv_display_set_flush_wait_cb(lvgl_disp, lcd_flush_wait_cb);
+    lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_90);
 
     lvgl_port_lock(0);
     ui_init();
