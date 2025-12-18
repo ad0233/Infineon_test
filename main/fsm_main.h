@@ -117,7 +117,7 @@ void fsm_main_in_sleep_mode(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_in_night_mode(void *arg, uint8_t last_state, uint8_t next_state);
 
 void fsm_main_memu_cat_playing(void *arg, uint8_t last_state, uint8_t next_state);//猫猫动画
-
+void fsm_main_in_MorningAnimation(void *arg, uint8_t last_state, uint8_t next_state);//早安动画
 
 void fsm_main_in_OTA(void *arg, uint8_t last_state, uint8_t next_state);
 
@@ -141,6 +141,9 @@ enum fsm_main_event_enum {
 
     F_MAIN_E_BOYA_DATA_UPDATE, //睡眠数据更新事件 
     F_MAIN_E_RadarInfo_UPDATE , //雷达数据更新事件 
+
+    F_MAIN_E_ALARM_MORNING,     // 早报闹钟触发
+    F_MAIN_E_ALARM_SLEEP,       // 睡眠提醒触发
 
     F_MAIN_E_BTN_CLICKED,       // 点击事件
     F_MAIN_E_BTN_L_CLICKED,     // 长按事件

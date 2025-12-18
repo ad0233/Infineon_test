@@ -17,6 +17,10 @@ struct device_config {
     uint8_t alarm_minute;
     uint8_t alarm_enable;
 
+    uint8_t sleep_hour;
+    uint8_t sleep_minute;
+    uint8_t sleep_enable;
+
     uint8_t volume;
     uint8_t wake_mode;
     uint8_t light_duty;
@@ -192,6 +196,11 @@ bool my_nvs_read_iot_config_key(iot_config_key_type_t key_type, char *out_buffer
  * @brief 打印 iot_config 分区中的所有密钥（用于调试）
  */
 void my_nvs_print_iot_config_keys(void);
+
+/**
+ * @brief 检查闹钟触发状态并直接触发 FSM 事件
+ */
+void my_nvs_check_alarm_triggers(void);
 
 #ifdef __cplusplus
 }

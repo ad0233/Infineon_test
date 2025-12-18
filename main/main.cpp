@@ -14,7 +14,8 @@
 #include <sys/time.h>
 #include <algorithm>
 #include <string>
-
+#include <dirent.h>
+#include <sys/stat.h>
 #include "board.h"
 #include "esp_log_timestamp.h"
 #include "freertos/idf_additions.h"
@@ -31,13 +32,11 @@
 #include "esp_peripherals.h"
 #include "periph_wifi.h"
 #include "periph_spiffs.h"
-// #include "periph_sdcard.h"
+#include "periph_sdcard.h"
 #include "audio_mem.h"
 #include "portmacro.h"
 #include "pwm_control.h"
-// #include "board.h"
-
-// MKDV4GCL-ABB 驱动相关头文件
+#include "board.h"
 #include "driver/sdmmc_host.h"
 #include "driver/sdmmc_defs.h"
 #include "sdmmc_cmd.h"
@@ -72,8 +71,11 @@
 #include "my_ui_canvas.h"
 #include "my_ui_lottie.h"
 #include "btn.h"
+
+static const char *TAG = "main";
+
 // 时间调整函数 - 根据编码器变化调整时间
-static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
+__attribute__((unused)) static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
     // 计算新的分钟值
     int new_min = *min + diff;
     
@@ -97,6 +99,10 @@ static void adjust_time_by_encoder(int32_t diff, uint8_t *hour, uint8_t *min) {
         // 正常情况，直接设置分钟
         *min = new_min;
     }
+}
+
+static void check_alarms_and_trigger(void) {
+    my_nvs_check_alarm_triggers();
 }
 
 // 人体存在检测数据回调函数
@@ -158,11 +164,10 @@ void heart_rate_data_callback(const radar_heart_rate_data_t *data, void *context
 
 // #define ENABLE_TASK_MONITOR
 
-static const char *TAG = "main";
-static audio_board_handle_t board_handle;
 static my_rtc_handle_t s_rtc_handle = NULL;  // RTC句柄，仅在main.cpp中使用
 static my_lidar_handle_t s_lidar_handle = NULL;  // 雷达句柄，仅在main.cpp中使用
 static my_wifi_handle_t s_wifi_handle = NULL;  // WiFi句柄
+static audio_board_handle_t board_handle = NULL;  // 音频板句柄
 
 #if defined(ENABLE_TASK_MONITOR)
 static void monitor_task(void *arg)
@@ -215,100 +220,34 @@ static char t_radar[128];
 
 extern "C" void app_main()
 {
-    // 基础初始化
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
 
+    esp_reset_reason_t reason = esp_reset_reason();
+    ESP_LOGI("BOOT", "Reset reason: %d", reason);
     ESP_LOGI(TAG, "Initialize board peripherals");
+    
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
 
     esp_err_t ret = audio_board_sdcard_init(set, SD_MODE_4_LINE);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to init SD card");
-        vTaskDelete(nullptr);
-    }
-    ESP_LOGI(TAG, "SD card initialized successfully");
-    // ========== LCD 初始化 ==========
-    ESP_LOGI(TAG, "Initializing LCD...");
-    my_lcd_init();
-    ESP_LOGI(TAG, "LCD initialized successfully");
-
-    board_handle = audio_board_init();
-    audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
-    audio_hal_set_volume(board_handle->audio_hal, 25);
-
-    periph_spiffs_cfg_t spiffs_cfg = {
-        .root = "/spiffs",
-        .partition_label = "spiffs_data",
-        .max_files = 5,
-        .format_if_mount_failed = true};
-    esp_periph_handle_t spiffs_handle = periph_spiffs_init(&spiffs_cfg);
-    esp_periph_start(set, spiffs_handle);
-
-    // 等待 SPIFFS 挂载完成
-    while (!periph_spiffs_is_mounted(spiffs_handle)) {
-        vTaskDelay(500 / portTICK_PERIOD_MS);
-    }
-
-    // 复制音频文件从 SPIFFS 到 SD 卡
-    {
-        const char* src_path = "/spiffs/V001-breath.wav";
-        const char* dst_path = "/sdcard/V001-breath.wav";
-        ESP_LOGI(TAG, "Copying %s to %s...", src_path, dst_path);
-        FILE* f_src = fopen(src_path, "rb");
-        if (f_src) {
-            FILE* f_dst = fopen(dst_path, "wb");
-            if (f_dst) {
-                char* buf = (char*)malloc(4096);
-                size_t read_bytes;
-                while ((read_bytes = fread(buf, 1, 4096, f_src)) > 0) {
-                    fwrite(buf, 1, read_bytes, f_dst);
-                }
-                free(buf);
-                fclose(f_dst);
-                ESP_LOGI(TAG, "File copied successfully");
-            } else {
-                ESP_LOGE(TAG, "Failed to open destination file %s", dst_path);
-            }
-            fclose(f_src);
-        } else {
-            ESP_LOGE(TAG, "Failed to open source file %s", src_path);
+        ESP_LOGE(TAG, "SD card mount failed! Error: 0x%x", ret);
+    } else {
+        ESP_LOGI(TAG, "SD card mounted successfully!");
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to list SD card files! Error: 0x%x", ret);
         }
-    }
-
-    // 初始化音频播放器
-    void tone_play_callback(audio_element_status_t evt);
-    audio_tone_init(tone_play_callback);
+    }  
     
-    // 播放音频
-    vTaskDelay(500 / portTICK_PERIOD_MS); // 等待音频系统完全初始化
-    audio_tone_play("/sdcard/V001-breath.wav");
-
-    uint8_t c = 0;
-    while (1) {
-        uint32_t played_ms;
-        player_pipeline_get_progress(&played_ms);
-        ESP_LOGI(TAG, "played_ms: %" PRIu32, played_ms);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        c++;
-        if(c > 5) {
-            audio_tone_play("/sdcard/V001-breath.wav");
-            c = 0;
-        }
-    }
-    return;
-
-    // ========== 以下代码已注释，仅保留音频相关 ==========
-    /*
     auto iot_config_view = my_nvs_get_iot_config_view();
     if (iot_config_view == nullptr) {
         ESP_LOGE(TAG, "Failed to get iot config view");
-        vTaskDelete(nullptr);
+        // vTaskDelete(nullptr);
     }
     
     // 打印 iot_config 分区中的密钥
-    my_nvs_print_iot_config_keys();
+    // my_nvs_print_iot_config_keys();
     
     rust_lib_init();
     my_lcd_init();
@@ -339,28 +278,29 @@ extern "C" void app_main()
         },
         nullptr
     );
-
-    my_lidar_init(&s_lidar_handle);
-    my_lidar_set_sensitivity(s_lidar_handle, 20, 5 * 1000);
-    my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
-    my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
-    my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
-    my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
-    my_lidar_reg_cb_move_trig(s_lidar_handle, [](void *context, my_lidar_handle_t self){
-        (void)context;
-        (void)self;
-        fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
-    }, nullptr);
+//雷达的初始化  
+    // my_lidar_init(&s_lidar_handle);
+    // my_lidar_set_sensitivity(s_lidar_handle, 20, 5 * 1000);
+    // my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
+    // my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
+    // my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
+    // my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
+    // my_lidar_reg_cb_move_trig(s_lidar_handle, [](void *context, my_lidar_handle_t self){
+    //     (void)context;
+    //     (void)self;
+    //     fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
+    // }, nullptr);
     
-    print_mem_info();
-    my_ui_generate_qr_code("https://lunawake.ai", iot_config_view->thing_name);
-    my_ble_init(iot_config_view->thing_name);
-    print_mem_info();
-    ble_protocol_init();
-    print_mem_info();
-    if (my_wifi_init(&s_wifi_handle) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to init WiFi");
-    }
+    // 二维码 ble  wifi
+    // print_mem_info();
+    // my_ui_generate_qr_code("https://lunawake.ai", iot_config_view->thing_name);
+    // my_ble_init(iot_config_view->thing_name);  // 使用默认名称，或传入自定义名称
+    // print_mem_info();
+    // ble_protocol_init();  // 初始化蓝牙协议解析（不启用发送任务）
+    // print_mem_info();
+    // if (my_wifi_init(&s_wifi_handle) != ESP_OK) {
+    //     ESP_LOGE(TAG, "Failed to init WiFi");
+    // }
     
     // 初始化FSM，传入上下文
     fsm_main_context_t fsm_ctx = {
@@ -372,7 +312,7 @@ extern "C" void app_main()
         ESP_LOGE(TAG, "fsm_main_init failed");
         vTaskDelete(nullptr);
     }
-    // bs814_init();
+    bs814_init();
     my_wifi_auto_connect(s_wifi_handle);
     // WiFi事件改为轮询方式，在encoder_test中处理
     // my_wifi_set_event_callback 保留用于其他用途（如NTP同步任务）
@@ -402,6 +342,7 @@ extern "C" void app_main()
     
     print_mem_info();
 
+    //老硬件 功放的初始化 ，看到了觉得没用删掉就好了
     // gpio_set_direction(PA_ENABLE_GPIO, GPIO_MODE_OUTPUT);
     // gpio_set_level(PA_ENABLE_GPIO, 1); // Disable PA
     vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -416,8 +357,8 @@ extern "C" void app_main()
     print_mem_info();
 
     // NTP初始化移到WiFi连接成功后，确保网络就绪
-    // esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-    // esp_netif_sntp_init(&config);
+    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+    esp_netif_sntp_init(&config);
     print_mem_info();
 
     periph_spiffs_cfg_t spiffs_cfg = {
@@ -428,183 +369,76 @@ extern "C" void app_main()
     esp_periph_handle_t spiffs_handle = periph_spiffs_init(&spiffs_cfg);
     esp_periph_start(set, spiffs_handle);
 
-    // 等待 SPIFFS 挂载完成
+    // Wait until spiffs is mounted
     while (!periph_spiffs_is_mounted(spiffs_handle)) {
         vTaskDelay(500 / portTICK_PERIOD_MS);
     }
-
-    // 初始化音频播放器
+    
+// 初始化音频播放器
     void tone_play_callback(audio_element_status_t evt);
     audio_tone_init(tone_play_callback);
-    
-    // 播放音频
-    vTaskDelay(500 / portTICK_PERIOD_MS); // 等待音频系统完全初始化
-    audio_tone_play("spiffs://spiffs/water-fountain.mp3");
-    */
 
-    // ========== MKDV4GCL-ABB 驱动测试 ==========
-    ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "MKDV4GCL-ABB Storage Chip Test");
-    ESP_LOGI(TAG, "Pins: CLK=GPIO20, CMD=GPIO21");
-    ESP_LOGI(TAG, "      D0=GPIO19, D1=GPIO17");
-    ESP_LOGI(TAG, "      D2=GPIO16, D3=GPIO18");
-    ESP_LOGI(TAG, "========================================");
-    
-    // 配置 SDMMC 主机
-    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
-    host.max_freq_khz = SDMMC_FREQ_DEFAULT;
-    
-    // 配置 SDMMC 插槽
-    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-    slot_config.clk = GPIO_NUM_20;  // CLK
-    slot_config.cmd = GPIO_NUM_21;  // CMD
-    slot_config.d0 = GPIO_NUM_19;   // DATA0
-    slot_config.d1 = GPIO_NUM_17;   // DATA1
-    slot_config.d2 = GPIO_NUM_16;   // DATA2
-    slot_config.d3 = GPIO_NUM_18;   // DATA3
-    
-    // 挂载 FAT 文件系统
-    const char mount_point[] = "/sdcard";
-    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
-        .format_if_mount_failed = false,
-        .max_files = 5,
-        .allocation_unit_size = 16 * 1024,
-        .disk_status_check_enable = false,
-        .use_one_fat = false
-    };
-    
-    sdmmc_card_t* card = NULL;
-    
-    // 先尝试4线模式（更快）
-    ESP_LOGI(TAG, "Trying 4-line mode...");
-    host.flags = SDMMC_HOST_FLAG_4BIT;
-    slot_config.width = 4;
-    ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &card);
-    
-    // 如果4线模式失败，尝试1线模式
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "4-line mode failed, trying 1-line mode...");
-        host.flags = SDMMC_HOST_FLAG_1BIT;
-        slot_config.width = 1;
-        ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &card);
-    }
-    
-    if (ret != ESP_OK) {
-        if (ret == ESP_FAIL) {
-            ESP_LOGE(TAG, "Failed to mount filesystem. Format the card?");
-        } else {
-            ESP_LOGE(TAG, "Failed to initialize the card (%s).", esp_err_to_name(ret));
-            ESP_LOGE(TAG, "Make sure SD card lines have pull-up resistors in place.");
-        }
-        return;
-    }
-    
-    // 打印卡信息
-    sdmmc_card_print_info(stdout, card);
-    ESP_LOGI(TAG, "SD card mounted successfully!");
-    
-    // ========== 读写测试 ==========
-    const char* test_file = "/sdcard/test.txt";
-    const char* test_data = "MKDV4GCL-ABB Test - Hello World! 1234567890 ABCDEF";
-    const size_t test_data_len = strlen(test_data);
+    // // wait for time to be set
+    // int retry = 0;
+    // const int retry_count = 5;
+    // while (esp_netif_sntp_sync_wait(3000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && ++retry < retry_count) {
+    //     ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
+    // }
+    // // Set timezone to China Standard Time
+    // time_t now = 0;
+    // struct tm timeinfo;
+    // setenv("TZ", "CST-8", 1);
+    // tzset();
+    // localtime_r(&now, &timeinfo);
+// mqtt 
+    // snprintf(t_req, sizeof(t_req), "lunawake/%s/request", iot_config_view->thing_name);
+    // snprintf(t_resp, sizeof(t_resp), "lunawake/%s/response", iot_config_view->thing_name);
+    // snprintf(t_cmd, sizeof(t_cmd), "lunawake/%s/command", iot_config_view->thing_name);
 
-    // 写入测试
-    ESP_LOGI(TAG, "Writing test data to %s...", test_file);
-    FILE* f = fopen(test_file, "w");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for writing!");
-        esp_vfs_fat_sdcard_unmount(mount_point, card);
-        return;
-    }
-    size_t written = fwrite(test_data, 1, test_data_len, f);
-    fclose(f);
-    
-    if (written != test_data_len) {
-        ESP_LOGE(TAG, "Write failed! Expected %zu bytes, wrote %zu bytes", test_data_len, written);
-        esp_vfs_fat_sdcard_unmount(mount_point, card);
-        return;
-    }
-    ESP_LOGI(TAG, "Successfully wrote %zu bytes", written);
-    
-    // 读取测试
-    ESP_LOGI(TAG, "Reading test data from %s...", test_file);
-    char read_buffer[256] = {0};
-    f = fopen(test_file, "r");
-    if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open file for reading!");
-        esp_vfs_fat_sdcard_unmount(mount_point, card);
-        return;
-    }
-    size_t read_len = fread(read_buffer, 1, sizeof(read_buffer) - 1, f);
-    fclose(f);
-    
-    ESP_LOGI(TAG, "Read %zu bytes: %s", read_len, read_buffer);
-    
-    // 验证数据
-    if (read_len == test_data_len && memcmp(test_data, read_buffer, test_data_len) == 0) {
-        ESP_LOGI(TAG, "========================================");
-        ESP_LOGI(TAG, "MKDV4GCL-ABB Test PASSED!");
-        ESP_LOGI(TAG, "Written: %s", test_data);
-        ESP_LOGI(TAG, "Read:    %s", read_buffer);
-        ESP_LOGI(TAG, "Data matches perfectly!");
-        ESP_LOGI(TAG, "========================================");
-    } else {
-        ESP_LOGE(TAG, "========================================");
-        ESP_LOGE(TAG, "MKDV4GCL-ABB Test FAILED!");
-        ESP_LOGE(TAG, "Expected length: %zu, Read length: %zu", test_data_len, read_len);
-        ESP_LOGE(TAG, "Written: %s", test_data);
-        ESP_LOGE(TAG, "Read:    %s", read_buffer);
-        ESP_LOGE(TAG, "========================================");
-    }
-    
-    // 保持挂载，不卸载（测试用）
-    // esp_vfs_fat_sdcard_unmount(mount_point, card);
+    // snprintf(t_shadow_upd, sizeof(t_shadow_upd), "$aws/things/%s/shadow/update", iot_config_view->thing_name);
+    // snprintf(t_shadow_upd_delta, sizeof(t_shadow_upd_delta), "$aws/things/%s/shadow/update/delta", iot_config_view->thing_name);
+    // snprintf(t_shadow_upd_acc, sizeof(t_shadow_upd_acc), "$aws/things/%s/shadow/update/accepted", iot_config_view->thing_name);
+    // snprintf(t_shadow_upd_rej, sizeof(t_shadow_upd_rej), "$aws/things/%s/shadow/update/rejected", iot_config_view->thing_name);
+    // snprintf(t_shadow_get, sizeof(t_shadow_get), "$aws/things/%s/shadow/get", iot_config_view->thing_name);
+    // snprintf(t_shadow_get_acc, sizeof(t_shadow_get_acc), "$aws/things/%s/shadow/get/accepted", iot_config_view->thing_name);
+    // snprintf(t_shadow_get_rej, sizeof(t_shadow_get_rej), "$aws/things/%s/shadow/get/rejected", iot_config_view->thing_name);
 
-    // ========== 以下代码已注释 ==========
-    /*
-    snprintf(t_req, sizeof(t_req), "lunawake/%s/request", iot_config_view->thing_name);
-    snprintf(t_resp, sizeof(t_resp), "lunawake/%s/response", iot_config_view->thing_name);
-    snprintf(t_cmd, sizeof(t_cmd), "lunawake/%s/command", iot_config_view->thing_name);
-
-    snprintf(t_shadow_upd, sizeof(t_shadow_upd), "$aws/things/%s/shadow/update", iot_config_view->thing_name);
-    snprintf(t_shadow_upd_delta, sizeof(t_shadow_upd_delta), "$aws/things/%s/shadow/update/delta", iot_config_view->thing_name);
-    snprintf(t_shadow_upd_acc, sizeof(t_shadow_upd_acc), "$aws/things/%s/shadow/update/accepted", iot_config_view->thing_name);
-    snprintf(t_shadow_upd_rej, sizeof(t_shadow_upd_rej), "$aws/things/%s/shadow/update/rejected", iot_config_view->thing_name);
-    snprintf(t_shadow_get, sizeof(t_shadow_get), "$aws/things/%s/shadow/get", iot_config_view->thing_name);
-    snprintf(t_shadow_get_acc, sizeof(t_shadow_get_acc), "$aws/things/%s/shadow/get/accepted", iot_config_view->thing_name);
-    snprintf(t_shadow_get_rej, sizeof(t_shadow_get_rej), "$aws/things/%s/shadow/get/rejected", iot_config_view->thing_name);
-
-    snprintf(t_radar, sizeof(t_radar), "lunawake/%s/body_signal_tick", iot_config_view->thing_name);
-    const char* topics[] = {
-        t_req,
-        t_resp,
-        t_cmd,
-        t_shadow_upd,
-        t_shadow_upd_delta,
-        t_shadow_upd_acc,
-        t_shadow_upd_rej,
-        t_shadow_get,
-        t_shadow_get_acc,
-        t_shadow_get_rej,
-    };
-    my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
+    // snprintf(t_radar, sizeof(t_radar), "lunawake/%s/body_signal_tick", iot_config_view->thing_name);
+    // const char* topics[] = {
+    //     t_req,
+    //     t_resp,
+    //     t_cmd,
+    //     t_shadow_upd,
+    //     t_shadow_upd_delta,
+    //     t_shadow_upd_acc,
+    //     t_shadow_upd_rej,
+    //     t_shadow_get,
+    //     t_shadow_get_acc,
+    //     t_shadow_get_rej,
+    // };
+    // my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
     
     print_mem_info();
+
+    // while(1) {
+    //     radar_latest_data_t data;
+    //     my_radar_get_latest_data(&data);
+    //     mqtt_publish_radar_data(&data, t_radar);
+    //     vTaskDelay(1000);
+    // }
 
     fsm_main_event_trig(F_MAIN_E_INIT, nullptr);
     xTaskCreate(encoder_test, "encoder_test", 1024 * 6, nullptr, 10, nullptr);
     // my_lidar_start(s_lidar_handle); //TOTD: 雷达好像不需要启动命令，默认启动，确认好就删除这个代码
 
     print_mem_info();
-    */
-    
-    ESP_LOGI(TAG, "Audio test started");
     return;
 }
 
 void tone_play_callback(audio_element_status_t evt) {
     ESP_LOGI(__func__, "%d", evt);
     if(AEL_STATUS_STATE_FINISHED == evt) {
+        
     }
 }
 
@@ -631,7 +465,7 @@ void encoder_test(void *arg)
     memset(&re, 0, sizeof(rotary_encoder_t));
     re.pin_a = (gpio_num_t)encoder_pins.pin_a;
     re.pin_b = (gpio_num_t)encoder_pins.pin_b;
-    re.pin_btn = (gpio_num_t)encoder_pins.pin_btn;
+    // re.pin_btn = (gpio_num_t)encoder_pins.pin_btn;
     ESP_ERROR_CHECK(rotary_encoder_add(&re));
 
     rotary_encoder_event_t e;
@@ -647,11 +481,13 @@ void encoder_test(void *arg)
     TickType_t last_lidar_flush = 0;
     TickType_t last_ota_flush = 0;
     TickType_t last_wifi_flush = 0;
+    TickType_t last_alarm_check_flush = 0;
     const TickType_t fsm_flush_interval = pdMS_TO_TICKS(100);    // 100ms
     const TickType_t ble_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t lidar_flush_interval = pdMS_TO_TICKS(1000);      // 1000ms
     const TickType_t ota_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t wifi_flush_interval = pdMS_TO_TICKS(200);    // 200ms
+    const TickType_t alarm_check_interval = pdMS_TO_TICKS(1000 * 30); // 30秒检查一次即可
     
     // WiFi状态检测（用于避免重复触发）
     static wifi_state_t last_wifi_state = WIFI_STATE_IDLE;
@@ -660,28 +496,28 @@ void encoder_test(void *arg)
     {
         TickType_t current_tick = xTaskGetTickCount();
         
-        // static TickType_t last_bs814_poll = 0;
-        // if (current_tick - last_bs814_poll >= pdMS_TO_TICKS(20)) {
-        //     last_bs814_poll = current_tick;
+        static TickType_t last_bs814_poll = 0;
+        if (current_tick - last_bs814_poll >= pdMS_TO_TICKS(20)) {
+            last_bs814_poll = current_tick;
 
-        //     // KEY2 处理
-        //     key_evt_t ev = bs814_key2_update();  // 刷新按键状态
+            // KEY2 处理
+            key_evt_t ev = bs814_key2_update();  // 刷新按键状态
 
-        //     if (ev == KEY_EVT_CLICKED) {
-        //         ESP_LOGI(TAG, "BS814 KEY2 CLICKED");
-        //         fsm_main_event_trig(F_MAIN_E_BTN_CLICKED, NULL);
-        //     }
-        //     else if (ev == KEY_EVT_LONG) {
-        //         ESP_LOGI(TAG, "BS814 KEY2 LONG");
-        //         fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, NULL);
-        //     }
+            if (ev == KEY_EVT_CLICKED) {
+                ESP_LOGI(TAG, "BS814 KEY2 CLICKED");
+                fsm_main_event_trig(F_MAIN_E_BTN_CLICKED, NULL);
+            }
+            else if (ev == KEY_EVT_LONG) {
+                ESP_LOGI(TAG, "BS814 KEY2 LONG");
+                fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, NULL);
+            }
 
-        //     // KEY1 处理（音量减，已在 btn.c 中处理）
-        //     bs814_key1_update();
+            // KEY1 处理（音量减，已在 btn.c 中处理）
+            bs814_key1_update();
 
-        //     // KEY3 处理（音量加，已在 btn.c 中处理）
-        //     bs814_key3_update();
-        // }
+            // KEY3 处理（音量加，已在 btn.c 中处理）
+            bs814_key3_update();
+        }
 
         // 处理编码器事件
         if(xQueueReceive(event_queue, &e, 0) == pdTRUE) {
@@ -766,6 +602,12 @@ void encoder_test(void *arg)
             }
             
             last_wifi_flush = current_tick;
+        }
+
+        // 定时检查闹钟（每30s检查一次，内部有分钟变化检测）
+        if ((current_tick - last_alarm_check_flush) >= alarm_check_interval) {
+            check_alarms_and_trigger();
+            last_alarm_check_flush = current_tick;
         }
         
         vTaskDelay(1);

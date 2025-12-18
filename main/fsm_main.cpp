@@ -13,67 +13,77 @@ static const char *TAG = "fsm_main";
 
 // 状态名称获取
 static const char* fsm_state_to_str(uint8_t state) {
-    static const char* names[] = {
-        "UNINIT",                    // F_MAIN_S_UNINIT (0)
-        "UNINIT_PLAYING",            // F_MAIN_S_UNINIT_PLAYING (1)
-        "CLOCK",                     // F_MAIN_S_CLOCK (2)
-        "CLOCK_AWAY",                // F_MAIN_S_CLOCK_AWAY (3)
-        "CLOCK_BACK",                // F_MAIN_S_CLOCK_BACK (4)
-        "FINDPERSONC_ANIM",          // F_MAIN_S_FINDPERSONC_ANIM (5)
-        "FINDPERSON",                // F_MAIN_S_FINDPERSON (6)
-        "FINDSUC",                   // F_MAIN_S_FINDSUC (7)
-        "FINDFAIL",                  // F_MAIN_S_FINDFAIL (8)
-        "FINDSUC_ANIM",              // F_MAIN_S_FINDSUC_ANIM (9)
-        "FINDFAIL_ANIM",             // F_MAIN_S_FINDFAIL_ANIM (10)
-        "WIFI_DETECT",               // F_MAIN_S_WIFI_DETECT (11)
-        "WIFI_GUIDE",                // F_MAIN_S_WIFI_GUIDE (12)
-        "WIFI_CONN",                 // F_MAIN_S_WIFI_CONN (13)
-        "WIFI_CONN_SUC",             // F_MAIN_S_WIFI_CONN_SUC (14)
-        "WIFI_CONN_FAIL",            // F_MAIN_S_WIFI_CONN_FAIL (15)
-        "WIFI_OFFLINE",              // F_MAIN_S_WIFI_OFFLINE (16)
-        "RTC_DETECT",                // F_MAIN_S_RTC_DETECT (17)
-        "RTC_DETECT_CLK",            // F_MAIN_S_RTC_DETECT_CLK (18)
-        "MENU",                      // F_MAIN_S_MENU (19)
-        "MENU_SLEEP_MODE",           // F_MAIN_S_MENU_SLEEP_MODE (20)
-        "MENU_ALARM",                // F_MAIN_S_MENU_ALARM (21)
-        "NO_MENU_ALARM",             // F_MAIN_S_NO_MENU_ALARM (22)
-        "MENU_UNWIND",               // F_MAIN_S_MENU_UNWIND (23)
-        "MENU_VOLUME",               // F_MAIN_S_MENU_VOLUME (24)
-        "MENU_BRIGHTNESS",           // F_MAIN_S_MENU_BRIGHTNESS (25)
-        "MENU_SET_TIME",             // F_MAIN_S_MENU_SET_TIME (26)
-        "MENU_UNWIND_PLAYING",       // F_MAIN_S_MENU_UNWIND_PLAYING (27)
-    };
-    if (state < sizeof(names)/sizeof(names[0]) && names[state]) {
-        return names[state];
+    switch (state) {
+        case F_MAIN_S_UNINIT:              return "UNINIT";
+        case F_MAIN_S_UNINIT_PLAYING:      return "UNINIT_PLAYING";
+        case F_MAIN_S_CLOCK:               return "CLOCK";
+        case F_MAIN_S_CLOCK_AWAY:          return "CLOCK_AWAY";
+        case F_MAIN_S_CLOCK_BACK:          return "CLOCK_BACK";
+        case F_MAIN_S_FINDPERSONC_ANIM:    return "FINDPERSONC_ANIM";
+        case F_MAIN_S_MEMU_FINDPERSONC_ANIM: return "MEMU_FINDPERSONC_ANIM";
+        case F_MAIN_S_FINDPERSON:          return "FINDPERSON";
+        case F_MAIN_S_FINDSUC:             return "FINDSUC";
+        case F_MAIN_S_FINDFAIL:            return "FINDFAIL";
+        case F_MAIN_S_FINDSUC_ANIM:        return "FINDSUC_ANIM";
+        case F_MAIN_S_FINDFAIL_ANIM:       return "FINDFAIL_ANIM";
+        case F_MAIN_S_WIFI_DETECT:         return "WIFI_DETECT";
+        case F_MAIN_S_WIFI_GUIDE:          return "WIFI_GUIDE";
+        case F_MAIN_S_WIFI_CONN:           return "WIFI_CONN";
+        case F_MAIN_S_WIFI_CONN_SUC:       return "WIFI_CONN_SUC";
+        case F_MAIN_S_WIFI_CONN_FAIL:      return "WIFI_CONN_FAIL";
+        case F_MAIN_S_WIFI_OFFLINE:        return "WIFI_OFFLINE";
+        case F_MAIN_S_MEMU_WIFI_SUC:       return "MEMU_WIFI_SUC";
+        case F_MAIN_S_MEMU_WIFI_FAILE:     return "MEMU_WIFI_FAILE";
+        case F_MAIN_S_RTC_DETECT:          return "RTC_DETECT";
+        case F_MAIN_S_RTC_DETECT_CLK:      return "RTC_DETECT_CLK";
+        case F_MAIN_S_MENU:                return "MENU";
+        case F_MAIN_S_MENU_SLEEP_MODE:     return "MENU_SLEEP_MODE";
+        case F_MAIN_S_MENU_ALARM:          return "MENU_ALARM";
+        case F_MAIN_S_NO_MENU_ALARM:       return "NO_MENU_ALARM";
+        case F_MAIN_S_MENU_UNWIND:         return "MENU_UNWIND";
+        case F_MAIN_S_MENU_UNWIND_PLAYING: return "MENU_UNWIND_PLAYING";
+        case F_MAIN_S_MENU_VOLUME:         return "MENU_VOLUME";
+        case F_MAIN_S_MENU_BRIGHTNESS:     return "MENU_BRIGHTNESS";
+        case F_MAIN_S_MENU_SET_TIME:       return "MENU_SET_TIME";
+        case F_MAIN_S_BOYA_DATA:           return "BOYA_DATA";
+        case F_MAIN_S_RadarInfo:           return "RadarInfo";
+        case F_MAIN_S_GoodMorning_DEMO:    return "GoodMorning_DEMO";
+        case F_MAIN_S_REMINDER:            return "REMINDER";
+        case F_MAIN_S_SLEEPMODE:           return "SLEEPMODE";
+        case F_MAIN_S_NIGHTMODE:           return "NIGHTMODE";
+        case F_MAIN_S_OTA:                 return "OTA";
+        default:                           return "UNKNOWN";
     }
-    return "UNKNOWN";
 }
 
 
 // 事件名称获取
 static const char* fsm_event_to_str(uint8_t event) {
-    if (event == F_MAIN_E_TIMEOUT) return "TIMEOUT";
-    
-    static const char* names[] = {
-        "INIT",                      // F_MAIN_E_INIT
-        "ANIM_PLAY_SUC",             // F_MAIN_E_ANIM_PLAY_SUC
-        "LIDAR_MOVE_TRIG",           // F_MAIN_E_LIDAR_MOVE_TRIG
-        "LIDAR_UPDATE",              // F_MAIN_E_LIDAR_UPDATE
-        "LIDAR_NOT_FOUND",           // F_MAIN_E_LIDAR_NOT_FOUND
-        "DEV_MOVE",                  // F_MAIN_E_DEV_MOVE
-        "WIFI_CMD_TRIG",             // F_MAIN_E_WIFI_CMD_TRIG
-        "WIFI_C_CONN",               // F_MAIN_E_WIFI_C_CONN
-        "WIFI_C_SUC",                // F_MAIN_E_WIFI_C_SUC
-        "WIFI_C_FAIL",               // F_MAIN_E_WIFI_C_FAIL
-        "WIFI_C_UNCFG",              // F_MAIN_E_WIFI_C_UNCFG
-        "RTC_EXIST",                 // F_MAIN_E_RTC_EXIST
-        "RTC_NOT_EXIST",             // F_MAIN_E_RTC_NOT_EXIST
-        "BTN_CLICKED",               // F_MAIN_E_BTN_CLICKED
-        "BTN_L_CLICKED",             // F_MAIN_E_BTN_L_CLICKED
-        "KNOB_CW",                   // F_MAIN_E_KNOB_CW
-        "TIME",                      // F_MAIN_E_TIME
-    };
-    return (event < sizeof(names)/sizeof(names[0]) && names[event]) ? names[event] : "UNKNOWN";
+    switch (event) {
+        case F_MAIN_E_INIT:                return "INIT";
+        case F_MAIN_E_ANIM_PLAY_SUC:       return "ANIM_PLAY_SUC";
+        case F_MAIN_E_LIDAR_MOVE_TRIG:     return "LIDAR_MOVE_TRIG";
+        case F_MAIN_E_LIDAR_UPDATE:        return "LIDAR_UPDATE";
+        case F_MAIN_E_LIDAR_NOT_FOUND:     return "LIDAR_NOT_FOUND";
+        case F_MAIN_E_DEV_MOVE:            return "DEV_MOVE";
+        case F_MAIN_E_WIFI_CMD_TRIG:       return "WIFI_CMD_TRIG";
+        case F_MAIN_E_WIFI_C_CONN:         return "WIFI_C_CONN";
+        case F_MAIN_E_WIFI_C_SUC:          return "WIFI_C_SUC";
+        case F_MAIN_E_WIFI_C_FAIL:         return "WIFI_C_FAIL";
+        case F_MAIN_E_WIFI_C_UNCFG:        return "WIFI_C_UNCFG";
+        case F_MAIN_E_RTC_EXIST:           return "RTC_EXIST";
+        case F_MAIN_E_RTC_NOT_EXIST:       return "RTC_NOT_EXIST";
+        case F_MAIN_E_BOYA_DATA_UPDATE:    return "BOYA_DATA_UPDATE";
+        case F_MAIN_E_RadarInfo_UPDATE:    return "RadarInfo_UPDATE";
+        case F_MAIN_E_ALARM_MORNING:       return "ALARM_MORNING";
+        case F_MAIN_E_ALARM_SLEEP:         return "ALARM_SLEEP";
+        case F_MAIN_E_BTN_CLICKED:         return "BTN_CLICKED";
+        case F_MAIN_E_BTN_L_CLICKED:       return "BTN_L_CLICKED";
+        case F_MAIN_E_KNOB_CW:             return "KNOB_CW";
+        case F_MAIN_E_TIME:                return "TIME";
+        case F_MAIN_E_TIMEOUT:             return "TIMEOUT";
+        default:                           return "UNKNOWN";
+    }
 }
 
 static struct StateTable fsm_user_table[] = {
@@ -147,7 +157,11 @@ static struct StateTable fsm_user_table[] = {
     //UNWIND 
     { fm_has_memu_state    ,FM_MEMU_UNWIND            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//菜单---歌曲选择
     { nullptr              ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_unwind_next_item},//切换歌曲
-    { fm_has_h_fd_state     ,FM_H_F_SUC               ,F_MAIN_E_LIDAR_MOVE_TRIG     , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
+    
+    //测试 改成旋钮播放动画
+    // { fm_has_h_fd_state     ,FM_H_F_SUC          ,F_MAIN_E_LIDAR_MOVE_TRIG     , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
+    { nullptr                ,0                      ,F_MAIN_E_BTN_L_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING    ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
+
     { nullptr              ,0                         ,F_MAIN_E_ANIM_PLAY_SUC     , F_MAIN_S_MENU_UNWIND_PLAYING  , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//动画---歌曲切换
     { nullptr              ,0                         ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU              ,10    ,true       , fsm_main_in_memu},//歌曲--菜单
     //声音
@@ -180,11 +194,31 @@ static struct StateTable fsm_user_table[] = {
     // {nullptr             ,0                     , F_MAIN_E_TIMEOUT    ,F_MAIN_S_GoodMorning_DEMO       ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//早报dome--主页面 
     // {nullptr             ,0                     , F_MAIN_E_TIMEOUT   ,F_MAIN_S_REMINDER               ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//提醒--主页面  
     
-     //TODO:状态卡片的给更新事件   睡眠数据的更新函数/雷达数据的更新函数要添加
+     //TODO:状态卡片的给更新事件   /雷达数据的更新函数要添睡眠数据的更新函数加
     {nullptr             ,0                     , F_MAIN_E_BOYA_DATA_UPDATE    ,F_MAIN_S_BOYA_DATA              ,F_MAIN_S_BOYA_DATA     ,0  ,false    ,  nullptr},//睡眠数据的更新函数
     {nullptr             ,0                     , F_MAIN_E_RadarInfo_UPDATE    ,F_MAIN_S_RadarInfo              ,F_MAIN_S_RadarInfo     ,0  ,false    ,  nullptr},//雷达数据的更新函数
 
-    // 其他状态 
+    // 闹钟跳转
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_CLOCK                     , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},//闹钟触发
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU                      , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MEMU_WIFI_SUC             , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MEMU_WIFI_FAILE           , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_SLEEP_MODE           , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_ALARM                , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_NO_MENU_ALARM             , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_UNWIND               , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_UNWIND_PLAYING       , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_VOLUME               , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_BRIGHTNESS           , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_RTC_DETECT_CLK            , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_BOYA_DATA                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_RadarInfo                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_REMINDER                  , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_SLEEPMODE                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+
+    // // 睡眠时间跳转
+    // {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_CLOCK                     , F_MAIN_S_SLEEPMODE           ,0  ,false    ,fsm_main_in_sleep_mode},
+    // {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_MENU                      , F_MAIN_S_SLEEPMODE           ,0  ,false    ,fsm_main_in_sleep_mode},
 };
 
 

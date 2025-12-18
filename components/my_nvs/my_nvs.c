@@ -3,9 +3,12 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <time.h>
+#include <sys/time.h>
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_log.h"
+#include "fsm_main.h"
 
 #define NVS_NAMESPACE "devcfg"
 #define NVS_KEY "config"
@@ -34,6 +37,9 @@ static void device_config_set_default(struct device_config *cfg) {
     cfg->alarm_hour = 7;
     cfg->alarm_minute = 0;
     cfg->alarm_enable = 0;
+    cfg->sleep_hour = 23;
+    cfg->sleep_minute = 0;
+    cfg->sleep_enable = 0;
     cfg->volume = 10;
 }
 
@@ -495,5 +501,41 @@ void my_nvs_print_iot_config_keys(void) {
     }
     
     ESP_LOGI("NVS", "=====================================");
+}
+
+    void my_nvs_check_alarm_triggers(void) {
+    static int last_trigger_min = -1;
+    
+    struct tm timeinfo;
+    time_t now;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+
+    // 只有在分钟变化时才检查，防止在一分钟内多次触发
+    if (timeinfo.tm_min == last_trigger_min) {
+        return;
+    }
+    last_trigger_min = timeinfo.tm_min;
+
+    const struct device_config *cfg = my_nvs_get_config();
+    if (cfg == NULL) {
+        return;
+    }
+
+    // 1. 检查闹钟时间 (即早报时间)
+    if (cfg->alarm_enable && 
+        timeinfo.tm_hour == cfg->alarm_hour && 
+        timeinfo.tm_min == cfg->alarm_minute) {
+        ESP_LOGI("NVS", "Alarm (Morning) triggered! %02d:%02d", cfg->alarm_hour, cfg->alarm_minute);
+        fsm_main_event_trig(F_MAIN_E_ALARM_MORNING, NULL);
+    }
+
+    // 2. 检查睡眠时间
+    if (cfg->sleep_enable && 
+        timeinfo.tm_hour == cfg->sleep_hour && 
+        timeinfo.tm_min == cfg->sleep_minute) {
+        ESP_LOGI("NVS", "Sleep alarm triggered! %02d:%02d", cfg->sleep_hour, cfg->sleep_minute);
+        fsm_main_event_trig(F_MAIN_E_ALARM_SLEEP, NULL);
+    }
 }
 

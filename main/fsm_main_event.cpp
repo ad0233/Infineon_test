@@ -1,6 +1,8 @@
 #include "fsm_main.h"
 #include <string.h>
 #include <inttypes.h>
+#include <sys/time.h>
+#include <time.h>
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_lvgl_port.h"
@@ -198,16 +200,24 @@ void fsm_main_set_time(void *arg, uint8_t last_state, uint8_t next_state) {
     struct tm t;
     bool valid = false;
 
-    // 检查 RTC 是否有效
+    // 优先从硬件 RTC 获取当前值作为编辑起点
     my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
     if (rtc_handle != NULL && my_rtc_get_time(rtc_handle, &t, &valid) == 0 && valid) {
-        // RTC 已设置，使用 RTC 时间
         s_editing_hour   = t.tm_hour;
         s_editing_minute = t.tm_min;
     } else {
-        // RTC 未设置，使用默认时间
-        s_editing_hour   = 7;
-        s_editing_minute = 30;
+        // 如果 RTC 无效，尝试使用系统时间（可能已由 NTP 设置）
+        time_t now;
+        time(&now);
+        localtime_r(&now, &t);
+        if (t.tm_year > 120) {
+            s_editing_hour   = t.tm_hour;
+            s_editing_minute = t.tm_min;
+        } else {
+            // 都无效则使用默认时间
+            s_editing_hour   = 7;
+            s_editing_minute = 30;
+        }
     }
 
     s_editing_hour_mode = false;  // 默认先编辑分钟
@@ -310,6 +320,15 @@ void fsm_main_rtc_save_and_exit(void *arg, uint8_t last_state, uint8_t next_stat
     if (ret == 0) {
         ESP_LOGI(TAG, "RTC saved successfully: %02d:%02d",
                  s_editing_hour, s_editing_minute);
+        
+        // 如果 NTP 还没同步，我们要同步系统时间到这个手动设置的时间
+        // 这样 UI 上的时间（由系统时间驱动）才会立即改变
+        if (rtc_handle != NULL && !my_rtc_is_ntp_synced(rtc_handle)) {
+            ESP_LOGI(TAG, "NTP not synced, updating system time from manual RTC set");
+            time_t timestamp = mktime(&t);
+            struct timeval tv = { .tv_sec = timestamp, .tv_usec = 0 };
+            settimeofday(&tv, NULL);
+        }
     } else {
         ESP_LOGE(TAG, "RTC save failed (err=%d)!", ret);
     }
@@ -323,42 +342,55 @@ void fsm_main_rtc_save_and_exit(void *arg, uint8_t last_state, uint8_t next_stat
 void fsm_main_to_clock(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "to clock...");
     
-    // RTC已配置，从RTC读取时间
-    struct tm time;
-    bool valid = false;
-    uint8_t hour = 7;
-    uint8_t minute = 30;
-    
+    struct tm timeinfo;
+    bool time_valid = false;
     my_rtc_handle_t rtc_handle = fsm_main_get_rtc_handle();
-    if (rtc_handle != NULL && my_rtc_get_time(rtc_handle, &time, &valid) == 0) {
-        hour = time.tm_hour;
-        minute = time.tm_min;
+
+    // 1. 优先尝试获取系统时间（如果NTP同步过，或者启动时从RTC同步过，系统时间是准确的）
+    time_t now;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    
+    // 如果年份 > 2020 (1900 + 120)，说明系统时间已经被设置过
+    if (timeinfo.tm_year > 120) {
+        time_valid = true;
+        ESP_LOGI(TAG, "Using system time: %02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+    } 
+    // 2. 如果系统时间无效，尝试直接从硬件RTC读取
+    else if (rtc_handle != NULL) {
+        bool rtc_valid = false;
+        if (my_rtc_get_time(rtc_handle, &timeinfo, &rtc_valid) == 0 && rtc_valid) {
+            time_valid = true;
+            ESP_LOGI(TAG, "Using hardware RTC time: %02d:%02d", timeinfo.tm_hour, timeinfo.tm_min);
+        }
     }
-    
-    // 加载主页面
+
+    uint8_t hour = time_valid ? timeinfo.tm_hour : 7;
+    uint8_t minute = time_valid ? timeinfo.tm_min : 30;
+
+    if (!time_valid) {
+        ESP_LOGW(TAG, "No valid time source found, using default 07:30");
+    }
+
     lvgl_port_lock(0);
-    lv_disp_load_scr(ui_MianNoPerson);
     
-    // 使用 lv_label_set_text 直接更新主页面时间显示
-    char hour_str[8];
-    char min_str[8];
-    snprintf(hour_str, sizeof(hour_str), "%02d", hour);
-    snprintf(min_str, sizeof(min_str), "%02d", minute);
-    lv_label_set_text(ui_MainHour, hour_str);
-    lv_label_set_text(ui_MainMinute, min_str);
+    // 先更新标签内容，再加载屏幕，防止显示 Studio 默认值 (如06:24) 导致的闪烁
+    char hour_buf[8], min_buf[8];
+    snprintf(hour_buf, sizeof(hour_buf), "%02d", hour);
+    snprintf(min_buf, sizeof(min_buf), "%02d", minute);
     
-    // 从NVS读取保存的闹钟时间并更新主页面显示（无论是否启用，都显示保存的时间）
+    if (ui_MainHour) lv_label_set_text(ui_MainHour, hour_buf);
+    if (ui_MainMinute) lv_label_set_text(ui_MainMinute, min_buf);
+    
+    // 从NVS读取保存的闹钟时间并更新主页面显示
     const struct device_config *cfg = my_nvs_get_config();
     if (cfg != nullptr && ui_MainMorningAlarm != NULL) {
-        uint8_t alarm_hour = cfg->alarm_hour;
-        uint8_t alarm_minute = cfg->alarm_minute;
-        
-        // 显示保存的闹钟时间（即使闹钟被禁用，也显示上次设置的时间）
         char alarm_time_str[8];
-        snprintf(alarm_time_str, sizeof(alarm_time_str), "%02d:%02d", alarm_hour, alarm_minute);
+        snprintf(alarm_time_str, sizeof(alarm_time_str), "%02d:%02d", cfg->alarm_hour, cfg->alarm_minute);
         lv_label_set_text(ui_MainMorningAlarm, alarm_time_str);
     }
-    
+
+    lv_disp_load_scr(ui_MianNoPerson);
     lvgl_port_unlock();
     
     ESP_LOGI(TAG, "Clock time updated: %02d:%02d", hour, minute);
@@ -533,13 +565,13 @@ void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
         ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_next_animal()");
         my_ui_unwind_next_animal();
         // 切换后重新播放音频（audio_tone_play 内部会处理停止逻辑）
-        audio_tone_play("spiffs://spiffs/water-fountain.mp3");
+        audio_tone_play("/sdcard/V001-morning.wav");
     } else if (diff < 0) {
         // 向上切换（上一个菜单项）
         ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_prev_animal()");
         my_ui_unwind_prev_animal();
         // 切换后重新播放音频（audio_tone_play 内部会处理停止逻辑）
-        audio_tone_play("spiffs://spiffs/water-fountain.mp3");
+        audio_tone_play("/sdcard/V001-morning.wav");
     } else {
         ESP_LOGI(TAG, "fsm_unwind_next_item: diff is 0, no action");
     }
@@ -660,7 +692,7 @@ void fsm_main_memu_cat_playing(void *arg, uint8_t last_state, uint8_t next_state
     // 进入动画时，禁用雷达检测
     fsm_main_set_radar_detect_enabled(false);
     // 获取当前选中的动物
-    unwind_animal_t current_animal = my_ui_unwind_get_animal();
+     unwind_animal_t current_animal = my_ui_unwind_get_animal();
     my_h264_animation_t anim_to_play = MY_H264_ANIM_CAT;  // 默认使用CAT动画
     
     // 根据选中的动物选择对应的动画
@@ -704,6 +736,7 @@ void fsm_main_memu_cat_playing(void *arg, uint8_t last_state, uint8_t next_state
     my_h264_start(anim_to_play, 100);
 
 }
+
 
 void fsm_main_lidar_find(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "find person...");
@@ -873,7 +906,7 @@ void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
 
     
     // audio_tone_play 内部会处理停止逻辑，直接调用即可
-    audio_tone_play("spiffs://spiffs/water-fountain.mp3");
+    audio_tone_play("/sdcard/V001-morning.wav");
 }
 
 
@@ -931,6 +964,14 @@ void fsm_main_in_night_mode(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in night_mode...");
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_nightMode);
+    lvgl_port_unlock();
+}
+
+void fsm_main_in_MorningAnimation(void *arg, uint8_t last_state, uint8_t next_state) {
+    lvgl_port_lock(0);
+    lv_disp_load_scr(ui_MorningAnimation);
+    
+    audio_tone_play("/sdcard/V001-morning.wav");
     lvgl_port_unlock();
 }
 

@@ -5,4 +5,6 @@ idf_component_register(
         .
     REQUIRES
         driver nvs_flash json
+    PRIV_REQUIRES
+        main
 )

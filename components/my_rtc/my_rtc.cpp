@@ -50,15 +50,7 @@ i2c_bus_handle_t my_rtc_get_i2c_bus(my_rtc_handle_t self)
 
 static int i2c_init(my_rtc_handle_t self)
 {
-    // 尝试复用LCD创建的I2C总线（如果LCD已初始化）
-    extern i2c_bus_handle_t lcd_i2c_bus;
-    if (lcd_i2c_bus != NULL) {
-        self->i2c = lcd_i2c_bus;
-        ESP_LOGI(TAG, "Reusing I2C bus from LCD/PCF8574");
-        return ESP_OK;
-    }
-    
-    // 如果LCD还没初始化，创建新的I2C总线
+    // 创建新的I2C总线
     i2c_config_t es_i2c_cfg;
     memset(&es_i2c_cfg, 0, sizeof(i2c_config_t));
     
