@@ -967,19 +967,22 @@ void fsm_main_in_night_mode(void *arg, uint8_t last_state, uint8_t next_state) {
     lvgl_port_unlock();
 }
 
+/**
+ * @brief 歌词实时刷新任务 (高频 10ms 轮询)
+ */
 static void lyric_update_task(void* param) {
     uint8_t target_state = (uint8_t)(uintptr_t)param;
-    ESP_LOGI(TAG, "lyric_update_task started (high speed 10ms mode)");
+    ESP_LOGI(TAG, "lyric_update_task started (10ms mode)");
     
     while (fsm_main_get_current_state() == target_state) {
         uint32_t played_ms = 0;
-        // 使用我之前优化的硬件反馈进度函数
+        // 获取硬件层真实的音频播放进度
         if (player_pipeline_get_progress(&played_ms) == ESP_OK) {
             lvgl_port_lock(0);
             updateMorningAnimationLyrics((int)played_ms);
             lvgl_port_unlock();
         }
-        vTaskDelay(pdMS_TO_TICKS(10)); // 10ms 高频轮询，确保毫秒级响应
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
     
     ESP_LOGI(TAG, "lyric_update_task finished");

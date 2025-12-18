@@ -10,7 +10,15 @@ struct LrcLine {
     lv_obj_t* label;    // 对应的 UI 标签
 };
 
-extern std::vector<LrcLine> lrcList;
+/**
+ * @brief 歌词显示管理器，用于封装歌词 UI 的状态
+ */
+typedef struct {
+    lv_obj_t* viewport;      // 裁剪视口
+    lv_obj_t* scroller;      // 滚动容器
+    int current_index;       // 当前显示的歌词索引
+    std::vector<LrcLine> lines; // 解析出的歌词列表
+} lrc_ui_manager_t;
 
 /**
  * @brief 从文件读取 LRC 歌词
