@@ -183,6 +183,21 @@ int my_ui_get_current_page(void);
 // 页面跳转函数
 void navigate_to_page(page_t page);
 
+// 将睡眠模式页面恢复到初始样式（黄色月亮、Good Night）
+void my_ui_sleep_mode_reset_to_default(void);
+
+// 将睡眠模式页面切换到播放完成后的样式（显示白圈、Good Night）
+void my_ui_sleep_mode_ready(void);
+
+// 将睡眠模式页面切换到夜间模式样式
+void my_ui_sleep_mode_to_night_mode(void);
+
+// 启动夜间模式进度条更新任务
+void my_ui_night_mode_start_progress(void);
+
+// 停止夜间模式进度条更新任务
+void my_ui_night_mode_stop_progress(void);
+
 #ifdef __cplusplus
 }
 #endif

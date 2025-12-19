@@ -114,6 +114,7 @@ void fsm_main_in_radarinfo(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_in_GoodMorning_demo(void *arg, uint8_t last_state, uint8_t next_state); 
 void fsm_main_in_reminder_tomorrow(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_in_sleep_mode(void *arg, uint8_t last_state, uint8_t next_state);
+void fsm_main_in_sleep_mode_ready(void *arg, uint8_t last_state, uint8_t next_state);
 void fsm_main_in_night_mode(void *arg, uint8_t last_state, uint8_t next_state);
 
 void fsm_main_memu_cat_playing(void *arg, uint8_t last_state, uint8_t next_state);//猫猫动画
@@ -197,6 +198,7 @@ enum fsm_main_state_enum {
     F_MAIN_S_GoodMorning_DEMO,  //早报demo
     F_MAIN_S_REMINDER,          //明天提醒
     F_MAIN_S_SLEEPMODE,          //睡觉提示
+    F_MAIN_S_SLEEPMODE_READY,    //睡觉提示准备就绪（播放完成后）
     F_MAIN_S_NIGHTMODE,          //夜间模式
     //ota
     F_MAIN_S_OTA,         //睡眠数据

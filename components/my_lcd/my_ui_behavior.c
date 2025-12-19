@@ -14,6 +14,8 @@
 #include "freertos/task.h"
 #include <string.h>
 #include <stdio.h>
+#include "fsm_main.h"  // 包含状态定义
+#include "my_lidar.h"  // 包含雷达数据结构
 
 // 前向声明，避免循环依赖
 void fsm_main_set_radar_detect_enabled(bool enabled);
@@ -1188,6 +1190,288 @@ void my_ui_light_prev(void) {
         my_ui_light_set(current_light_duty - 10);
     } else {
         my_ui_light_set(10);  
+    }
+}
+
+// 静态变量：保存夜间模式圆圈对象
+static lv_obj_t *s_night_mode_circle = NULL;
+static TaskHandle_t s_night_mode_task_handle = NULL;
+static uint32_t s_night_mode_start_time = 0;  // 夜间模式开始时间（毫秒）
+static bool s_night_mode_movement_valid = false;  // 体动数据是否有效
+
+// 将睡眠模式页面恢复到初始样式（黄色月亮、Good Night）
+void my_ui_sleep_mode_reset_to_default(void) {
+    lvgl_port_lock(0);
+    
+    // 恢复月亮图片：从棕色月亮改回黄色月亮
+    if (ui_sleepModeMoon != NULL) {
+        lv_image_set_src(ui_sleepModeMoon, &ui_img_yello_moon_png);
+    }
+    
+    // 恢复所有文字颜色：从 0xA86F2A 改回 0xFFBB5C
+    lv_color_t default_color = lv_color_hex(0xFFBB5C);
+    
+    if (ui_sleepModeHour != NULL) {
+        lv_obj_set_style_text_color(ui_sleepModeHour, default_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    
+    if (ui_sleepModeMinute != NULL) {
+        lv_obj_set_style_text_color(ui_sleepModeMinute, default_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    
+    if (ui_sleepModeTips != NULL) {
+        lv_label_set_text(ui_sleepModeTips, "Time for Bed");
+        lv_obj_set_style_text_color(ui_sleepModeTips, default_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    
+    if (ui_sleepModeLabel != NULL) {
+        lv_obj_set_style_text_color(ui_sleepModeLabel, default_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    
+    // 屏蔽掉白圈（夜间模式的圆圈）
+    if (s_night_mode_circle != NULL) {
+        lv_obj_add_flag(s_night_mode_circle, LV_OBJ_FLAG_HIDDEN);
+    }
+    
+    lvgl_port_unlock();
+}
+
+// 将睡眠模式页面切换到播放完成后的样式（显示白圈、Good Night）
+void my_ui_sleep_mode_ready(void) {
+    lvgl_port_lock(0);
+    
+    // 创建白圈（如果还没有创建）
+    if (s_night_mode_circle == NULL && ui_sleepMode != NULL) {
+        s_night_mode_circle = lv_arc_create(ui_sleepMode);
+        lv_obj_set_width(s_night_mode_circle, 300);
+        lv_obj_set_height(s_night_mode_circle, 300);
+        lv_obj_set_align(s_night_mode_circle, LV_ALIGN_CENTER);
+        
+        // 设置背景圆圈：完整的360度，白色，细边框（2px）
+        lv_arc_set_bg_angles(s_night_mode_circle, 0, 360);
+        lv_obj_set_style_arc_color(s_night_mode_circle, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_width(s_night_mode_circle, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        
+        // 设置背景为透明（镂空效果）
+        lv_obj_set_style_bg_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+        
+        // 初始化指示器：从270度（最上方）开始，宽度2px，初始为0度
+        lv_arc_set_angles(s_night_mode_circle, 270, 270);
+        lv_obj_set_style_arc_width(s_night_mode_circle, 2, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        
+        // 隐藏旋钮
+        lv_obj_set_style_bg_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_KNOB | LV_STATE_DEFAULT);
+        
+        // 设置为不可点击
+        lv_obj_clear_flag(s_night_mode_circle, LV_OBJ_FLAG_CLICKABLE);
+    }
+    
+    // 显示白圈
+    if (s_night_mode_circle != NULL) {
+        lv_obj_clear_flag(s_night_mode_circle, LV_OBJ_FLAG_HIDDEN);
+        // 重置进度条
+        lv_arc_set_angles(s_night_mode_circle, 270, 270);
+        lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    }
+    
+    // 文字改回 Good Night
+    if (ui_sleepModeTips != NULL) {
+        lv_label_set_text(ui_sleepModeTips, "Good Night");
+    }
+    
+    lvgl_port_unlock();
+}
+
+// 将睡眠模式页面切换到夜间模式样式
+void my_ui_sleep_mode_to_night_mode(void) {
+    lvgl_port_lock(0);
+    
+    // 修改月亮图片：从黄色月亮改成棕色月亮
+    if (ui_sleepModeMoon != NULL) {
+        lv_image_set_src(ui_sleepModeMoon, &ui_img_brown_moon_png);
+    }
+    
+    // 修改所有文字颜色：从 0xFFBB5C 改成 0xA86F2A
+    lv_color_t night_color = lv_color_hex(0xA86F2A);
+    
+    if (ui_sleepModeHour != NULL) {
+        lv_obj_set_style_text_color(ui_sleepModeHour, night_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    
+    if (ui_sleepModeMinute != NULL) {
+        lv_obj_set_style_text_color(ui_sleepModeMinute, night_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    
+    if (ui_sleepModeTips != NULL) {
+        lv_label_set_text(ui_sleepModeTips, "Night mode");
+        lv_obj_set_style_text_color(ui_sleepModeTips, night_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    
+    if (ui_sleepModeLabel != NULL) {
+        lv_obj_set_style_text_color(ui_sleepModeLabel, night_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    
+    // 创建镂空圆圈（如果还没有创建）
+    if (s_night_mode_circle == NULL && ui_sleepMode != NULL) {
+        s_night_mode_circle = lv_arc_create(ui_sleepMode);
+        lv_obj_set_width(s_night_mode_circle, 300);
+        lv_obj_set_height(s_night_mode_circle, 300);
+        lv_obj_set_align(s_night_mode_circle, LV_ALIGN_CENTER);
+        
+        // 设置背景圆圈：完整的360度，白色，细边框（2px）
+        lv_arc_set_bg_angles(s_night_mode_circle, 0, 360);
+        lv_obj_set_style_arc_color(s_night_mode_circle, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_width(s_night_mode_circle, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        
+        // 设置背景为透明（镂空效果）
+        lv_obj_set_style_bg_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+        
+        // 初始化指示器：从270度（最上方）开始，宽度2px，初始为0度
+        lv_arc_set_angles(s_night_mode_circle, 270, 270);
+        lv_obj_set_style_arc_width(s_night_mode_circle, 2, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        
+        // 隐藏旋钮
+        lv_obj_set_style_bg_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_KNOB | LV_STATE_DEFAULT);
+        
+        // 设置为不可点击
+        lv_obj_clear_flag(s_night_mode_circle, LV_OBJ_FLAG_CLICKABLE);
+    } else if (s_night_mode_circle != NULL) {
+        // 如果已存在，显示它并重置进度
+        lv_obj_clear_flag(s_night_mode_circle, LV_OBJ_FLAG_HIDDEN);
+        lv_arc_set_angles(s_night_mode_circle, 270, 270);
+        lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    }
+    
+    // 记录开始时间（重新进入时重置）
+    s_night_mode_start_time = esp_log_timestamp();
+    
+    // 清空进度条（重新进入时重置）
+    if (s_night_mode_circle != NULL) {
+        lv_arc_set_angles(s_night_mode_circle, 270, 270);
+        lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    }
+    
+    lvgl_port_unlock();
+}
+
+/**
+ * @brief 夜间模式进度条更新任务
+ * 轮询体动数据，当体动<30时显示进度条，0-360度代表3分钟
+ */
+static void night_mode_progress_task(void* param) {
+    ESP_LOGI(TAG, "night_mode_progress_task started");
+    
+    const uint32_t TOTAL_TIME_MS = 180000;  // 3分钟 = 180秒 = 180000毫秒
+    const uint8_t MOVEMENT_THRESHOLD = 30;  // 体动阈值
+    static uint8_t last_movement = 255;  // 记录上一次体动值，用于检测状态变化
+    
+    while (fsm_main_get_current_state() == F_MAIN_S_NIGHTMODE) {
+        // 轮询获取体动数据
+        my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
+        uint8_t movement = 0;
+        bool has_movement_data = false;
+        
+        if (lidar_handle != NULL) {
+            radar_latest_data_t data;
+            if (my_lidar_get_latest_data(lidar_handle, &data) == ESP_OK) {
+                movement = data.movement_param;
+                has_movement_data = true;
+            }
+        }
+        
+        uint32_t current_time = esp_log_timestamp();
+        uint32_t elapsed_time = current_time - s_night_mode_start_time;
+        
+        // 如果体动 < 30，重新开始计时
+        if (has_movement_data && movement < MOVEMENT_THRESHOLD) {
+            // 如果体动从 >= 30 变为 < 30，或者已经超过3分钟，重新开始
+            if (last_movement >= MOVEMENT_THRESHOLD || elapsed_time >= TOTAL_TIME_MS) {
+                s_night_mode_start_time = current_time;
+                elapsed_time = 0;
+            }
+            last_movement = movement;
+            
+            if (s_night_mode_circle != NULL) {
+                // 计算角度：0-360度对应0-180秒，从270度（最上方）开始往右
+                float progress = (float)elapsed_time / TOTAL_TIME_MS;
+                if (progress > 1.0f) progress = 1.0f;
+                
+                int32_t end_angle = 270 + (int32_t)(progress * 360);
+                if (end_angle >= 630) end_angle = 270 + 360;  // 确保不超过一圈
+                
+                lvgl_port_lock(0);
+                
+                // 设置指示器角度：从270度到end_angle
+                lv_arc_set_angles(s_night_mode_circle, 270, end_angle);
+                
+                // 体动 < 30：用棕色 A86F2A 描绘
+                lv_obj_set_style_arc_color(s_night_mode_circle, lv_color_hex(0xA86F2A), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+                lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+                
+                lvgl_port_unlock();
+            }
+        } else if (has_movement_data && movement >= MOVEMENT_THRESHOLD) {
+            // 体动 >= 30：用白色描绘
+            last_movement = movement;
+            if (s_night_mode_circle != NULL) {
+                float progress = (float)elapsed_time / TOTAL_TIME_MS;
+                if (progress > 1.0f) progress = 1.0f;
+                
+                int32_t end_angle = 270 + (int32_t)(progress * 360);
+                if (end_angle >= 630) end_angle = 270 + 360;
+                
+                lvgl_port_lock(0);
+                
+                lv_arc_set_angles(s_night_mode_circle, 270, end_angle);
+                lv_obj_set_style_arc_color(s_night_mode_circle, lv_color_hex(0xFFFFFF), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+                lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+                
+                lvgl_port_unlock();
+            }
+        } else if (s_night_mode_circle != NULL) {
+            // 没有体动数据，隐藏进度条
+            last_movement = 255;  // 重置
+            lvgl_port_lock(0);
+            lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+            lvgl_port_unlock();
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(100));  // 每100ms更新一次
+    }
+    
+    // 退出夜间模式时，隐藏进度条
+    if (s_night_mode_circle != NULL) {
+        lvgl_port_lock(0);
+        lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lvgl_port_unlock();
+    }
+    
+    ESP_LOGI(TAG, "night_mode_progress_task finished");
+    s_night_mode_task_handle = NULL;
+    vTaskDelete(NULL);
+}
+
+// 启动夜间模式进度条更新任务
+void my_ui_night_mode_start_progress(void) {
+    // 如果任务已存在，先停止
+    if (s_night_mode_task_handle != NULL) {
+        vTaskDelete(s_night_mode_task_handle);
+        s_night_mode_task_handle = NULL;
+    }
+    
+    // 创建新任务
+    xTaskCreate(night_mode_progress_task, "night_progress", 4096, NULL, 5, &s_night_mode_task_handle);
+}
+
+// 停止夜间模式进度条更新任务
+void my_ui_night_mode_stop_progress(void) {
+    if (s_night_mode_task_handle != NULL) {
+        vTaskDelete(s_night_mode_task_handle);
+        s_night_mode_task_handle = NULL;
     }
 }
 

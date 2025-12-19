@@ -186,7 +186,8 @@ static struct StateTable fsm_user_table[] = {
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_RadarInfo                 ,F_MAIN_S_GoodMorning_DEMO     ,0  ,false    ,  fsm_main_in_MorningAnimation},//雷达数据---早报dome
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_GoodMorning_DEMO          ,F_MAIN_S_REMINDER            ,0  ,false    ,  fsm_main_in_reminder_tomorrow},//早报dome---提醒 
     {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_REMINDER                   ,F_MAIN_S_SLEEPMODE     ,0  ,false    ,  fsm_main_in_sleep_mode},//提醒--入睡提示dome
-    {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_SLEEPMODE                   ,F_MAIN_S_NIGHTMODE     ,0  ,false    ,  fsm_main_in_night_mode},//入睡提示dome--夜间模式
+    {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_SLEEPMODE                   ,F_MAIN_S_SLEEPMODE_READY     ,0  ,false    ,  fsm_main_in_sleep_mode},//提醒--入睡提示dome
+    {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_SLEEPMODE_READY             ,F_MAIN_S_NIGHTMODE     ,0  ,false    ,  fsm_main_in_night_mode},//入睡提示dome--夜间模式
     {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_NIGHTMODE                   ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//夜间模式--主页面
 
     // //状态卡片  10s退回
@@ -216,14 +217,33 @@ static struct StateTable fsm_user_table[] = {
     {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_RadarInfo                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
     {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_REMINDER                  , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
     {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_SLEEPMODE                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+
     {nullptr             ,0                     ,F_MAIN_E_WAV_PLAY_FINISHED  , F_MAIN_S_GoodMorning_DEMO          , F_MAIN_S_CLOCK               ,0  ,false    ,fsm_main_to_clock},             // 播放完毕回主页面
 
     // 睡眠时间跳转
     // {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP        , F_MAIN_S_CLOCK                     , F_MAIN_S_SLEEPMODE           ,0  ,false    ,fsm_main_in_sleep_mode},
     // {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP        , F_MAIN_S_MENU                      , F_MAIN_S_SLEEPMODE           ,0  ,false    ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_CLOCK                     , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},//闹钟触发
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_MENU                      , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_MEMU_WIFI_SUC             , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_MEMU_WIFI_FAILE           , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_MENU_SLEEP_MODE           , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_MENU_ALARM                , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_NO_MENU_ALARM             , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_MENU_UNWIND               , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_MENU_UNWIND_PLAYING       , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_MENU_VOLUME               , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_MENU_BRIGHTNESS           , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_RTC_DETECT_CLK            , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_BOYA_DATA                 , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_RadarInfo                 , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_REMINDER                  , F_MAIN_S_SLEEPMODE          ,0        ,false         ,fsm_main_in_sleep_mode},
+    {nullptr             ,0                     ,F_MAIN_E_WAV_PLAY_FINISHED , F_MAIN_S_SLEEPMODE                , F_MAIN_S_SLEEPMODE_READY    ,0        ,false         ,fsm_main_in_sleep_mode_ready},
+    {nullptr             ,0                     ,F_MAIN_E_WAV_PLAY_FINISHED ,F_MAIN_S_SLEEPMODE_READY           , F_MAIN_S_NIGHTMODE          ,0        ,false         ,fsm_main_in_night_mode},
+      
 };
 
-
+// fsm_main_in_night_mode
 static uint32_t timeout_ms_tick = 0;
 static fsm_handle_t s_fsm_handle = nullptr;
 static fsm_main_context_t s_fsm_context = {NULL};
