@@ -15,13 +15,14 @@
 #include "my_nvs.h"
 #include "my_wifi.h"
 #include "fsm_main.h"
+#include "esp_heap_caps.h"
 
 static const char *TAG = "mqtts_example";
 
-// 主题缓存（拷贝入内部缓冲，避免外部生命周期问题）
+// 主题缓存（从外部内存分配，避免占用内部RAM）
 #define MY_MQTT_MAX_TOPICS     10
 #define MY_MQTT_MAX_TOPIC_LEN  192
-static char s_topics[MY_MQTT_MAX_TOPICS][MY_MQTT_MAX_TOPIC_LEN];
+static char (*s_topics)[MY_MQTT_MAX_TOPIC_LEN] = NULL;
 static int s_topic_count = 0;
 
 // 回调与上下文
@@ -101,6 +102,20 @@ static void mqtt_app_start(const char *broker_uri, const char *client_id,
     if (!broker_uri || broker_uri[0] == '\0') {
         ESP_LOGE(TAG, "broker_uri is null or empty");
         vTaskDelete(NULL);
+    }
+
+    // 分配主题缓冲区（从外部内存）
+    if (s_topics == NULL) {
+        s_topics = (char (*)[MY_MQTT_MAX_TOPIC_LEN])heap_caps_malloc(
+            MY_MQTT_MAX_TOPICS * MY_MQTT_MAX_TOPIC_LEN, 
+            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (s_topics == NULL) {
+            ESP_LOGE(TAG, "Failed to allocate topics buffer from SPIRAM");
+            vTaskDelete(NULL);
+            return;
+        }
+        ESP_LOGI(TAG, "Allocated topics buffer from SPIRAM: %d bytes", 
+                 MY_MQTT_MAX_TOPICS * MY_MQTT_MAX_TOPIC_LEN);
     }
 
     // 回调

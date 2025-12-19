@@ -1,8 +1,10 @@
 #include "mqtt_protocol.h"
+#include "fsm_main.h"
 #include "my_mqtt.h"
 #include "my_utils.h"
 #include "ble_protocol.h"
 #include "esp_log.h"
+#include "my_wifi.h"
 #include <string>
 #include <sstream>
 
@@ -39,6 +41,11 @@ int protocol_publish_radar_data(protocol_type_t protocol, const radar_latest_dat
 
     int ret = -1;
     if (protocol == PROTOCOL_TYPE_MQTT) {
+        my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+        if(wifi_handle != NULL && my_wifi_get_state(wifi_handle) != WIFI_STATE_CONNECTED) {
+            ESP_LOGD(TAG, "protocol_publish_radar_data: WiFi 未连接");
+            return -1;
+        }
         // MQTT 直接发送原始 JSON
         ret = my_mqtt_publish(topic, json_string.c_str(), json_string.length(), 0, 0);
         if (ret != 0) {

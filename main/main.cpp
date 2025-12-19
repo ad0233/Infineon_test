@@ -26,6 +26,7 @@
 #include "esp_netif_sntp.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 
 #include "audio_sys.h"
 #include "audio_thread.h"
@@ -207,23 +208,44 @@ void print_mem_info(void)
     // heap_caps_print_heap_info(MALLOC_CAP_SPIRAM);
 }
 
-// 按固定模板由 thing_name 生成订阅主题
-static char t_req[128];
-static char t_resp[128];
-static char t_cmd[128];
-static char t_shadow_upd[160];
-static char t_shadow_upd_delta[200];
-static char t_shadow_upd_acc[200];
-static char t_shadow_upd_rej[200];
-static char t_shadow_get[160];
-static char t_shadow_get_acc[200];
-static char t_shadow_get_rej[200];
-static char t_radar[128];
+// 按固定模板由 thing_name 生成订阅主题（从外部内存分配）
+static char *t_req = nullptr;
+static char *t_resp = nullptr;
+static char *t_cmd = nullptr;
+static char *t_shadow_upd = nullptr;
+static char *t_shadow_upd_delta = nullptr;
+static char *t_shadow_upd_acc = nullptr;
+static char *t_shadow_upd_rej = nullptr;
+static char *t_shadow_get = nullptr;
+static char *t_shadow_get_acc = nullptr;
+static char *t_shadow_get_rej = nullptr;
+static char *t_radar = nullptr;
 
 extern "C" void app_main()
 {
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
+
+    // 从外部内存分配主题字符串缓冲区
+    t_req = (char *)heap_caps_malloc(128, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    t_resp = (char *)heap_caps_malloc(128, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    t_cmd = (char *)heap_caps_malloc(128, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    t_shadow_upd = (char *)heap_caps_malloc(160, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    t_shadow_upd_delta = (char *)heap_caps_malloc(200, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    t_shadow_upd_acc = (char *)heap_caps_malloc(200, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    t_shadow_upd_rej = (char *)heap_caps_malloc(200, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    t_shadow_get = (char *)heap_caps_malloc(160, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    t_shadow_get_acc = (char *)heap_caps_malloc(200, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    t_shadow_get_rej = (char *)heap_caps_malloc(200, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    t_radar = (char *)heap_caps_malloc(128, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    
+    // 检查分配是否成功
+    if (!t_req || !t_resp || !t_cmd || !t_shadow_upd || !t_shadow_upd_delta || 
+        !t_shadow_upd_acc || !t_shadow_upd_rej || !t_shadow_get || !t_shadow_get_acc || 
+        !t_shadow_get_rej || !t_radar) {
+        ESP_LOGE(TAG, "Failed to allocate topic buffers from SPIRAM");
+        return;
+    }
 
     esp_reset_reason_t reason = esp_reset_reason();
     ESP_LOGI("BOOT", "Reset reason: %d", reason);
@@ -331,19 +353,19 @@ extern "C" void app_main()
                 ESP_LOGE(TAG, "Failed to get iot config view");
                 return;
             }
-            snprintf(t_req, sizeof(t_req), "lunawake/%s/request", iot_config_view->thing_name);
-            snprintf(t_resp, sizeof(t_resp), "lunawake/%s/response", iot_config_view->thing_name);
-            snprintf(t_cmd, sizeof(t_cmd), "lunawake/%s/command", iot_config_view->thing_name);
+            snprintf(t_req, 128, "lunawake/%s/request", iot_config_view->thing_name);
+            snprintf(t_resp, 128, "lunawake/%s/response", iot_config_view->thing_name);
+            snprintf(t_cmd, 128, "lunawake/%s/command", iot_config_view->thing_name);
         
-            snprintf(t_shadow_upd, sizeof(t_shadow_upd), "$aws/things/%s/shadow/update", iot_config_view->thing_name);
-            snprintf(t_shadow_upd_delta, sizeof(t_shadow_upd_delta), "$aws/things/%s/shadow/update/delta", iot_config_view->thing_name);
-            snprintf(t_shadow_upd_acc, sizeof(t_shadow_upd_acc), "$aws/things/%s/shadow/update/accepted", iot_config_view->thing_name);
-            snprintf(t_shadow_upd_rej, sizeof(t_shadow_upd_rej), "$aws/things/%s/shadow/update/rejected", iot_config_view->thing_name);
-            snprintf(t_shadow_get, sizeof(t_shadow_get), "$aws/things/%s/shadow/get", iot_config_view->thing_name);
-            snprintf(t_shadow_get_acc, sizeof(t_shadow_get_acc), "$aws/things/%s/shadow/get/accepted", iot_config_view->thing_name);
-            snprintf(t_shadow_get_rej, sizeof(t_shadow_get_rej), "$aws/things/%s/shadow/get/rejected", iot_config_view->thing_name);
+            snprintf(t_shadow_upd, 160, "$aws/things/%s/shadow/update", iot_config_view->thing_name);
+            snprintf(t_shadow_upd_delta, 200, "$aws/things/%s/shadow/update/delta", iot_config_view->thing_name);
+            snprintf(t_shadow_upd_acc, 200, "$aws/things/%s/shadow/update/accepted", iot_config_view->thing_name);
+            snprintf(t_shadow_upd_rej, 200, "$aws/things/%s/shadow/update/rejected", iot_config_view->thing_name);
+            snprintf(t_shadow_get, 160, "$aws/things/%s/shadow/get", iot_config_view->thing_name);
+            snprintf(t_shadow_get_acc, 200, "$aws/things/%s/shadow/get/accepted", iot_config_view->thing_name);
+            snprintf(t_shadow_get_rej, 200, "$aws/things/%s/shadow/get/rejected", iot_config_view->thing_name);
         
-            snprintf(t_radar, sizeof(t_radar), "lunawake/%s/body_signal_tick", iot_config_view->thing_name);
+            snprintf(t_radar, 128, "lunawake/%s/body_signal_tick", iot_config_view->thing_name);
             const char* topics[] = {
                 t_req,
                 t_resp,
