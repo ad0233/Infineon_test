@@ -43,6 +43,7 @@ static my_h264_callback_t s_callback = NULL;
 static void *s_context = NULL;
 static my_h264_done_callback_t s_done_callback = NULL;
 static void *s_done_context = NULL;
+static volatile bool s_abort = false;
 
 typedef struct {
     uint8_t *buf;
@@ -202,6 +203,8 @@ int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
         return -1;
     }
 
+    my_h264_stop();
+
     len = anim_data[animation].end - anim_data[animation].start;
     if (len == 0 || len > s_h264_shared_buf_size) {
         ESP_LOGE("h264", "%s invalid animation size: %zu (max: %zu)", __func__, len, s_h264_shared_buf_size);
@@ -216,11 +219,8 @@ int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
         ESP_LOGE("h264", "%s s_playback_event_group == NULL", __func__);
         return -1;
     }
-    EventBits_t previous_bits = xEventGroupClearBits(s_playback_event_group, PLAYBACK_DONE_BIT);
-    if ((previous_bits & PLAYBACK_DONE_BIT) == 0) {
-        ESP_LOGE("h264", "%s (previous_bits & PLAYBACK_DONE_BIT) == 0", __func__);
-        return -1;
-    }
+    xEventGroupClearBits(s_playback_event_group, PLAYBACK_DONE_BIT);
+    
     memset(&in_frame, 0, sizeof(in_frame));
     in_frame.raw_data.buffer = start;
     in_frame.raw_data.len = len;
@@ -302,7 +302,7 @@ static void i420_decode_thread(void *arg) {
     while (1) {
         if (xQueueReceive(h264_queue, &in_frame, portMAX_DELAY) == pdPASS) {
             bool decode_failed = false;
-            while (in_frame.raw_data.len > 0) {
+            while (in_frame.raw_data.len > 0 && !s_abort) {
                 ret = esp_h264_dec_process(dec, &in_frame, &out_frame);
                 in_frame.raw_data.buffer += in_frame.consume;
                 in_frame.raw_data.len -= in_frame.consume;
@@ -499,11 +499,19 @@ static void playback_thread(void *arg)
                 if (s_playback_event_group != NULL) {
                     xEventGroupSetBits(s_playback_event_group, PLAYBACK_DONE_BIT);
                 }
-                if (s_done_callback != NULL) {
+                if (s_done_callback != NULL && !s_abort) {
                     s_done_callback(s_done_context);
                 }
                 continue;
             }
+
+            if (s_abort) {
+                if (frame.buf) {
+                    xQueueSend(s_rgb_free_queue, &frame.buf, portMAX_DELAY);
+                }
+                continue;
+            }
+
             if (s_callback != NULL) {
                 s_callback(frame.buf, frame.len, s_context);
             }
@@ -520,6 +528,31 @@ static void playback_thread(void *arg)
             }
         }
     }
+}
+
+void my_h264_stop(void)
+{
+    if (s_playback_event_group == NULL) {
+        return;
+    }
+
+    // Check if already done
+    if (xEventGroupGetBits(s_playback_event_group) & PLAYBACK_DONE_BIT) {
+        return;
+    }
+
+    s_abort = true;
+
+    // Drain h264_queue to stop i420_decode_thread from starting new segments
+    esp_h264_dec_in_frame_t in_frame;
+    while (xQueueReceive(h264_queue, &in_frame, 0) == pdPASS) {
+        // Data is in s_h264_shared_buf, no need to free
+    }
+
+    // Wait for playback to finish (it will drain s_rgb_ready_queue because s_abort is true)
+    xEventGroupWaitBits(s_playback_event_group, PLAYBACK_DONE_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+
+    s_abort = false;
 }
 
 void my_h264_set_fps(uint32_t fps)
