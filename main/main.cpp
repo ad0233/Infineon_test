@@ -230,8 +230,8 @@ extern "C" void app_main()
     ESP_LOGI(TAG, "Initialize board peripherals");
     
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
-    esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
     periph_cfg.extern_stack = true;
+    esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
 
     esp_err_t ret = audio_board_sdcard_init(set, SD_MODE_4_LINE);
     if (ret != ESP_OK) {
