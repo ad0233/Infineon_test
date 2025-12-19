@@ -151,6 +151,8 @@ void ui_init(void)
     ui_img_nightrightwing_png_load();
     ui_img_nightleftwing1_png_load();
     ui_img_nightrightwing1_png_load();
+    ui_img_brown_moon_png_load();
+    ui_img_yello_moon_png_load();
     ui_AlarmOFF_screen_init();
     ui_AlarmON_screen_init();
     ui_Volume__screen_init();

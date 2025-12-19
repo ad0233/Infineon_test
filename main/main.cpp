@@ -441,7 +441,7 @@ extern "C" void app_main()
 void tone_play_callback(audio_element_status_t evt) {
     ESP_LOGI(__func__, "%d", evt);
     if(AEL_STATUS_STATE_FINISHED == evt) {
-        fsm_main_event_trig(F_MAIN_E_ANIM_PLAY_SUC, NULL);
+        fsm_main_event_trig(F_MAIN_E_WAV_PLAY_FINISHED, NULL);
     }
 }
 

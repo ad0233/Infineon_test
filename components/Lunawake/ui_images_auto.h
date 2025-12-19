@@ -41,3 +41,5 @@ extern lv_image_dsc_t ui_img_ui_img_nightleftwing1_png;
 extern lv_image_dsc_t ui_img_ui_img_nightrighttwing_png;
 extern lv_image_dsc_t ui_img_ui_img_nightrightwing1_png;
 extern lv_image_dsc_t ui_img_ui_img_sleepmode_png;
+extern lv_image_dsc_t ui_img_ui_img_yello_moon_png;
+extern lv_image_dsc_t ui_img_ui_img_brown_moon_png;
