@@ -159,7 +159,7 @@ static struct StateTable fsm_user_table[] = {
     { fm_has_memu_state    ,FM_MEMU_UNWIND            ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU             , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//菜单---歌曲选择
     { nullptr              ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_unwind_next_item},//切换歌曲
     
-    //测试 改成旋钮播放动画
+    //TODO:测试  改成长按播放动画
     // { fm_has_h_fd_state     ,FM_H_F_SUC          ,F_MAIN_E_LIDAR_MOVE_TRIG     , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
     { nullptr                ,0                      ,F_MAIN_E_BTN_L_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING    ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
 
@@ -169,7 +169,6 @@ static struct StateTable fsm_user_table[] = {
     { fm_has_memu_state     ,FM_MEMU_VOL           ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU                 , F_MAIN_S_MENU_VOLUME       ,0    ,false         , fsm_main_in_volume},//菜单选择声音
     { nullptr               ,0                     ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_VOLUME       , F_MAIN_S_MENU_VOLUME       ,0    ,false         , fsm_volume_next_item},//设置声音
     { nullptr               ,0                      ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_VOLUME       , F_MAIN_S_MENU              ,10    ,true         , fsm_main_in_memu},//声音--菜单
-    //FIXME:亮度改变有问题
     { fm_has_memu_state      ,FM_MEMU_SC_BR        ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU              , F_MAIN_S_MENU_BRIGHTNESS   ,0    ,false       , fsm_main_in_light},//菜单选择亮度
     { nullptr                 ,0                   ,F_MAIN_E_KNOB_CW           , F_MAIN_S_MENU_BRIGHTNESS     , F_MAIN_S_MENU_BRIGHTNESS   ,0    ,false       , fsm_light_next_item},//设置亮度
     { nullptr                 ,0                    ,F_MAIN_E_BTN_CLICKED        , F_MAIN_S_MENU_BRIGHTNESS    , F_MAIN_S_MENU             ,10    ,true      , fsm_main_in_memu},//亮度--菜单
