@@ -243,6 +243,19 @@ int my_lidar_reg_cb_heart_rate(my_lidar_handle_t self, my_lidar_heart_rate_callb
     return ESP_OK;
 }
 
+int my_lidar_reg_cb_move_trig(my_lidar_handle_t self, my_lidar_move_trig_callback_t func, void *context) {
+    if (self == NULL || func == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (self->move_trig_cb != NULL) {
+        ESP_LOGW(TAG, "Move trig callback already registered");
+        return ESP_ERR_INVALID_STATE;
+    }
+    self->move_trig_cb = func;
+    self->move_trig_context = context;
+    return ESP_OK;
+}
+
 // 查询连接状态
 bool my_lidar_is_connected(my_lidar_handle_t self) {
     if (self == NULL) {

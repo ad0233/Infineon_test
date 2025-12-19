@@ -20,8 +20,8 @@ static QueueHandle_t uart_queue;
 static int uart_num = UART_NUM_1;
 #define BUF_SIZE (1024)
 #define RD_BUF_SIZE (BUF_SIZE)
-#define TXD_PIN (GPIO_NUM_13)
-#define RXD_PIN (GPIO_NUM_12)
+#define TXD_PIN (GPIO_NUM_11)
+#define RXD_PIN (GPIO_NUM_10)
 
 // 全局变量
 static bool radar_running = false;

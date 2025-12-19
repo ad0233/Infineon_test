@@ -34,7 +34,7 @@ static board_lcd_pin_t lcd_pins;
 #define EXAMPLE_LCD_H_RES           (360)
 #define EXAMPLE_LCD_V_RES           (360)
 #define EXAMPLE_LCD_BIT_PER_PIXEL   (16)
-#define LCD_BUFFER_SIZE (EXAMPLE_LCD_H_RES * EXAMPLE_LCD_V_RES / 10)
+#define LCD_BUFFER_SIZE (EXAMPLE_LCD_H_RES * 20)
 
 // 亮度映射表（10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%）
 static const uint16_t bl_map[10] = {
@@ -54,14 +54,6 @@ static esp_lcd_panel_io_handle_t io_handle = NULL;
 static esp_lcd_panel_handle_t panel_handle = NULL;
 
 static lv_disp_t *lvgl_disp = NULL;
-
-// 添加 flush_wait_cb 回调，避免忙等待阻塞 IDLE 任务
-static void lcd_flush_wait_cb(lv_display_t *disp)
-{
-    // 使用 vTaskDelay 让出 CPU，避免忙等待
-    // 等待传输完成（通常 SPI 传输很快，但需要给硬件时间）
-    vTaskDelay(pdMS_TO_TICKS(1));
-}
 
 void bsp_lcd_init(void);
 void bsp_lcd_bl_init(void);
@@ -94,7 +86,7 @@ int my_lcd_init() {
         },
         .flags = {
             .swap_bytes = true,
-            .buff_dma = false,
+            .buff_dma = true,
             .buff_spiram = false,
             .sw_rotate = true,
         }
@@ -102,7 +94,6 @@ int my_lcd_init() {
     lvgl_disp = lvgl_port_add_disp(&disp_cfg);
     
     // 设置 flush_wait_cb，避免忙等待阻塞 IDLE 任务
-    lv_display_set_flush_wait_cb(lvgl_disp, lcd_flush_wait_cb);
     lv_display_set_rotation(lvgl_disp, LV_DISPLAY_ROTATION_90);
 
     lvgl_port_lock(0);
@@ -133,7 +124,8 @@ void bsp_lcd_init(void)
 
     ESP_LOGI(TAG, "Install panel IO");
     
-    const esp_lcd_panel_io_spi_config_t io_config = ST77916_PANEL_IO_QSPI_CONFIG(lcd_pins.cs, NULL, NULL);
+    esp_lcd_panel_io_spi_config_t io_config = ST77916_PANEL_IO_QSPI_CONFIG(lcd_pins.cs, NULL, NULL);
+    io_config.trans_queue_depth = 2;
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &io_config, &io_handle));
 
     ESP_LOGI(TAG, "Install ST77916 panel driver");

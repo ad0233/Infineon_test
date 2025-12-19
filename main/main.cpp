@@ -246,11 +246,12 @@ extern "C" void app_main()
     auto iot_config_view = my_nvs_get_iot_config_view();
     if (iot_config_view == nullptr) {
         ESP_LOGE(TAG, "Failed to get iot config view");
-        // vTaskDelete(nullptr);
+        ESP_LOGE(TAG, "https://axialtech.feishu.cn/wiki/BInkwDDtYiI0kdkMfh5cZKSEn4e?from=from_copylink");
+        return;
     }
     
     // 打印 iot_config 分区中的密钥
-    // my_nvs_print_iot_config_keys();
+    my_nvs_print_iot_config_keys();
     
     rust_lib_init();
     my_lcd_init();
@@ -282,28 +283,28 @@ extern "C" void app_main()
         nullptr
     );
 //雷达的初始化  
-    // my_lidar_init(&s_lidar_handle);
-    // my_lidar_set_sensitivity(s_lidar_handle, 20, 5 * 1000);
-    // my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
-    // my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
-    // my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
-    // my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
-    // my_lidar_reg_cb_move_trig(s_lidar_handle, [](void *context, my_lidar_handle_t self){
-    //     (void)context;
-    //     (void)self;
-    //     fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
-    // }, nullptr);
+    my_lidar_init(&s_lidar_handle);
+    my_lidar_set_sensitivity(s_lidar_handle, 20, 5 * 1000);
+    my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
+    my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
+    my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
+    my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
+    my_lidar_reg_cb_move_trig(s_lidar_handle, [](void *context, my_lidar_handle_t self){
+        (void)context;
+        (void)self;
+        fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
+    }, nullptr);
     
     // 二维码 ble  wifi
-    // print_mem_info();
-    // my_ui_generate_qr_code("https://lunawake.ai", iot_config_view->thing_name);
-    // my_ble_init(iot_config_view->thing_name);  // 使用默认名称，或传入自定义名称
-    // print_mem_info();
-    // ble_protocol_init();  // 初始化蓝牙协议解析（不启用发送任务）
-    // print_mem_info();
-    // if (my_wifi_init(&s_wifi_handle) != ESP_OK) {
-    //     ESP_LOGE(TAG, "Failed to init WiFi");
-    // }
+    print_mem_info();
+    my_ui_generate_qr_code("https://lunawake.ai", iot_config_view->thing_name);
+    my_ble_init(iot_config_view->thing_name);  // 使用默认名称，或传入自定义名称
+    print_mem_info();
+    ble_protocol_init();  // 初始化蓝牙协议解析（不启用发送任务）
+    print_mem_info();
+    if (my_wifi_init(&s_wifi_handle) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to init WiFi");
+    }
     
     // 初始化FSM，传入上下文
     fsm_main_context_t fsm_ctx = {
@@ -318,13 +319,44 @@ extern "C" void app_main()
     bs814_init();
     my_wifi_auto_connect(s_wifi_handle);
     // WiFi事件改为轮询方式，在encoder_test中处理
-    // my_wifi_set_event_callback 保留用于其他用途（如NTP同步任务）
     my_wifi_set_event_callback(s_wifi_handle, [](wifi_state_t state, void *context, my_wifi_handle_t self){
         // WiFi连接成功后，开始NTP同步
         if (state == WIFI_STATE_CONNECTED) {
             if (s_rtc_handle != NULL) {
                 my_rtc_start_ntp_sync(s_rtc_handle);
             }
+            auto iot_config_view = my_nvs_get_iot_config_view();
+            if (iot_config_view == nullptr) {
+                ESP_LOGE(TAG, "Failed to get iot config view");
+                return;
+            }
+            snprintf(t_req, sizeof(t_req), "lunawake/%s/request", iot_config_view->thing_name);
+            snprintf(t_resp, sizeof(t_resp), "lunawake/%s/response", iot_config_view->thing_name);
+            snprintf(t_cmd, sizeof(t_cmd), "lunawake/%s/command", iot_config_view->thing_name);
+        
+            snprintf(t_shadow_upd, sizeof(t_shadow_upd), "$aws/things/%s/shadow/update", iot_config_view->thing_name);
+            snprintf(t_shadow_upd_delta, sizeof(t_shadow_upd_delta), "$aws/things/%s/shadow/update/delta", iot_config_view->thing_name);
+            snprintf(t_shadow_upd_acc, sizeof(t_shadow_upd_acc), "$aws/things/%s/shadow/update/accepted", iot_config_view->thing_name);
+            snprintf(t_shadow_upd_rej, sizeof(t_shadow_upd_rej), "$aws/things/%s/shadow/update/rejected", iot_config_view->thing_name);
+            snprintf(t_shadow_get, sizeof(t_shadow_get), "$aws/things/%s/shadow/get", iot_config_view->thing_name);
+            snprintf(t_shadow_get_acc, sizeof(t_shadow_get_acc), "$aws/things/%s/shadow/get/accepted", iot_config_view->thing_name);
+            snprintf(t_shadow_get_rej, sizeof(t_shadow_get_rej), "$aws/things/%s/shadow/get/rejected", iot_config_view->thing_name);
+        
+            snprintf(t_radar, sizeof(t_radar), "lunawake/%s/body_signal_tick", iot_config_view->thing_name);
+            const char* topics[] = {
+                t_req,
+                t_resp,
+                t_cmd,
+                t_shadow_upd,
+                t_shadow_upd_delta,
+                t_shadow_upd_acc,
+                t_shadow_upd_rej,
+                t_shadow_get,
+                t_shadow_get_acc,
+                t_shadow_get_rej,
+            };
+            my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
+            
         }
     }, nullptr);
 
@@ -359,11 +391,6 @@ extern "C" void app_main()
 
     print_mem_info();
 
-    // NTP初始化移到WiFi连接成功后，确保网络就绪
-    esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-    esp_netif_sntp_init(&config);
-    print_mem_info();
-
     periph_spiffs_cfg_t spiffs_cfg = {
         .root = "/spiffs",
         .partition_label = "spiffs_data",
@@ -380,46 +407,6 @@ extern "C" void app_main()
 // 初始化音频播放器
     void tone_play_callback(audio_element_status_t evt);
     audio_tone_init(tone_play_callback);
-
-    // // wait for time to be set
-    // int retry = 0;
-    // const int retry_count = 5;
-    // while (esp_netif_sntp_sync_wait(3000 / portTICK_PERIOD_MS) == ESP_ERR_TIMEOUT && ++retry < retry_count) {
-    //     ESP_LOGI(TAG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
-    // }
-    // // Set timezone to China Standard Time
-    // time_t now = 0;
-    // struct tm timeinfo;
-    // setenv("TZ", "CST-8", 1);
-    // tzset();
-    // localtime_r(&now, &timeinfo);
-// mqtt 
-    // snprintf(t_req, sizeof(t_req), "lunawake/%s/request", iot_config_view->thing_name);
-    // snprintf(t_resp, sizeof(t_resp), "lunawake/%s/response", iot_config_view->thing_name);
-    // snprintf(t_cmd, sizeof(t_cmd), "lunawake/%s/command", iot_config_view->thing_name);
-
-    // snprintf(t_shadow_upd, sizeof(t_shadow_upd), "$aws/things/%s/shadow/update", iot_config_view->thing_name);
-    // snprintf(t_shadow_upd_delta, sizeof(t_shadow_upd_delta), "$aws/things/%s/shadow/update/delta", iot_config_view->thing_name);
-    // snprintf(t_shadow_upd_acc, sizeof(t_shadow_upd_acc), "$aws/things/%s/shadow/update/accepted", iot_config_view->thing_name);
-    // snprintf(t_shadow_upd_rej, sizeof(t_shadow_upd_rej), "$aws/things/%s/shadow/update/rejected", iot_config_view->thing_name);
-    // snprintf(t_shadow_get, sizeof(t_shadow_get), "$aws/things/%s/shadow/get", iot_config_view->thing_name);
-    // snprintf(t_shadow_get_acc, sizeof(t_shadow_get_acc), "$aws/things/%s/shadow/get/accepted", iot_config_view->thing_name);
-    // snprintf(t_shadow_get_rej, sizeof(t_shadow_get_rej), "$aws/things/%s/shadow/get/rejected", iot_config_view->thing_name);
-
-    // snprintf(t_radar, sizeof(t_radar), "lunawake/%s/body_signal_tick", iot_config_view->thing_name);
-    // const char* topics[] = {
-    //     t_req,
-    //     t_resp,
-    //     t_cmd,
-    //     t_shadow_upd,
-    //     t_shadow_upd_delta,
-    //     t_shadow_upd_acc,
-    //     t_shadow_upd_rej,
-    //     t_shadow_get,
-    //     t_shadow_get_acc,
-    //     t_shadow_get_rej,
-    // };
-    // my_mqtt_init(iot_config_view->mqtt_uri, iot_config_view->thing_name, topics, (int)(sizeof(topics)/sizeof(topics[0])), NULL, NULL);
     
     print_mem_info();
 
@@ -432,7 +419,7 @@ extern "C" void app_main()
 
     fsm_main_event_trig(F_MAIN_E_INIT, nullptr);
     xTaskCreate(encoder_test, "encoder_test", 1024 * 6, nullptr, 10, nullptr);
-    // my_lidar_start(s_lidar_handle); //TOTD: 雷达好像不需要启动命令，默认启动，确认好就删除这个代码
+    my_lidar_start(s_lidar_handle); //TOTD: 雷达好像不需要启动命令，默认启动，确认好就删除这个代码
 
     print_mem_info();
     return;

@@ -106,7 +106,7 @@ int my_lidar_reg_cb_human_presence(my_lidar_handle_t self, my_lidar_human_presen
 int my_lidar_reg_cb_human_movement(my_lidar_handle_t self, my_lidar_human_movement_callback_t func, void *context);
 int my_lidar_reg_cb_respiratory(my_lidar_handle_t self, my_lidar_respiratory_callback_t func, void *context);
 int my_lidar_reg_cb_heart_rate(my_lidar_handle_t self, my_lidar_heart_rate_callback_t func, void *context);
-int my_lidar_reg_cb_move_trig(my_lidar_handle_t self, my_lidar_move_trig_callback_t func, void *context);   //FIXME:编译说没有这个函数
+int my_lidar_reg_cb_move_trig(my_lidar_handle_t self, my_lidar_move_trig_callback_t func, void *context);
 
 // 查询连接状态
 bool my_lidar_is_connected(my_lidar_handle_t self);
