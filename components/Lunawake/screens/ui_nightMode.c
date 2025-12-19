@@ -29,7 +29,7 @@ void ui_nightMode_screen_init(void)
     lv_obj_set_width(ui_nightModeImageLeft, LV_SIZE_CONTENT);   /// 26
     lv_obj_set_height(ui_nightModeImageLeft, LV_SIZE_CONTENT);    /// 41
     lv_obj_set_x(ui_nightModeImageLeft, -15);
-    lv_obj_set_y(ui_nightModeImageLeft, -70);
+    lv_obj_set_y(ui_nightModeImageLeft, -80);
     lv_obj_set_align(ui_nightModeImageLeft, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_nightModeImageLeft, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_nightModeImageLeft, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
@@ -39,7 +39,7 @@ void ui_nightMode_screen_init(void)
     lv_obj_set_width(ui_nightModeImageRight, LV_SIZE_CONTENT);   /// 26
     lv_obj_set_height(ui_nightModeImageRight, LV_SIZE_CONTENT);    /// 41
     lv_obj_set_x(ui_nightModeImageRight, 15);
-    lv_obj_set_y(ui_nightModeImageRight, -70);
+    lv_obj_set_y(ui_nightModeImageRight, -80);
     lv_obj_set_align(ui_nightModeImageRight, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_nightModeImageRight, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_nightModeImageRight, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
@@ -48,7 +48,7 @@ void ui_nightMode_screen_init(void)
     lv_obj_set_width(ui_nightModeHour, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_nightModeHour, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_nightModeHour, -60);
-    lv_obj_set_y(ui_nightModeHour, 15);
+    lv_obj_set_y(ui_nightModeHour, 0);
     lv_obj_set_align(ui_nightModeHour, LV_ALIGN_CENTER);
     lv_label_set_text(ui_nightModeHour, "06");
     lv_obj_set_style_text_color(ui_nightModeHour, lv_color_hex(0xA86F2A), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -59,7 +59,7 @@ void ui_nightMode_screen_init(void)
     lv_obj_set_width(ui_nightModeMinute, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_nightModeMinute, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_nightModeMinute, 60);
-    lv_obj_set_y(ui_nightModeMinute, 15);
+    lv_obj_set_y(ui_nightModeMinute, 0);
     lv_obj_set_align(ui_nightModeMinute, LV_ALIGN_CENTER);
     lv_label_set_text(ui_nightModeMinute, "24");
     lv_obj_set_style_text_color(ui_nightModeMinute, lv_color_hex(0xA86F2A), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -70,12 +70,12 @@ void ui_nightMode_screen_init(void)
     lv_obj_set_width(ui_nightModeLabel, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_nightModeLabel, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_nightModeLabel, 0);
-    lv_obj_set_y(ui_nightModeLabel, 10);
+    lv_obj_set_y(ui_nightModeLabel, -5);
     lv_obj_set_align(ui_nightModeLabel, LV_ALIGN_CENTER);
     lv_label_set_text(ui_nightModeLabel, ":");
     lv_obj_set_style_text_color(ui_nightModeLabel, lv_color_hex(0xA86F2A), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_nightModeLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_nightModeLabel, &ui_font_sfprodisplay60, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_nightModeLabel, &ui_font_sfprodisplay45, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_nightModeAlarm = lv_label_create(ui_nightMode);
     lv_obj_set_width(ui_nightModeAlarm, LV_SIZE_CONTENT);   /// 1

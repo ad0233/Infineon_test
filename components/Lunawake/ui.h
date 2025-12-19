@@ -147,6 +147,10 @@ extern lv_image_dsc_t ui_img_nightleftwing1_png;   // assets/NightLeftWing1.png
 void ui_img_nightleftwing1_png_load();
 extern lv_image_dsc_t ui_img_nightrightwing1_png;   // assets/NightRightWing1.png
 void ui_img_nightrightwing1_png_load();
+extern lv_image_dsc_t ui_img_brown_moon_png;   // assets/brown_moon.png
+void ui_img_brown_moon_png_load();
+extern lv_image_dsc_t ui_img_yello_moon_png;   // assets/yello_moon.png
+void ui_img_yello_moon_png_load();
 
 // FONTS
 LV_FONT_DECLARE(ui_font_sfprodisplay14);

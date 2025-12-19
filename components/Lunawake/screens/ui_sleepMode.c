@@ -24,11 +24,11 @@ void ui_sleepMode_screen_init(void)
     lv_obj_set_style_text_font(ui_sleepMode, &ui_font_sfprodisplay18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_sleepModeMoon = lv_image_create(ui_sleepMode);
-    lv_image_set_src(ui_sleepModeMoon, &ui_img_sleepmode_png);
+    lv_image_set_src(ui_sleepModeMoon, &ui_img_yello_moon_png);
     lv_obj_set_width(ui_sleepModeMoon, LV_SIZE_CONTENT);   /// 43
     lv_obj_set_height(ui_sleepModeMoon, LV_SIZE_CONTENT);    /// 43
     lv_obj_set_x(ui_sleepModeMoon, 0);
-    lv_obj_set_y(ui_sleepModeMoon, -70);
+    lv_obj_set_y(ui_sleepModeMoon, -80);
     lv_obj_set_align(ui_sleepModeMoon, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_sleepModeMoon, LV_OBJ_FLAG_CLICKABLE);     /// Flags
     lv_obj_remove_flag(ui_sleepModeMoon, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
@@ -37,7 +37,7 @@ void ui_sleepMode_screen_init(void)
     lv_obj_set_width(ui_sleepModeHour, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_sleepModeHour, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_sleepModeHour, -60);
-    lv_obj_set_y(ui_sleepModeHour, 15);
+    lv_obj_set_y(ui_sleepModeHour, 0);
     lv_obj_set_align(ui_sleepModeHour, LV_ALIGN_CENTER);
     lv_label_set_text(ui_sleepModeHour, "23");
     lv_obj_set_style_text_color(ui_sleepModeHour, lv_color_hex(0xFFBB5C), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -48,7 +48,7 @@ void ui_sleepMode_screen_init(void)
     lv_obj_set_width(ui_sleepModeMinute, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_sleepModeMinute, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_sleepModeMinute, 60);
-    lv_obj_set_y(ui_sleepModeMinute, 15);
+    lv_obj_set_y(ui_sleepModeMinute, 0);
     lv_obj_set_align(ui_sleepModeMinute, LV_ALIGN_CENTER);
     lv_label_set_text(ui_sleepModeMinute, "30");
     lv_obj_set_style_text_color(ui_sleepModeMinute, lv_color_hex(0xFFBB5C), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -61,21 +61,21 @@ void ui_sleepMode_screen_init(void)
     lv_obj_set_x(ui_sleepModeTips, 0);
     lv_obj_set_y(ui_sleepModeTips, 90);
     lv_obj_set_align(ui_sleepModeTips, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_sleepModeTips, "Time for Bed");
+    lv_label_set_text(ui_sleepModeTips, "Good Night");
     lv_obj_set_style_text_color(ui_sleepModeTips, lv_color_hex(0xFFBB5C), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_sleepModeTips, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_sleepModeTips, &ui_font_sfprodisplay18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_sleepModeTips, &ui_font_sfprodisplay24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_sleepModeLabel = lv_label_create(ui_sleepMode);
     lv_obj_set_width(ui_sleepModeLabel, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_sleepModeLabel, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_sleepModeLabel, 0);
-    lv_obj_set_y(ui_sleepModeLabel, 10);
+    lv_obj_set_y(ui_sleepModeLabel, -5);
     lv_obj_set_align(ui_sleepModeLabel, LV_ALIGN_CENTER);
     lv_label_set_text(ui_sleepModeLabel, ":");
     lv_obj_set_style_text_color(ui_sleepModeLabel, lv_color_hex(0xFFBB5C), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_sleepModeLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_sleepModeLabel, &ui_font_sfprodisplay60, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_sleepModeLabel, &ui_font_sfprodisplay45, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 }
 

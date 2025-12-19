@@ -62,6 +62,7 @@ static const char* fsm_event_to_str(uint8_t event) {
     switch (event) {
         case F_MAIN_E_INIT:                return "INIT";
         case F_MAIN_E_ANIM_PLAY_SUC:       return "ANIM_PLAY_SUC";
+        case F_MAIN_E_WAV_PLAY_FINISHED:   return "WAV_PLAY_FINISHED";
         case F_MAIN_E_LIDAR_MOVE_TRIG:     return "LIDAR_MOVE_TRIG";
         case F_MAIN_E_LIDAR_UPDATE:        return "LIDAR_UPDATE";
         case F_MAIN_E_LIDAR_NOT_FOUND:     return "LIDAR_NOT_FOUND";
@@ -199,26 +200,27 @@ static struct StateTable fsm_user_table[] = {
     {nullptr             ,0                     , F_MAIN_E_RadarInfo_UPDATE    ,F_MAIN_S_RadarInfo              ,F_MAIN_S_RadarInfo     ,0  ,false    ,  nullptr},//雷达数据的更新函数
 
     // 闹钟跳转
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_CLOCK                     , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},//闹钟触发
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU                      , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MEMU_WIFI_SUC             , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MEMU_WIFI_FAILE           , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_SLEEP_MODE           , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_ALARM                , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_NO_MENU_ALARM             , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_UNWIND               , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_UNWIND_PLAYING       , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_VOLUME               , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_MENU_BRIGHTNESS           , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_RTC_DETECT_CLK            , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_BOYA_DATA                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_RadarInfo                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_REMINDER                  , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING    , F_MAIN_S_SLEEPMODE                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_CLOCK                     , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},//闹钟触发
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_MENU                      , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_MEMU_WIFI_SUC             , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_MEMU_WIFI_FAILE           , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_MENU_SLEEP_MODE           , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_MENU_ALARM                , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_NO_MENU_ALARM             , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_MENU_UNWIND               , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_MENU_UNWIND_PLAYING       , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_MENU_VOLUME               , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_MENU_BRIGHTNESS           , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_RTC_DETECT_CLK            , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_BOYA_DATA                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_RadarInfo                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_REMINDER                  , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_SLEEPMODE                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
+    {nullptr             ,0                     ,F_MAIN_E_WAV_PLAY_FINISHED  , F_MAIN_S_GoodMorning_DEMO          , F_MAIN_S_CLOCK               ,0  ,false    ,fsm_main_to_clock},             // 播放完毕回主页面
 
-    // // 睡眠时间跳转
-    // {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_CLOCK                     , F_MAIN_S_SLEEPMODE           ,0  ,false    ,fsm_main_in_sleep_mode},
-    // {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP      , F_MAIN_S_MENU                      , F_MAIN_S_SLEEPMODE           ,0  ,false    ,fsm_main_in_sleep_mode},
+    // 睡眠时间跳转
+    // {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP        , F_MAIN_S_CLOCK                     , F_MAIN_S_SLEEPMODE           ,0  ,false    ,fsm_main_in_sleep_mode},
+    // {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP        , F_MAIN_S_MENU                      , F_MAIN_S_SLEEPMODE           ,0  ,false    ,fsm_main_in_sleep_mode},
 };
 
 
