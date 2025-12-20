@@ -6,6 +6,7 @@
 
 // ============================================================================
 // R60ABD1 毫米波雷达协议定义（旧雷达）
+// 协议内存参考protocol.txt文件
 // ============================================================================
 
 #define RADAR_FRAME_HEADER_1    0x53
@@ -137,6 +138,7 @@ bool r60abd1_send_command(uint8_t control, uint8_t command, const uint8_t *data,
 
 // 查询命令
 bool r60abd1_query_product_info(void);
+bool r60abd1_query_firmware_version(void);
 bool r60abd1_query_human_presence(void);
 bool r60abd1_query_human_motion(void);
 bool r60abd1_set_human_switch(bool enable);
@@ -149,6 +151,18 @@ void r60abd1_set_human_movement_callback(radar_human_callback_t callback);
 void r60abd1_set_respiratory_callback(radar_respiratory_callback_t callback);
 void r60abd1_set_heart_rate_callback(radar_heart_rate_callback_t callback);
 
+// 睡眠监测回调函数设置
+void r60abd1_set_sleep_bed_callback(radar_sleep_bed_callback_t callback);
+void r60abd1_set_sleep_status_callback(radar_sleep_status_callback_t callback);
+void r60abd1_set_sleep_duration_callback(radar_sleep_duration_callback_t callback);
+void r60abd1_set_sleep_quality_score_callback(radar_sleep_quality_score_callback_t callback);
+void r60abd1_set_sleep_comprehensive_callback(radar_sleep_comprehensive_callback_t callback);
+void r60abd1_set_sleep_quality_analysis_callback(radar_sleep_quality_analysis_callback_t callback);
+void r60abd1_set_sleep_abnormal_callback(radar_sleep_abnormal_callback_t callback);
+void r60abd1_set_sleep_quality_rating_callback(radar_sleep_quality_rating_callback_t callback);
+void r60abd1_set_sleep_struggle_callback(radar_sleep_struggle_callback_t callback);
+void r60abd1_set_sleep_no_person_callback(radar_sleep_no_person_callback_t callback);
+
 // 状态查询
 bool r60abd1_is_connected(void);
 
@@ -158,6 +172,18 @@ bool r60abd1_get_respiratory_data(radar_respiratory_data_t *data);
 bool r60abd1_get_heart_rate_data(radar_heart_rate_data_t *data);
 bool r60abd1_get_product_info(radar_product_info_t *info);
 bool r60abd1_get_latest_data(radar_latest_data_t *data);
+
+// 睡眠监测数据获取
+bool r60abd1_get_sleep_bed_data(radar_sleep_bed_data_t *data);
+bool r60abd1_get_sleep_status_data(radar_sleep_status_data_t *data);
+bool r60abd1_get_sleep_duration_data(radar_sleep_duration_data_t *data);
+bool r60abd1_get_sleep_quality_score_data(radar_sleep_quality_score_data_t *data);
+bool r60abd1_get_sleep_comprehensive_data(radar_sleep_comprehensive_data_t *data);
+bool r60abd1_get_sleep_quality_analysis_data(radar_sleep_quality_analysis_data_t *data);
+bool r60abd1_get_sleep_abnormal_data(radar_sleep_abnormal_data_t *data);
+bool r60abd1_get_sleep_quality_rating_data(radar_sleep_quality_rating_data_t *data);
+bool r60abd1_get_sleep_struggle_data(radar_sleep_struggle_data_t *data);
+bool r60abd1_get_sleep_no_person_data(radar_sleep_no_person_data_t *data);
 
 #ifdef __cplusplus
 }

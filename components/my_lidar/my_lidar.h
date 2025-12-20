@@ -48,6 +48,148 @@ typedef struct {
     uint8_t heart_rate_waveform[5]; // 心率波形数据 (5字节, 0-255, 1秒上报一次)
 } radar_heart_rate_data_t;
 
+// ============================================================================
+// 睡眠监测枚举类型
+// ============================================================================
+
+// 入床/离床状态
+typedef enum {
+    RADAR_SLEEP_BED_OFF = 0x00,  // 离床
+    RADAR_SLEEP_BED_ON = 0x01,   // 入床
+    RADAR_SLEEP_BED_NONE = 0x02  // 无（实时探测模式）
+} radar_sleep_bed_status_t;
+
+// 睡眠状态
+typedef enum {
+    RADAR_SLEEP_STATUS_DEEP = 0x00,    // 深睡
+    RADAR_SLEEP_STATUS_LIGHT = 0x01,   // 浅睡
+    RADAR_SLEEP_STATUS_AWAKE = 0x02,   // 清醒
+    RADAR_SLEEP_STATUS_NONE = 0x03     // 无（离床时/实时探测模式）
+} radar_sleep_status_t;
+
+// 睡眠异常类型
+typedef enum {
+    RADAR_SLEEP_ABNORMAL_SHORT = 0x00,      // 睡眠时长不足4小时
+    RADAR_SLEEP_ABNORMAL_LONG = 0x01,       // 睡眠时长大于12小时
+    RADAR_SLEEP_ABNORMAL_NO_PERSON = 0x02,  // 长时间异常无人
+    RADAR_SLEEP_ABNORMAL_NONE = 0x03        // 无
+} radar_sleep_abnormal_t;
+
+// 睡眠质量评级
+typedef enum {
+    RADAR_SLEEP_QUALITY_RATING_NONE = 0x00,    // 无
+    RADAR_SLEEP_QUALITY_RATING_GOOD = 0x01,    // 睡眠质量良好
+    RADAR_SLEEP_QUALITY_RATING_NORMAL = 0x02, // 睡眠质量一般
+    RADAR_SLEEP_QUALITY_RATING_POOR = 0x03     // 睡眠质量较差
+} radar_sleep_quality_rating_t;
+
+// 异常挣扎状态
+typedef enum {
+    RADAR_SLEEP_STRUGGLE_NONE = 0x00,    // 无
+    RADAR_SLEEP_STRUGGLE_NORMAL = 0x01, // 正常状态
+    RADAR_SLEEP_STRUGGLE_ABNORMAL = 0x02 // 异常挣扎状态
+} radar_sleep_struggle_status_t;
+
+// 无人计时状态
+typedef enum {
+    RADAR_SLEEP_NO_PERSON_NONE = 0x00,    // 无
+    RADAR_SLEEP_NO_PERSON_NORMAL = 0x01,  // 正常
+    RADAR_SLEEP_NO_PERSON_ABNORMAL = 0x02 // 异常
+} radar_sleep_no_person_status_t;
+
+// ============================================================================
+// 睡眠监测数据结构
+// ============================================================================
+
+// 入床/离床状态数据
+typedef struct {
+    radar_sleep_bed_status_t status;  // 入床/离床状态
+    uint32_t timestamp;               // 更新时间戳 (s)
+    uint32_t system_timestamp;        // 系统时间戳 (ms)
+} radar_sleep_bed_data_t;
+
+// 睡眠状态数据
+typedef struct {
+    radar_sleep_status_t status;      // 睡眠状态
+    uint32_t timestamp;               // 更新时间戳 (s)
+    uint32_t system_timestamp;        // 系统时间戳 (ms)
+} radar_sleep_status_data_t;
+
+// 睡眠时长数据
+typedef struct {
+    uint16_t awake_duration;          // 清醒时长 (分钟)
+    uint16_t light_duration;          // 浅睡时长 (分钟)
+    uint16_t deep_duration;           // 深睡时长 (分钟)
+    uint32_t timestamp;               // 更新时间戳 (s)
+    uint32_t system_timestamp;        // 系统时间戳 (ms)
+} radar_sleep_duration_data_t;
+
+// 睡眠质量评分数据
+typedef struct {
+    uint8_t quality_score;            // 睡眠质量评分 (0-100)
+    uint32_t timestamp;               // 更新时间戳 (s)
+    uint32_t system_timestamp;        // 系统时间戳 (ms)
+} radar_sleep_quality_score_data_t;
+
+// 睡眠综合状态数据
+typedef struct {
+    bool presence;                    // 存在 (1=有人, 0=无人)
+    radar_sleep_status_t sleep_status; // 睡眠状态
+    uint8_t avg_respiratory;          // 平均呼吸 (次/分)
+    uint8_t avg_heart_rate;          // 平均心跳 (次/分)
+    uint8_t turn_over_count;         // 翻身次数
+    uint8_t large_movement_ratio;     // 大幅度体动占比 (0-100)
+    uint8_t small_movement_ratio;    // 小幅度体动占比 (0-100)
+    uint8_t apnea_count;             // 呼吸暂停次数
+    uint32_t timestamp;               // 更新时间戳 (s)
+    uint32_t system_timestamp;        // 系统时间戳 (ms)
+} radar_sleep_comprehensive_data_t;
+
+// 睡眠质量分析数据
+typedef struct {
+    uint8_t quality_score;            // 睡眠质量评分 (0-100)
+    uint16_t total_duration;          // 睡眠总时长 (分钟)
+    uint8_t awake_ratio;              // 清醒时长占比 (0-100)
+    uint8_t light_ratio;              // 浅睡时长占比 (0-100)
+    uint8_t deep_ratio;               // 深睡时长占比 (0-100)
+    uint8_t off_bed_duration;         // 离床时长 (分钟)
+    uint8_t off_bed_count;           // 离床次数
+    uint8_t turn_over_count;         // 翻身次数
+    uint8_t avg_respiratory;          // 平均呼吸 (次/分)
+    uint8_t avg_heart_rate;          // 平均心跳 (次/分)
+    uint8_t apnea_count;             // 呼吸暂停次数 (预留)
+    uint32_t timestamp;               // 更新时间戳 (s)
+    uint32_t system_timestamp;        // 系统时间戳 (ms)
+} radar_sleep_quality_analysis_data_t;
+
+// 睡眠异常数据
+typedef struct {
+    radar_sleep_abnormal_t abnormal_type; // 异常类型
+    uint32_t timestamp;                   // 更新时间戳 (s)
+    uint32_t system_timestamp;            // 系统时间戳 (ms)
+} radar_sleep_abnormal_data_t;
+
+// 睡眠质量评级数据
+typedef struct {
+    radar_sleep_quality_rating_t rating;  // 睡眠质量评级
+    uint32_t timestamp;                   // 更新时间戳 (s)
+    uint32_t system_timestamp;            // 系统时间戳 (ms)
+} radar_sleep_quality_rating_data_t;
+
+// 异常挣扎状态数据
+typedef struct {
+    radar_sleep_struggle_status_t status; // 异常挣扎状态
+    uint32_t timestamp;                   // 更新时间戳 (s)
+    uint32_t system_timestamp;            // 系统时间戳 (ms)
+} radar_sleep_struggle_data_t;
+
+// 无人计时状态数据
+typedef struct {
+    radar_sleep_no_person_status_t status; // 无人计时状态
+    uint32_t timestamp;                    // 更新时间戳 (s)
+    uint32_t system_timestamp;             // 系统时间戳 (ms)
+} radar_sleep_no_person_data_t;
+
 // 产品信息结构
 typedef struct {
     char product_model[32];      // 产品型号
@@ -76,6 +218,18 @@ typedef struct my_lidar_impl* my_lidar_handle_t;
 typedef void (*radar_human_callback_t)(const radar_human_data_t *data);
 typedef void (*radar_respiratory_callback_t)(const radar_respiratory_data_t *data);
 typedef void (*radar_heart_rate_callback_t)(const radar_heart_rate_data_t *data);
+
+// 睡眠监测回调类型定义
+typedef void (*radar_sleep_bed_callback_t)(const radar_sleep_bed_data_t *data);
+typedef void (*radar_sleep_status_callback_t)(const radar_sleep_status_data_t *data);
+typedef void (*radar_sleep_duration_callback_t)(const radar_sleep_duration_data_t *data);
+typedef void (*radar_sleep_quality_score_callback_t)(const radar_sleep_quality_score_data_t *data);
+typedef void (*radar_sleep_comprehensive_callback_t)(const radar_sleep_comprehensive_data_t *data);
+typedef void (*radar_sleep_quality_analysis_callback_t)(const radar_sleep_quality_analysis_data_t *data);
+typedef void (*radar_sleep_abnormal_callback_t)(const radar_sleep_abnormal_data_t *data);
+typedef void (*radar_sleep_quality_rating_callback_t)(const radar_sleep_quality_rating_data_t *data);
+typedef void (*radar_sleep_struggle_callback_t)(const radar_sleep_struggle_data_t *data);
+typedef void (*radar_sleep_no_person_callback_t)(const radar_sleep_no_person_data_t *data);
 
 // 事件回调声明，context 是用于传递上下文
 typedef void (*my_lidar_human_presence_callback_t)(const radar_human_data_t *data, void *context, my_lidar_handle_t self);
