@@ -108,58 +108,6 @@ static void check_alarms_and_trigger(void) {
     my_nvs_check_alarm_triggers();
 }
 
-// 人体存在检测数据回调函数
-void human_presence_callback(const radar_human_data_t *data, void *context, my_lidar_handle_t self)
-{
-    (void)context;
-    (void)self;
-    // 有人没人 - 状态变化时上报
-    // ESP_LOGI("HUMAN", "有人: %s", data->presence ? "是" : "否");
-}
-
-// 体动参数数据回调函数（已不使用，保留接口）
-void human_movement_callback(const radar_human_data_t *data, void *context, my_lidar_handle_t self)
-{
-    (void)context;
-    (void)self;
-    // ESP_LOGI("HUMAN", "体动参数: %d", data->movement_param);
-    // 体动参数可用于更新图表曲线
-    if (ui_RadarInfoChart != NULL && lvgl_port_lock(0)) {
-        lv_chart_series_t *series = lv_chart_get_series_next(ui_RadarInfoChart, NULL);
-        if (series != NULL) {
-            lv_chart_set_next_value(ui_RadarInfoChart, series, data->movement_param);
-        }
-        lvgl_port_unlock();
-    }
-}
-
-// 呼吸监测数据回调函数
-void respiratory_data_callback(const radar_respiratory_data_t *data, void *context, my_lidar_handle_t self)
-{
-    (void)context;
-    (void)self;
-    // ESP_LOGI("RESPIRATORY", "呼吸: %d 次/min", data->respiratory_value);
-    if (ui_RadarInfoBreathingX != NULL && lvgl_port_lock(0)) {
-        char text[16];
-        snprintf(text, sizeof(text), "%d", data->respiratory_value);
-        lv_label_set_text(ui_RadarInfoBreathingX, text);
-        lvgl_port_unlock();
-    }
-}
-
-// 心率监测数据回调函数
-void heart_rate_data_callback(const radar_heart_rate_data_t *data, void *context, my_lidar_handle_t self)
-{
-    (void)context;
-    (void)self;
-    // ESP_LOGI("HEART_RATE", "心率: %d 次/min", data->heart_rate_value);
-    if (ui_RadarInfoHeartX != NULL && lvgl_port_lock(0)) {
-        char text[16];
-        snprintf(text, sizeof(text), "%d", data->heart_rate_value);
-        lv_label_set_text(ui_RadarInfoHeartX, text);
-        lvgl_port_unlock();
-    }
-}
 
 #include "audio_recorder.h"
 #include "audio_processor.h"
@@ -305,17 +253,57 @@ extern "C" void app_main()
         nullptr
     );
 //雷达的初始化  
-    // my_lidar_init(&s_lidar_handle);
-    // my_lidar_set_sensitivity(s_lidar_handle, 20, 5 * 1000);
-    // my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
-    // my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
-    // my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
-    // my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
-    // my_lidar_reg_cb_move_trig(s_lidar_handle, [](void *context, my_lidar_handle_t self){
-    //     (void)context;
-    //     (void)self;
-    //     fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
-    // }, nullptr);
+    my_lidar_init(&s_lidar_handle);
+    my_lidar_set_sensitivity(s_lidar_handle, 20, 5 * 1000);
+    my_lidar_reg_cb_human_presence(s_lidar_handle, [](const radar_human_data_t *data, void *context, my_lidar_handle_t self) {
+        (void)context;
+        (void)self;
+        // 有人没人 - 状态变化时上报
+        // ESP_LOGI("HUMAN", "有人: %s", data->presence ? "是" : "否");
+    }, NULL);
+    
+    my_lidar_reg_cb_human_movement(s_lidar_handle, [](const radar_human_data_t *data, void *context, my_lidar_handle_t self) {
+        (void)context;
+        (void)self;
+        // ESP_LOGI("HUMAN", "体动参数: %d", data->movement_param);
+        // 体动参数可用于更新图表曲线
+        if (ui_RadarInfoChart != NULL && lvgl_port_lock(0)) {
+            lv_chart_series_t *series = lv_chart_get_series_next(ui_RadarInfoChart, NULL);
+            if (series != NULL) {
+                lv_chart_set_next_value(ui_RadarInfoChart, series, data->movement_param);
+            }
+            lvgl_port_unlock();
+        }
+    }, NULL);
+    
+    my_lidar_reg_cb_respiratory(s_lidar_handle, [](const radar_respiratory_data_t *data, void *context, my_lidar_handle_t self) {
+        (void)context;
+        (void)self;
+        // ESP_LOGI("RESPIRATORY", "呼吸: %d 次/min", data->respiratory_value);
+        if (ui_RadarInfoBreathingX != NULL && lvgl_port_lock(0)) {
+            char text[16];
+            snprintf(text, sizeof(text), "%d", data->respiratory_value);
+            lv_label_set_text(ui_RadarInfoBreathingX, text);
+            lvgl_port_unlock();
+        }
+    }, NULL);
+    
+    my_lidar_reg_cb_heart_rate(s_lidar_handle, [](const radar_heart_rate_data_t *data, void *context, my_lidar_handle_t self) {
+        (void)context;
+        (void)self;
+        // ESP_LOGI("HEART_RATE", "心率: %d 次/min", data->heart_rate_value);
+        if (ui_RadarInfoHeartX != NULL && lvgl_port_lock(0)) {
+            char text[16];
+            snprintf(text, sizeof(text), "%d", data->heart_rate_value);
+            lv_label_set_text(ui_RadarInfoHeartX, text);
+            lvgl_port_unlock();
+        }
+    }, NULL);
+    my_lidar_reg_cb_move_trig(s_lidar_handle, [](void *context, my_lidar_handle_t self){
+        (void)context;
+        (void)self;
+        fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
+    }, nullptr);
     
     // 二维码 ble  wifi
     print_mem_info();
