@@ -252,8 +252,8 @@ extern "C" void app_main()
     ESP_LOGI(TAG, "Initialize board peripherals");
     
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
-    periph_cfg.extern_stack = true;
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
+    periph_cfg.extern_stack = true;
 
     esp_err_t ret = audio_board_sdcard_init(set, SD_MODE_4_LINE);
     if (ret != ESP_OK) {
@@ -305,17 +305,17 @@ extern "C" void app_main()
         nullptr
     );
 //雷达的初始化  
-    my_lidar_init(&s_lidar_handle);
-    my_lidar_set_sensitivity(s_lidar_handle, 20, 5 * 1000);
-    my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
-    my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
-    my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
-    my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
-    my_lidar_reg_cb_move_trig(s_lidar_handle, [](void *context, my_lidar_handle_t self){
-        (void)context;
-        (void)self;
-        fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
-    }, nullptr);
+    // my_lidar_init(&s_lidar_handle);
+    // my_lidar_set_sensitivity(s_lidar_handle, 20, 5 * 1000);
+    // my_lidar_reg_cb_human_presence(s_lidar_handle, human_presence_callback, NULL);
+    // my_lidar_reg_cb_human_movement(s_lidar_handle, human_movement_callback, NULL);
+    // my_lidar_reg_cb_respiratory(s_lidar_handle, respiratory_data_callback, NULL);
+    // my_lidar_reg_cb_heart_rate(s_lidar_handle, heart_rate_data_callback, NULL);
+    // my_lidar_reg_cb_move_trig(s_lidar_handle, [](void *context, my_lidar_handle_t self){
+    //     (void)context;
+    //     (void)self;
+    //     fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
+    // }, nullptr);
     
     // 二维码 ble  wifi
     print_mem_info();
@@ -341,6 +341,7 @@ extern "C" void app_main()
     bs814_init();
     my_wifi_auto_connect(s_wifi_handle);
     // WiFi事件改为轮询方式，在encoder_test中处理
+    // my_wifi_set_event_callback 保留用于其他用途（如NTP同步任务）
     my_wifi_set_event_callback(s_wifi_handle, [](wifi_state_t state, void *context, my_wifi_handle_t self){
         // WiFi连接成功后，开始NTP同步
         if (state == WIFI_STATE_CONNECTED) {
@@ -441,7 +442,7 @@ extern "C" void app_main()
 
     fsm_main_event_trig(F_MAIN_E_INIT, nullptr);
     xTaskCreate(encoder_test, "encoder_test", 1024 * 6, nullptr, 10, nullptr);
-    my_lidar_start(s_lidar_handle); //TOTD: 雷达好像不需要启动命令，默认启动，确认好就删除这个代码
+   
 
     print_mem_info();
     return;
@@ -450,7 +451,19 @@ extern "C" void app_main()
 void tone_play_callback(audio_element_status_t evt) {
     ESP_LOGI(__func__, "%d", evt);
     if(AEL_STATUS_STATE_FINISHED == evt) {
-        fsm_main_event_trig(F_MAIN_E_WAV_PLAY_FINISHED, NULL);
+        uint8_t current_state = fsm_main_get_current_state();
+        // 允许在以下状态下触发播放完成事件：
+        // - F_MAIN_S_GoodMorning_DEMO: 早报播放完成
+        // - F_MAIN_S_SLEEPMODE: 入睡提示播放完成
+        // - F_MAIN_S_SLEEPMODE_READY: 呼吸音频播放完成
+        if (current_state == F_MAIN_S_GoodMorning_DEMO || 
+            current_state == F_MAIN_S_SLEEPMODE ||
+            current_state == F_MAIN_S_SLEEPMODE_READY) {
+            ESP_LOGI(__func__, "Audio finished in state %d, triggering event", current_state);
+            fsm_main_event_trig(F_MAIN_E_WAV_PLAY_FINISHED, NULL);
+        } else {
+            ESP_LOGI(__func__, "Audio finished but current state is %d, ignoring event", current_state);
+        }
     }
 }
 

@@ -958,13 +958,25 @@ void fsm_main_in_sleep_mode(void *arg, uint8_t last_state, uint8_t next_state) {
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_sleepMode);
     lvgl_port_unlock();
+    // 恢复睡眠模式页面的初始样式（确保是黄色月亮和Good Night）
+    my_ui_sleep_mode_reset_to_default();
+    audio_tone_play("/sdcard/V001-night-Bed-test.wav");
+}
+
+void fsm_main_in_sleep_mode_ready(void *arg, uint8_t last_state, uint8_t next_state) {
+    ESP_LOGI(TAG, "in sleep_mode_ready...");
+    // 不切换屏幕，直接修改当前睡眠模式页面的样式
+    // 显示白圈，文字改回 Good Night
+    my_ui_sleep_mode_ready();
+    audio_tone_play("/sdcard/V001-night-Breath-test.wav");
 }
 
 void fsm_main_in_night_mode(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in night_mode...");
-    lvgl_port_lock(0);
-    lv_disp_load_scr(ui_nightMode);
-    lvgl_port_unlock();
+    // 不切换屏幕，直接修改当前睡眠模式页面的样式
+    my_ui_sleep_mode_to_night_mode();
+    // 启动进度条更新任务
+    my_ui_night_mode_start_progress();
 }
 
 /**
@@ -991,6 +1003,12 @@ static void lyric_update_task(void* param) {
 
 void fsm_main_in_MorningAnimation(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "Entering MorningAnimation...");
+    
+    // 先停止之前的播放，确保清除所有残留状态和事件
+    audio_tone_stop();
+    // 给系统一点时间处理停止操作
+    vTaskDelay(pdMS_TO_TICKS(50));
+    
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_MorningAnimation);
     // 确保使用正确的文件名：/sdcard/V001-morning_Voice.lrc

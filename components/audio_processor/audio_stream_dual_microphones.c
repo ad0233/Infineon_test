@@ -17,7 +17,7 @@
 #include "wav_decoder.h"
 #include "audio_common.h"
 #include "i2s_stream.h"
-#include "es7210.h"
+#include "es7210.h" 
 #include "board.h"
 #if defined (CONFIG_AUDIO_SUPPORT_OPUS_DECODER)
 #include "raw_opus_encoder.h"

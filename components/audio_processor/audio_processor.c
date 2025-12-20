@@ -505,14 +505,20 @@ static void audio_player_state_task(void *arg)
         }
         /* Stop when the last pipeline element (i2s_stream_writer in this case) receives stop event */
         if (msg.source_type == AUDIO_ELEMENT_TYPE_ELEMENT && msg.source == (void *) s_audio_player->i2s_stream_writer
-            && msg.cmd == AEL_MSG_CMD_REPORT_STATUS
-            && (((int)msg.data == AEL_STATUS_STATE_STOPPED) || ((int)msg.data == AEL_STATUS_STATE_FINISHED))) {
-            ESP_LOGI(TAG, "[ * ] Stop event received");
-            // 注意：这里不要调用 audio_tone_stop()，因为会设置 is_switching 标志
-            // 直接更新状态即可
+            && msg.cmd == AEL_MSG_CMD_REPORT_STATUS) {
+            if ((int)msg.data == AEL_STATUS_STATE_STOPPED) {
+                // 停止事件：可能是手动停止，不触发完成回调
+                ESP_LOGI(TAG, "[ * ] Stop event received (STOPPED)");
+                s_audio_player->player_state = PIPE_STATE_IDLE;
+                s_audio_player->is_switching = false;
+                // 不调用回调，因为这是手动停止
+            } else if ((int)msg.data == AEL_STATUS_STATE_FINISHED) {
+                // 完成事件：播放自然结束，触发完成回调
+                ESP_LOGI(TAG, "[ * ] Finish event received (FINISHED)");
             s_audio_player->player_state = PIPE_STATE_IDLE;
-            s_audio_player->is_switching = false;  // 清除切换标志
+                s_audio_player->is_switching = false;
             s_audio_player->tone_cb(AEL_STATUS_STATE_FINISHED);
+            }
         }
     }
 }
