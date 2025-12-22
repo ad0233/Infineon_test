@@ -326,6 +326,10 @@ extern "C" void app_main()
         ESP_LOGE(TAG, "fsm_main_init failed");
         vTaskDelete(nullptr);
     }
+
+    // FSM初始化后再启动雷达，避免回调中的FSM代码出现空指针异常
+    my_lidar_start(s_lidar_handle);
+
     bs814_init();
     my_wifi_auto_connect(s_wifi_handle);
     // WiFi事件改为轮询方式，在encoder_test中处理
