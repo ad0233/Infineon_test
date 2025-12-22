@@ -548,6 +548,25 @@ void fsm_set_alarm_item(void *arg, uint8_t last_state, uint8_t next_state) {
 }
 
 /*----------------------------------------------------------------------------------unwind-------------------------------------------------------------------------------------*/
+// 根据动物类型获取对应的歌曲文件路径
+static const char* get_unwind_music_path(unwind_animal_t animal) {
+    switch (animal) {
+        case UNWIND_ANIMAL_CAT:
+            return "/sdcard/V001-Unwind-cat.wav";
+        case UNWIND_ANIMAL_FOX:
+            return "/sdcard/V001-Unwind-Fox.wav";
+        case UNWIND_ANIMAL_HUMMINGBIRD:
+            return "/sdcard/V001-Unwind-Bird.wav";
+        case UNWIND_ANIMAL_KOI:
+            return "/sdcard/V001-Unwind-Fish.wav";
+        case UNWIND_ANIMAL_SWAN:
+            return "/sdcard/V001-Unwind-Swan.wav";
+        default:
+            ESP_LOGW(TAG, "Unknown animal type %d, using cat music", animal);
+            return "/sdcard/V001-Unwind-cat.wav";
+    }
+}
+
 void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
     if (arg == nullptr) {
         ESP_LOGW(TAG, "fsm_unwind_next_item: arg is nullptr");
@@ -564,19 +583,21 @@ void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
         // 向下切换（下一个菜单项）
         ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_next_animal()");
         my_ui_unwind_next_animal();
-        // 切换后重新播放音频（audio_tone_play 内部会处理停止逻辑）
-        audio_tone_play("/sdcard/V001-morning.wav");
     } else if (diff < 0) {
         // 向上切换（上一个菜单项）
         ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_prev_animal()");
         my_ui_unwind_prev_animal();
-        // 切换后重新播放音频（audio_tone_play 内部会处理停止逻辑）
-        audio_tone_play("/sdcard/V001-morning.wav");
     } else {
         ESP_LOGI(TAG, "fsm_unwind_next_item: diff is 0, no action");
+        return;
     }
     
-
+    // 获取切换后的当前动物，播放对应的歌曲
+    unwind_animal_t current_animal = my_ui_unwind_get_animal();
+    const char* music_path = get_unwind_music_path(current_animal);
+    ESP_LOGI(TAG, "fsm_unwind_next_item: playing music for animal %d: %s", current_animal, music_path);
+    // audio_tone_play 内部会处理停止逻辑
+    audio_tone_play(music_path);
 }
 
 /*----------------------------------------------------------------------------------volume-------------------------------------------------------------------------------------*/
@@ -701,32 +722,29 @@ void fsm_main_memu_cat_playing(void *arg, uint8_t last_state, uint8_t next_state
     case UNWIND_ANIMAL_CAT:
         anim_to_play = MY_H264_ANIM_CAT;
         ESP_LOGI(TAG, "Playing CAT animation");
+        audio_tone_play("/sdcard/V001-Unwind-cat_hum.wav");
         break;
     
     case UNWIND_ANIMAL_FOX:
-        // TODO: 添加FOX动画后使用 MY_H264_ANIM_FOX
-        anim_to_play = MY_H264_ANIM_CAT;  // 暂时使用CAT动画
+        anim_to_play = MY_H264_ANIM_FOX; 
         ESP_LOGI(TAG, "Playing FOX animation (using CAT for now)");
         break;
     
     case UNWIND_ANIMAL_HUMMINGBIRD:
-        // TODO: 添加HUMMINGBIRD动画后使用 MY_H264_ANIM_HUMMINGBIRD
-        anim_to_play = MY_H264_ANIM_CAT;  // 暂时使用CAT动画
+        anim_to_play = MY_H264_ANIM_BIRD;  
         ESP_LOGI(TAG, "Playing HUMMINGBIRD animation (using CAT for now)");
         break;
     
     case UNWIND_ANIMAL_KOI:
-        // TODO: 添加KOI动画后使用 MY_H264_ANIM_KOI
-        anim_to_play = MY_H264_ANIM_CAT;  // 暂时使用CAT动画
+        anim_to_play = MY_H264_ANIM_FISH;  
         ESP_LOGI(TAG, "Playing KOI animation (using CAT for now)");
         break;
     
     case UNWIND_ANIMAL_SWAN:
-        // TODO: 添加SWAN动画后使用 MY_H264_ANIM_SWAN
-        anim_to_play = MY_H264_ANIM_CAT;  // 暂时使用CAT动画
+        anim_to_play = MY_H264_ANIM_SWAN;  
         ESP_LOGI(TAG, "Playing SWAN animation (using CAT for now)");
-        break;
-    
+        break;   
+
     default:
         anim_to_play = MY_H264_ANIM_CAT;
         ESP_LOGW(TAG, "Unknown animal type, using CAT animation");
@@ -904,9 +922,12 @@ void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
     // 调用UI函数，内部会处理显示和3秒定时器
     my_ui_in_unwind();
 
-    
+    // 获取当前显示的动物，播放对应的歌曲
+    unwind_animal_t current_animal = my_ui_unwind_get_animal();
+    const char* music_path = get_unwind_music_path(current_animal);
+    ESP_LOGI(TAG, "fsm_main_in_unwind: playing music for animal %d: %s", current_animal, music_path);
     // audio_tone_play 内部会处理停止逻辑，直接调用即可
-    audio_tone_play("/sdcard/V001-morning.wav");
+    audio_tone_play(music_path);
 }
 
 

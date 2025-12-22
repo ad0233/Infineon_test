@@ -32,8 +32,16 @@ extern const uint8_t _binary_processing_h264_start[];
 extern const uint8_t _binary_processing_h264_end[];
 extern const uint8_t _binary_success2_h264_start[];
 extern const uint8_t _binary_success2_h264_end[];
-extern const uint8_t _binary_cat_h264_start[];
-extern const uint8_t _binary_cat_h264_end[];
+extern const uint8_t _binary_cat_hum_h264_start[];
+extern const uint8_t _binary_cat_hum_h264_end[];
+extern const uint8_t _binary_swan_hum_h264_start[];
+extern const uint8_t _binary_swan_hum_h264_end[];
+extern const uint8_t _binary_bird_hum_h264_start[];
+extern const uint8_t _binary_bird_hum_h264_end[];
+extern const uint8_t _binary_fish_hum_h264_start[];
+extern const uint8_t _binary_fish_hum_h264_end[];
+extern const uint8_t _binary_fox_hum_h264_start[];
+extern const uint8_t _binary_fox_hum_h264_end[];
 
 static QueueHandle_t h264_queue = NULL;
 static QueueHandle_t s_rgb_ready_queue = NULL;
@@ -85,7 +93,7 @@ static bool s_buffers_initialized = false;
 static uint32_t s_target_fps = 15;
 static TickType_t s_frame_interval_ticks = 0;
 
-#define H264_ANIM_COUNT (7)
+#define H264_ANIM_COUNT (11)
 // 单个共享 PSRAM 缓冲区：存储当前播放的动画数据（大小为最大动画的大小）
 static uint8_t *s_h264_shared_buf = NULL;
 static size_t s_h264_shared_buf_size = 0;
@@ -121,13 +129,17 @@ const struct {
     const uint8_t *start;
     const uint8_t *end;
 } anim_data[H264_ANIM_COUNT] = {
-    {_binary_brand_motion2_h264_start, _binary_brand_motion2_h264_end},
-    {_binary_fail2_h264_start, _binary_fail2_h264_end},
-    {_binary_go_up_h264_start, _binary_go_up_h264_end},
-    {_binary_human_recognized_h264_start, _binary_human_recognized_h264_end},
-    {_binary_processing_h264_start, _binary_processing_h264_end},
-    {_binary_success2_h264_start, _binary_success2_h264_end},
-    {_binary_cat_h264_start, _binary_cat_h264_end},
+    {_binary_brand_motion2_h264_start, _binary_brand_motion2_h264_end},      // 0: MY_H264_ANIM_BRAND_MOTION2
+    {_binary_fail2_h264_start, _binary_fail2_h264_end},                    // 1: MY_H264_ANIM_FAIL2
+    {_binary_go_up_h264_start, _binary_go_up_h264_end},                    // 2: MY_H264_ANIM_GO_UP
+    {_binary_human_recognized_h264_start, _binary_human_recognized_h264_end}, // 3: MY_H264_ANIM_HUMAN_RECOGNIZED
+    {_binary_processing_h264_start, _binary_processing_h264_end},           // 4: MY_H264_ANIM_PROCESSING
+    {_binary_success2_h264_start, _binary_success2_h264_end},               // 5: MY_H264_ANIM_SUCCESS2
+    {_binary_cat_hum_h264_start, _binary_cat_hum_h264_end},              // 6: MY_H264_ANIM_CAT
+    {_binary_swan_hum_h264_start, _binary_swan_hum_h264_end},              // 7: MY_H264_ANIM_SWAN
+    {_binary_bird_hum_h264_start, _binary_bird_hum_h264_end},              // 8: MY_H264_ANIM_BIRD
+    {_binary_fish_hum_h264_start, _binary_fish_hum_h264_end},              // 9: MY_H264_ANIM_FISH
+    {_binary_fox_hum_h264_start, _binary_fox_hum_h264_end},                // 10: MY_H264_ANIM_FOX
 };
 
 void my_h264_init(my_h264_callback_t callback, void *context, my_h264_done_callback_t done_callback, void *done_context)
