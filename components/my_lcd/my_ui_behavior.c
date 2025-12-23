@@ -674,6 +674,18 @@ void my_ui_unwind_set_animal(unwind_animal_t animal) {
     
 }
 
+// 只更新动物变量，不更新UI（用于直接切换动画）
+void my_ui_unwind_set_animal_no_ui(unwind_animal_t animal) {
+    if (animal >= UNWIND_ANIMAL_MAX) {
+        animal = UNWIND_ANIMAL_CAT;
+    }
+    current_unwind_animal = animal;
+    
+    // 重置动画标志位
+    unwind_animation_started = false;
+    ESP_LOGI(TAG, "my_ui_unwind_set_animal_no_ui: animal set to %d, no UI update", animal);
+}
+
 // 获取当前选择的动物
 unwind_animal_t my_ui_unwind_get_animal(void) {
     return current_unwind_animal;

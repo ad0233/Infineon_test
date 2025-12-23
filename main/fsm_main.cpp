@@ -162,8 +162,10 @@ static struct StateTable fsm_user_table[] = {
     { nullptr              ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_unwind_next_item},//切换歌曲
     
     //TODO:测试  改成长按播放动画
-    // { fm_has_h_fd_state     ,FM_H_F_SUC          ,F_MAIN_E_LIDAR_MOVE_TRIG     , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
-    { nullptr                ,0                      ,F_MAIN_E_BTN_L_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING    ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
+    { fm_has_h_fd_state     ,FM_H_F_FAI             ,F_MAIN_E_ANIM_PLAY_SUC              , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
+    { fm_has_h_fd_state     ,FM_H_F_SUC             ,F_MAIN_E_ANIM_PLAY_SUC              , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
+    
+    // { nullptr                ,0                      ,F_MAIN_E_BTN_L_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING    ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
 
     { nullptr              ,0                         ,F_MAIN_E_ANIM_PLAY_SUC     , F_MAIN_S_MENU_UNWIND_PLAYING  , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_main_in_unwind},//动画---歌曲切换
     { nullptr              ,0                         ,F_MAIN_E_BTN_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU              ,10    ,true       , fsm_main_in_memu},//歌曲--菜单
@@ -187,7 +189,7 @@ static struct StateTable fsm_user_table[] = {
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_RadarInfo                 ,F_MAIN_S_GoodMorning_DEMO     ,0  ,false    ,  fsm_main_in_MorningAnimation},//雷达数据---早报dome
     {nullptr             ,0                     ,F_MAIN_E_BTN_CLICKED     ,F_MAIN_S_GoodMorning_DEMO          ,F_MAIN_S_REMINDER            ,0  ,false    ,  fsm_main_in_reminder_tomorrow},//早报dome---提醒 
     {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_REMINDER                   ,F_MAIN_S_SLEEPMODE     ,0  ,false    ,  fsm_main_in_sleep_mode},//提醒--入睡提示dome
-    {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_SLEEPMODE                   ,F_MAIN_S_SLEEPMODE_READY     ,0  ,false    ,  fsm_main_in_sleep_mode},//提醒--入睡提示dome
+    {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_SLEEPMODE                   ,F_MAIN_S_SLEEPMODE_READY     ,0  ,false    ,  fsm_main_in_sleep_mode_ready},//提醒--入睡提示dome
     {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_SLEEPMODE_READY             ,F_MAIN_S_NIGHTMODE     ,0  ,false    ,  fsm_main_in_night_mode},//入睡提示dome--夜间模式
     {nullptr             ,0                     , F_MAIN_E_BTN_CLICKED   ,F_MAIN_S_NIGHTMODE                   ,F_MAIN_S_CLOCK     ,0  ,false    ,  fsm_main_to_clock},//夜间模式--主页面
 

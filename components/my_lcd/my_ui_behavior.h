@@ -125,6 +125,7 @@ void my_ui_in_unwind_on(void);
 void my_ui_in_unwind_select(void);
 void my_ui_in_noise_time(void);
 void my_ui_unwind_set_animal(unwind_animal_t animal);
+void my_ui_unwind_set_animal_no_ui(unwind_animal_t animal);  // 只更新变量，不更新UI
 unwind_animal_t my_ui_unwind_get_animal(void);
 void my_ui_unwind_next_animal(void);
 void my_ui_unwind_prev_animal(void);

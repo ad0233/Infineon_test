@@ -593,6 +593,24 @@ static const char* get_unwind_music_path(unwind_animal_t animal) {
     }
 }
 
+static my_h264_animation_t get_unwind_h264_anim(unwind_animal_t animal) {
+    switch (animal) {
+        case UNWIND_ANIMAL_CAT:
+            return MY_H264_ANIM_CAT;
+        case UNWIND_ANIMAL_FOX:
+            return MY_H264_ANIM_FOX;
+        case UNWIND_ANIMAL_HUMMINGBIRD:
+            return MY_H264_ANIM_BIRD;
+        case UNWIND_ANIMAL_KOI:
+            return MY_H264_ANIM_FISH;
+        case UNWIND_ANIMAL_SWAN:
+            return MY_H264_ANIM_SWAN;
+        default:
+            return MY_H264_ANIM_CAT;
+    }
+}
+
+
 void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
     if (arg == nullptr) {
         ESP_LOGW(TAG, "fsm_unwind_next_item: arg is nullptr");
@@ -603,28 +621,72 @@ void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
     
     ESP_LOGI(TAG, "fsm_unwind_next_item, diff: %" PRId32, diff);
     
-    // 根据旋钮方向切换菜单项
+    // 获取当前动物
+    unwind_animal_t current_animal = my_ui_unwind_get_animal();
+    unwind_animal_t next_animal;
+    
+    // 根据旋钮方向计算下一个动物（只更新变量，不更新UI）
     // diff > 0: 右旋（向下），diff < 0: 左旋（向上）
     if (diff > 0) {
-        // 向下切换（下一个菜单项）
-        ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_next_animal()");
-        my_ui_unwind_next_animal();
+        // 向下切换（下一个）
+        next_animal = (unwind_animal_t)((current_animal + 1) % UNWIND_ANIMAL_MAX);
+        ESP_LOGI(TAG, "fsm_unwind_next_item: next animal %d", next_animal);
     } else if (diff < 0) {
-        // 向上切换（上一个菜单项）
-        ESP_LOGI(TAG, "fsm_unwind_next_item: calling my_ui_unwind_prev_animal()");
-        my_ui_unwind_prev_animal();
+        // 向上切换（上一个）
+        next_animal = (unwind_animal_t)((current_animal + UNWIND_ANIMAL_MAX - 1) % UNWIND_ANIMAL_MAX);
+        ESP_LOGI(TAG, "fsm_unwind_next_item: prev animal %d", next_animal);
     } else {
         ESP_LOGI(TAG, "fsm_unwind_next_item: diff is 0, no action");
         return;
     }
     
-    // 获取切换后的当前动物，播放对应的歌曲
-    unwind_animal_t current_animal = my_ui_unwind_get_animal();
-    const char* music_path = get_unwind_music_path(current_animal);
-    ESP_LOGI(TAG, "fsm_unwind_next_item: playing music for animal %d: %s", current_animal, music_path);
-    // audio_tone_play 内部会处理停止逻辑
+    // 只更新动物变量（不更新UI）
+    my_ui_unwind_set_animal_no_ui(next_animal);
+    
+    // 获取对应的动画和音频路径
+    const char* music_path = get_unwind_music_path(next_animal);
+    my_h264_animation_t h264_anim = get_unwind_h264_anim(next_animal);
+    
+    ESP_LOGI(TAG, "fsm_unwind_next_item: playing animation and music for animal %d: %s", next_animal, music_path);
+    // 播放动画和音频
+    my_h264_start(h264_anim, 100);
     audio_tone_play(music_path);
 }
+ 
+// void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
+//     ESP_LOGI(TAG, "fsm_main_in_unwind: last_state=%d, next_state=%d", last_state, next_state);
+//     ESP_LOGI(TAG, "in unwind mode...");
+    
+//     if(last_state == F_MAIN_S_MENU_UNWIND_PLAYING) {
+//         my_ui_unwind_set_animal(UNWIND_ANIMAL_CAT);
+//     }
+    
+//     // 调用UI函数，内部会处理显示和3秒定时器
+//     my_ui_in_unwind();
+
+//     // 获取当前显示的动物，播放对应的歌曲
+//     unwind_animal_t current_animal = my_ui_unwind_get_animal();
+//     const char* music_path = get_unwind_music_path(current_animal);
+//     ESP_LOGI(TAG, "fsm_main_in_unwind: playing music for animal %d: %s", current_animal, music_path);
+//     // audio_tone_play 内部会处理停止逻辑，直接调用即可
+//     audio_tone_play(music_path);
+// }
+
+void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
+
+    my_ui_unwind_set_animal(UNWIND_ANIMAL_CAT);
+    
+    // 获取当前显示的动物，播放对应的动画和歌曲
+    unwind_animal_t current_animal = my_ui_unwind_get_animal();
+    const char* music_path = get_unwind_music_path(current_animal);
+    my_h264_animation_t h264_anim = get_unwind_h264_anim(current_animal);
+    
+    ESP_LOGI(TAG, "fsm_main_in_unwind: playing animation and music for animal %d: %s", current_animal, music_path);
+    // 播放动画和音频
+    my_h264_start(h264_anim, 100);
+    audio_tone_play(music_path);
+}
+
 
 /*----------------------------------------------------------------------------------volume-------------------------------------------------------------------------------------*/
 void fsm_volume_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
@@ -942,26 +1004,6 @@ void fsm_main_in_no_alarm(void *arg, uint8_t last_state, uint8_t next_state) {
     }
     
     my_ui_in_no_alarm();
-}
-
-
-void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
-    ESP_LOGI(TAG, "fsm_main_in_unwind: last_state=%d, next_state=%d", last_state, next_state);
-    ESP_LOGI(TAG, "in unwind mode...");
-    
-    if(last_state == F_MAIN_S_MENU_UNWIND_PLAYING) {
-        my_ui_unwind_set_animal(UNWIND_ANIMAL_CAT);
-    }
-    
-    // 调用UI函数，内部会处理显示和3秒定时器
-    my_ui_in_unwind();
-
-    // 获取当前显示的动物，播放对应的歌曲
-    unwind_animal_t current_animal = my_ui_unwind_get_animal();
-    const char* music_path = get_unwind_music_path(current_animal);
-    ESP_LOGI(TAG, "fsm_main_in_unwind: playing music for animal %d: %s", current_animal, music_path);
-    // audio_tone_play 内部会处理停止逻辑，直接调用即可
-    audio_tone_play(music_path);
 }
 
 
