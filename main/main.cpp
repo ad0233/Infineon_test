@@ -61,7 +61,7 @@
 #include "my_mqtt.h"
 #include "broadcast.h"
 
-#include "rust_lunawake.h"
+#include "single_parse.h"
 #include "cmd_parse.h"
 
 #include "fsm_main.h"
@@ -223,7 +223,7 @@ extern "C" void app_main()
     // 打印 iot_config 分区中的密钥
     my_nvs_print_iot_config_keys();
     
-    rust_lib_init();
+    single_parse_lib_init();
     my_lcd_init();
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
         my_ui_canvas_update(rgb565_buf, rgb565_buf_len);

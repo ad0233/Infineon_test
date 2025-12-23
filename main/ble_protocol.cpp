@@ -1,7 +1,7 @@
 #include "ble_protocol.h"
 #include "my_ble.h"
 #include "my_utils.h"
-#include "rust_lunawake.h"
+#include "single_parse.h"
 #include "cmd_parse.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -13,9 +13,13 @@
 static const char *TAG = "ble_protocol";
 
 static StreamBufferHandle_t s_ble_recv_stream = NULL;
+static struct single_parse_t s_single_parser_struct;
 static single_parse_handle_t s_single_parser = NULL;
 static uint8_t *s_one_packet_buf = NULL;
+static uint8_t *s_parse_recv_buf = NULL;
+static uint8_t *s_parse_output_buf = NULL;
 static const size_t s_one_packet_len = 10 * 1024;
+static const size_t s_parse_max_size = 100 * 1024;
 
 // BLE 接收回调，将数据写入流缓冲区
 static void ble_recv_callback(const uint8_t *data, uint16_t len, void *context)
@@ -44,7 +48,7 @@ void ble_parse_flush(void)
         // 逐字节解析
         for(size_t i = 0; i < len; i++) {
             size_t out_len;
-            const uint8_t *out_buf = rust_single_parse_unpack(
+            const uint8_t *out_buf = single_parse_unpack(
                 s_single_parser,
                 s_one_packet_buf[i],
                 &out_len);
@@ -69,18 +73,43 @@ int ble_protocol_init()
         return -1;
     }
     
-    // 创建解析器
-    s_single_parser = rust_single_parse_new(100 * 1024);
-    if (s_single_parser == nullptr) {
-        ESP_LOGE(TAG, "Failed to init single parser");
-        return -1;
-    }
-    
     // 分配接收缓冲区（使用 SPIRAM）
     s_one_packet_buf = (uint8_t *)heap_caps_malloc(s_one_packet_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (s_one_packet_buf == nullptr) {
         ESP_LOGE(TAG, "Failed to allocate packet buffer");
-        rust_single_parse_free(s_single_parser);
+        return -1;
+    }
+    
+    // 分配解析器接收缓冲区（使用 SPIRAM）
+    s_parse_recv_buf = (uint8_t *)heap_caps_malloc(s_parse_max_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_parse_recv_buf == nullptr) {
+        ESP_LOGE(TAG, "Failed to allocate parse receive buffer");
+        heap_caps_free(s_one_packet_buf);
+        s_one_packet_buf = NULL;
+        return -1;
+    }
+    
+    // 分配解析器输出缓冲区（使用 SPIRAM）
+    s_parse_output_buf = (uint8_t *)heap_caps_malloc(s_parse_max_size / 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_parse_output_buf == nullptr) {
+        ESP_LOGE(TAG, "Failed to allocate parse output buffer");
+        heap_caps_free(s_one_packet_buf);
+        heap_caps_free(s_parse_recv_buf);
+        s_one_packet_buf = NULL;
+        s_parse_recv_buf = NULL;
+        return -1;
+    }
+    
+    // 初始化解析器（使用外部提供的缓冲区）
+    s_single_parser = &s_single_parser_struct;
+    if (single_parse_init(s_single_parser, s_parse_recv_buf, s_parse_output_buf, s_parse_max_size) != 0) {
+        ESP_LOGE(TAG, "Failed to init single parser");
+        heap_caps_free(s_one_packet_buf);
+        heap_caps_free(s_parse_recv_buf);
+        heap_caps_free(s_parse_output_buf);
+        s_one_packet_buf = NULL;
+        s_parse_recv_buf = NULL;
+        s_parse_output_buf = NULL;
         s_single_parser = NULL;
         return -1;
     }
@@ -114,7 +143,7 @@ int ble_send_response(const char *json_str)
     }
     
     // 打包数据
-    int packed_len = rust_single_parse_pack(
+    int packed_len = single_parse_pack(
         (const uint8_t *)json_str,
         json_len,
         send_buf,
