@@ -710,11 +710,18 @@ void fsm_main_lidar_find_boot(void *arg, uint8_t last_state, uint8_t next_state)
 
 //找人动画
 void fsm_main_lidar_find_playing(void *arg, uint8_t last_state, uint8_t next_state){
-    // 重置失败时间戳和检测结果
-    s_fail_start_time = esp_log_timestamp();
+    // 只在第一次进入F_MAIN_S_FINDPERSONC_ANIM状态时设置时间戳（从其他状态进入时）
+    // 如果是从F_MAIN_S_FINDPERSONC_ANIM循环进入（last_state == F_MAIN_S_FINDPERSONC_ANIM），不重置时间戳
+    if (last_state != F_MAIN_S_FINDPERSONC_ANIM) {
+        s_fail_start_time = esp_log_timestamp();
+        ESP_LOGI(TAG, "First time entering find person animation, start timeout timer");
+    }
+    
+    // 重置检测结果标志位
     s_person_detected = false;
     s_timeout_detected = false;
-    // 启动动画（边播放边检测，检测逻辑在encoder_test任务中）
+    
+    // 启动动画
     my_h264_start(MY_H264_ANIM_PROCESSING,100);
 }
 //找到人动画
