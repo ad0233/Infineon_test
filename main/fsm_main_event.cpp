@@ -596,17 +596,17 @@ static const char* get_unwind_music_path(unwind_animal_t animal) {
 static my_h264_animation_t get_unwind_h264_anim(unwind_animal_t animal) {
     switch (animal) {
         case UNWIND_ANIMAL_CAT:
-            return MY_H264_ANIM_CAT;
+            return MY_H264_ANIM_CAT_STATIC;
         case UNWIND_ANIMAL_FOX:
-            return MY_H264_ANIM_FOX;
+            return MY_H264_ANIM_FOX_STATIC;
         case UNWIND_ANIMAL_HUMMINGBIRD:
-            return MY_H264_ANIM_BIRD;
+            return MY_H264_ANIM_BIRD_STATIC;
         case UNWIND_ANIMAL_KOI:
-            return MY_H264_ANIM_FISH;
+            return MY_H264_ANIM_FISH_STATIC;
         case UNWIND_ANIMAL_SWAN:
-            return MY_H264_ANIM_SWAN;
+            return MY_H264_ANIM_SWAN_STATIC;
         default:
-            return MY_H264_ANIM_CAT;
+            return MY_H264_ANIM_CAT_STATIC;
     }
 }
 

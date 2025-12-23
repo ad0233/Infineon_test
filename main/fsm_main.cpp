@@ -162,7 +162,7 @@ static struct StateTable fsm_user_table[] = {
     { nullptr              ,0                         ,F_MAIN_E_KNOB_CW             , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND       ,0    ,false       , fsm_unwind_next_item},//切换歌曲
     
     //TODO:测试  改成长按播放动画
-    { fm_has_h_fd_state     ,FM_H_F_FAI             ,F_MAIN_E_ANIM_PLAY_SUC              , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
+    { fm_has_h_fd_state     ,FM_H_F_FAI             ,F_MAIN_E_ANIM_PLAY_SUC              , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换--歌曲切换
     { fm_has_h_fd_state     ,FM_H_F_SUC             ,F_MAIN_E_ANIM_PLAY_SUC              , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画
     
     // { nullptr                ,0                      ,F_MAIN_E_BTN_L_CLICKED         , F_MAIN_S_MENU_UNWIND       , F_MAIN_S_MENU_UNWIND_PLAYING    ,0    ,false       , fsm_main_memu_cat_playing},//歌曲切换---动画

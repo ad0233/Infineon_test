@@ -42,6 +42,16 @@ extern const uint8_t _binary_fish_hum_h264_start[];
 extern const uint8_t _binary_fish_hum_h264_end[];
 extern const uint8_t _binary_fox_hum_h264_start[];
 extern const uint8_t _binary_fox_hum_h264_end[];
+extern const uint8_t _binary_cat_static_h264_start[];
+extern const uint8_t _binary_cat_static_h264_end[];
+extern const uint8_t _binary_fox__static_h264_start[];
+extern const uint8_t _binary_fox__static_h264_end[];
+extern const uint8_t _binary_bird__static_h264_start[];
+extern const uint8_t _binary_bird__static_h264_end[];
+extern const uint8_t _binary_fish__static_h264_start[];
+extern const uint8_t _binary_fish__static_h264_end[];
+extern const uint8_t _binary_swan__static_h264_start[];
+extern const uint8_t _binary_swan__static_h264_end[];
 
 static QueueHandle_t h264_queue = NULL;
 static QueueHandle_t s_rgb_ready_queue = NULL;
@@ -93,7 +103,7 @@ static bool s_buffers_initialized = false;
 static uint32_t s_target_fps = 15;
 static TickType_t s_frame_interval_ticks = 0;
 
-#define H264_ANIM_COUNT (11)
+#define H264_ANIM_COUNT (16)
 // 单个共享 PSRAM 缓冲区：存储当前播放的动画数据（大小为最大动画的大小）
 static uint8_t *s_h264_shared_buf = NULL;
 static size_t s_h264_shared_buf_size = 0;
@@ -140,6 +150,11 @@ const struct {
     {_binary_bird_hum_h264_start, _binary_bird_hum_h264_end},              // 8: MY_H264_ANIM_BIRD
     {_binary_fish_hum_h264_start, _binary_fish_hum_h264_end},              // 9: MY_H264_ANIM_FISH
     {_binary_fox_hum_h264_start, _binary_fox_hum_h264_end},                // 10: MY_H264_ANIM_FOX
+    {_binary_cat_static_h264_start, _binary_cat_static_h264_end},          // 11: MY_H264_ANIM_CAT_STATIC
+    {_binary_fox__static_h264_start, _binary_fox__static_h264_end},        // 12: MY_H264_ANIM_FOX_STATIC
+    {_binary_bird__static_h264_start, _binary_bird__static_h264_end},      // 13: MY_H264_ANIM_BIRD_STATIC
+    {_binary_fish__static_h264_start, _binary_fish__static_h264_end},      // 14: MY_H264_ANIM_FISH_STATIC
+    {_binary_swan__static_h264_start, _binary_swan__static_h264_end},       // 15: MY_H264_ANIM_SWAN_STATIC
 };
 
 void my_h264_init(my_h264_callback_t callback, void *context, my_h264_done_callback_t done_callback, void *done_context)
