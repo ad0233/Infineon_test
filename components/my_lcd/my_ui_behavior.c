@@ -1194,10 +1194,22 @@ void my_ui_light_prev(void) {
 }
 
 // 静态变量：保存夜间模式圆圈对象
-static lv_obj_t *s_night_mode_circle = NULL;
+static lv_obj_t *s_night_mode_circle = NULL;  // 背景圆圈（白色边框）
 static TaskHandle_t s_night_mode_task_handle = NULL;
 static uint32_t s_night_mode_start_time = 0;  // 夜间模式开始时间（毫秒）
 static bool s_night_mode_movement_valid = false;  // 体动数据是否有效
+
+// 时间段结构：记录体动值变化的时间点
+typedef struct {
+    uint32_t start_time_ms;  // 相对于s_night_mode_start_time的开始时间（毫秒）
+    uint32_t end_time_ms;    // 结束时间（0表示还在进行中）
+    bool is_low_movement;    // true=体动<30（棕色），false=体动>=30（白色）
+} movement_segment_t;
+
+#define MAX_SEGMENTS 200  // 最多200个时间段（足够3分钟内的变化）
+static movement_segment_t s_movement_segments[MAX_SEGMENTS];
+static uint16_t s_segment_count = 0;  // 当前时间段数量
+static lv_obj_t *s_segment_arcs[MAX_SEGMENTS];  // 每个时间段对应的arc对象
 
 // 将睡眠模式页面恢复到初始样式（黄色月亮、Good Night）
 void my_ui_sleep_mode_reset_to_default(void) {
@@ -1349,7 +1361,16 @@ void my_ui_sleep_mode_to_night_mode(void) {
     // 记录开始时间（重新进入时重置）
     s_night_mode_start_time = esp_log_timestamp();
     
-    // 清空进度条（重新进入时重置）
+    // 清空所有时间段和arc对象（重新进入时重置）
+    s_segment_count = 0;
+    for (int i = 0; i < MAX_SEGMENTS; i++) {
+        if (s_segment_arcs[i] != NULL) {
+            lv_obj_del(s_segment_arcs[i]);
+            s_segment_arcs[i] = NULL;
+        }
+    }
+    
+    // 清空背景圆圈（重新进入时重置）
     if (s_night_mode_circle != NULL) {
         lv_arc_set_angles(s_night_mode_circle, 270, 270);
         lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
@@ -1360,7 +1381,8 @@ void my_ui_sleep_mode_to_night_mode(void) {
 
 /**
  * @brief 夜间模式进度条更新任务
- * 轮询体动数据，当体动<30时显示进度条，0-360度代表3分钟
+ * 轮询体动数据，分段绘制进度条：体动<30用棕色，体动>=30用白色
+ * 0-360度代表3分钟，从270度（最上方）开始往右
  */
 static void night_mode_progress_task(void* param) {
     ESP_LOGI(TAG, "night_mode_progress_task started");
@@ -1368,6 +1390,7 @@ static void night_mode_progress_task(void* param) {
     const uint32_t TOTAL_TIME_MS = 180000;  // 3分钟 = 180秒 = 180000毫秒
     const uint8_t MOVEMENT_THRESHOLD = 30;  // 体动阈值
     static uint8_t last_movement = 255;  // 记录上一次体动值，用于检测状态变化
+    static bool last_is_low = false;  // 上一次是否为低体动（<30）
     
     while (fsm_main_get_current_state() == F_MAIN_S_NIGHTMODE) {
         // 轮询获取体动数据
@@ -1386,69 +1409,109 @@ static void night_mode_progress_task(void* param) {
         uint32_t current_time = esp_log_timestamp();
         uint32_t elapsed_time = current_time - s_night_mode_start_time;
         
-        // 如果体动 < 30，重新开始计时
-        if (has_movement_data && movement < MOVEMENT_THRESHOLD) {
-            // 如果体动从 >= 30 变为 < 30，或者已经超过3分钟，重新开始
-            if (last_movement >= MOVEMENT_THRESHOLD || elapsed_time >= TOTAL_TIME_MS) {
-                s_night_mode_start_time = current_time;
-                elapsed_time = 0;
-            }
-            last_movement = movement;
+        if (has_movement_data) {
+            bool current_is_low = (movement < MOVEMENT_THRESHOLD);
             
-            if (s_night_mode_circle != NULL) {
-                // 计算角度：0-360度对应0-180秒，从270度（最上方）开始往右
-                float progress = (float)elapsed_time / TOTAL_TIME_MS;
-                if (progress > 1.0f) progress = 1.0f;
+            // 检测体动值变化：如果体动状态改变，结束当前时间段，开始新时间段
+            if (last_movement == 255 || current_is_low != last_is_low) {
+                // 结束当前时间段（如果有）
+                if (s_segment_count > 0 && s_movement_segments[s_segment_count - 1].end_time_ms == 0) {
+                    s_movement_segments[s_segment_count - 1].end_time_ms = elapsed_time;
+                }
                 
-                int32_t end_angle = 270 + (int32_t)(progress * 360);
-                if (end_angle >= 630) end_angle = 270 + 360;  // 确保不超过一圈
+                // 开始新时间段（如果还有空间）
+                if (s_segment_count < MAX_SEGMENTS) {
+                    s_movement_segments[s_segment_count].start_time_ms = elapsed_time;
+                    s_movement_segments[s_segment_count].end_time_ms = 0;  // 0表示还在进行中
+                    s_movement_segments[s_segment_count].is_low_movement = current_is_low;
+                    s_segment_count++;
+                }
                 
-                lvgl_port_lock(0);
-                
-                // 设置指示器角度：从270度到end_angle
-                lv_arc_set_angles(s_night_mode_circle, 270, end_angle);
-                
-                // 体动 < 30：用棕色 A86F2A 描绘
-                lv_obj_set_style_arc_color(s_night_mode_circle, lv_color_hex(0xA86F2A), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-                lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-                
-                lvgl_port_unlock();
+                last_is_low = current_is_low;
             }
-        } else if (has_movement_data && movement >= MOVEMENT_THRESHOLD) {
-            // 体动 >= 30：用白色描绘
+            
             last_movement = movement;
-            if (s_night_mode_circle != NULL) {
-                float progress = (float)elapsed_time / TOTAL_TIME_MS;
-                if (progress > 1.0f) progress = 1.0f;
-                
-                int32_t end_angle = 270 + (int32_t)(progress * 360);
-                if (end_angle >= 630) end_angle = 270 + 360;
-                
-                lvgl_port_lock(0);
-                
-                lv_arc_set_angles(s_night_mode_circle, 270, end_angle);
-                lv_obj_set_style_arc_color(s_night_mode_circle, lv_color_hex(0xFFFFFF), LV_PART_INDICATOR | LV_STATE_DEFAULT);
-                lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-                
-                lvgl_port_unlock();
-            }
-        } else if (s_night_mode_circle != NULL) {
-            // 没有体动数据，隐藏进度条
-            last_movement = 255;  // 重置
+        }
+        
+        // 更新当前时间段（最后一个）的结束时间为当前时间（用于绘制）
+        if (s_segment_count > 0 && s_movement_segments[s_segment_count - 1].end_time_ms == 0) {
+            s_movement_segments[s_segment_count - 1].end_time_ms = elapsed_time;
+        }
+        
+        // 重新绘制所有时间段
+        if (s_night_mode_circle != NULL && ui_sleepMode != NULL) {
             lvgl_port_lock(0);
-            lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+            
+            // 删除所有旧的arc对象
+            for (int i = 0; i < MAX_SEGMENTS; i++) {
+                if (s_segment_arcs[i] != NULL) {
+                    lv_obj_del(s_segment_arcs[i]);
+                    s_segment_arcs[i] = NULL;
+                }
+            }
+            
+            // 为每个时间段创建arc对象
+            for (uint16_t i = 0; i < s_segment_count; i++) {
+                movement_segment_t *seg = &s_movement_segments[i];
+                
+                // 计算时间段的开始和结束角度
+                float start_progress = (float)seg->start_time_ms / TOTAL_TIME_MS;
+                float end_progress = (float)seg->end_time_ms / TOTAL_TIME_MS;
+                if (start_progress > 1.0f) start_progress = 1.0f;
+                if (end_progress > 1.0f) end_progress = 1.0f;
+                
+                int32_t start_angle = 270 + (int32_t)(start_progress * 360);
+                int32_t end_angle = 270 + (int32_t)(end_progress * 360);
+                
+                // 创建arc对象
+                lv_obj_t *arc = lv_arc_create(ui_sleepMode);
+                lv_obj_set_width(arc, 300);
+                lv_obj_set_height(arc, 300);
+                lv_obj_set_align(arc, LV_ALIGN_CENTER);
+                
+                // 设置背景为透明
+                lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+                lv_obj_set_style_arc_opa(arc, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+                
+                // 设置指示器角度和颜色
+                lv_arc_set_angles(arc, start_angle, end_angle);
+                lv_obj_set_style_arc_width(arc, 2, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+                lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+                
+                // 根据体动值设置颜色
+                if (seg->is_low_movement) {
+                    lv_obj_set_style_arc_color(arc, lv_color_hex(0xA86F2A), LV_PART_INDICATOR | LV_STATE_DEFAULT);  // 棕色
+                } else {
+                    lv_obj_set_style_arc_color(arc, lv_color_hex(0xFFFFFF), LV_PART_INDICATOR | LV_STATE_DEFAULT);  // 白色
+                }
+                
+                // 隐藏旋钮
+                lv_obj_set_style_bg_opa(arc, LV_OPA_TRANSP, LV_PART_KNOB | LV_STATE_DEFAULT);
+                lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE);
+                
+                s_segment_arcs[i] = arc;
+            }
+            
+            // 恢复当前时间段为进行中状态
+            if (s_segment_count > 0) {
+                s_movement_segments[s_segment_count - 1].end_time_ms = 0;
+            }
+            
             lvgl_port_unlock();
         }
         
         vTaskDelay(pdMS_TO_TICKS(100));  // 每100ms更新一次
     }
     
-    // 退出夜间模式时，隐藏进度条
-    if (s_night_mode_circle != NULL) {
-        lvgl_port_lock(0);
-        lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-        lvgl_port_unlock();
+    // 退出夜间模式时，删除所有arc对象
+    lvgl_port_lock(0);
+    for (int i = 0; i < MAX_SEGMENTS; i++) {
+        if (s_segment_arcs[i] != NULL) {
+            lv_obj_del(s_segment_arcs[i]);
+            s_segment_arcs[i] = NULL;
+        }
     }
+    lvgl_port_unlock();
     
     ESP_LOGI(TAG, "night_mode_progress_task finished");
     s_night_mode_task_handle = NULL;

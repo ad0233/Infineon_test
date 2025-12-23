@@ -16,6 +16,7 @@ static const char* fsm_state_to_str(uint8_t state) {
     switch (state) {
         case F_MAIN_S_UNINIT:              return "UNINIT";
         case F_MAIN_S_UNINIT_PLAYING:      return "UNINIT_PLAYING";
+        case F_MAIN_S_UNINIT_PLAYING_BOOT: return "UNINIT_PLAYING_BOOT";
         case F_MAIN_S_CLOCK:               return "CLOCK";
         case F_MAIN_S_CLOCK_AWAY:          return "CLOCK_AWAY";
         case F_MAIN_S_CLOCK_BACK:          return "CLOCK_BACK";
@@ -91,8 +92,9 @@ static struct StateTable fsm_user_table[] = {
     //区分事件组变量       编号         到来的事件               当前的状态             下一个状态                超时  立即执行  将要要执行的函数
 
     //开机
-    {nullptr             ,0            ,F_MAIN_E_INIT              ,F_MAIN_S_UNINIT         ,F_MAIN_S_UNINIT_PLAYING  ,0  ,false    ,  fsm_main_uninit_playing},//开机动画
-    {nullptr             ,0            ,F_MAIN_E_ANIM_PLAY_SUC     ,F_MAIN_S_UNINIT_PLAYING ,F_MAIN_S_FINDPERSONC_ANIM ,0  ,false    ,  fsm_main_lidar_find_playing},//找人动画 
+    {nullptr             ,0            ,F_MAIN_E_INIT              ,F_MAIN_S_UNINIT             ,F_MAIN_S_UNINIT_PLAYING        ,0  ,false    ,  fsm_main_uninit_playing},//开机动画
+    {nullptr             ,0            ,F_MAIN_E_ANIM_PLAY_SUC     ,F_MAIN_S_UNINIT_PLAYING     ,F_MAIN_S_UNINIT_PLAYING_BOOT   ,0  ,false    ,  fsm_main_lidar_find_boot},//开机动画过度
+    {nullptr             ,0            ,F_MAIN_E_ANIM_PLAY_SUC     ,F_MAIN_S_UNINIT_PLAYING_BOOT ,F_MAIN_S_FINDPERSONC_ANIM     ,0  ,false    ,  fsm_main_lidar_find_playing},//找人动画 
     //雷达找人
     {fm_has_h_fd_state   ,FM_H_F_FAI    ,F_MAIN_E_ANIM_PLAY_SUC      , F_MAIN_S_FINDPERSONC_ANIM    ,F_MAIN_S_FINDPERSONC_ANIM       ,0  ,false    ,fsm_main_lidar_find_playing},//没找到人继续找人动画
     {fm_has_h_fd_state   ,FM_H_F_SUC    ,F_MAIN_E_ANIM_PLAY_SUC      ,F_MAIN_S_FINDPERSONC_ANIM     ,F_MAIN_S_FINDSUC_ANIM     ,0  ,false    ,   fsm_main_find_someone },//找到人动画

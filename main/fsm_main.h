@@ -58,6 +58,9 @@ enum fsm_clock_need_cfg {
     FM_MEMU_SETTIME,
 };
 uint8_t fm_has_h_fd_state(void); //雷达找人检测
+uint32_t fsm_main_get_fail_start_time(void); //获取失败开始时间戳
+void fsm_main_set_person_detected(bool detected); //设置体动检测结果
+void fsm_main_set_timeout_detected(bool detected); //设置超时检测结果
 uint8_t fm_has_w_c_state(void);//wifi检测
 uint8_t fm_has_rtc_state(void); //RTC检测
 uint8_t fm_has_memu_state(void); //菜单状态检测
@@ -157,6 +160,7 @@ enum fsm_main_event_enum {
 enum fsm_main_state_enum {
     F_MAIN_S_UNINIT,              // 未初始化
     F_MAIN_S_UNINIT_PLAYING,       //开机动画
+    F_MAIN_S_UNINIT_PLAYING_BOOT,  //开机动画过度
     F_MAIN_S_CLOCK,              // 时钟页面 
     F_MAIN_S_CLOCK_AWAY,        // 时钟页面人走
     F_MAIN_S_CLOCK_BACK,        //时种页面人回来过度（大蝴蝶）
