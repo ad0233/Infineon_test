@@ -630,24 +630,6 @@ void encoder_test(void *arg)
             check_alarms_and_trigger();
             last_alarm_check_flush = current_tick;
         }
-
-        // 边播放动画边检测体动和超时（在F_MAIN_S_FINDPERSONC_ANIM状态时）
-        if (fsm_main_get_current_state() == F_MAIN_S_FINDPERSONC_ANIM) {
-            my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
-            uint32_t elapsed_time = esp_log_timestamp() - fsm_main_get_fail_start_time();
-            
-            // 检测体动（设置标志位，等待动画完成）
-            if (lidar_handle != NULL && my_lidar_have_human(lidar_handle)) {
-                ESP_LOGI(TAG, "Person detected during animation, elapsed: %lu ms", elapsed_time);
-                fsm_main_set_person_detected(true);
-            }
-            // 检测超时（设置标志位，等待动画完成）
-            else if (elapsed_time > 15000) {
-                ESP_LOGI(TAG, "Timeout detected during animation, elapsed: %lu ms", elapsed_time);
-                fsm_main_set_timeout_detected(true);
-            }
-        }
-        
         vTaskDelay(1);
     }
 }
