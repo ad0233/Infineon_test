@@ -661,7 +661,7 @@ void fsm_unwind_next_item(void *arg, uint8_t last_state, uint8_t next_state) {
 
 void fsm_main_in_unwind(void *arg, uint8_t last_state, uint8_t next_state) {
 
-    my_ui_unwind_set_animal(UNWIND_ANIMAL_CAT);
+    // my_ui_unwind_set_animal(UNWIND_ANIMAL_CAT);
     
     // 获取当前显示的动物，播放对应的动画和歌曲
     unwind_animal_t current_animal = my_ui_unwind_get_animal();

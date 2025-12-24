@@ -103,7 +103,7 @@ audio_element_handle_t create_player_wav_decoder_stream(void)
 {
     ESP_LOGI(TAG, "Create wav decoder");
     wav_decoder_cfg_t wav_cfg = DEFAULT_WAV_DECODER_CONFIG();
-    wav_cfg.task_core = 1;
+    wav_cfg.task_core = 0;
     wav_cfg.out_rb_size = 8 * 1024;
     return wav_decoder_init(&wav_cfg);
 }
