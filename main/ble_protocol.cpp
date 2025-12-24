@@ -8,6 +8,7 @@
 #include "freertos/task.h"
 #include "freertos/stream_buffer.h"
 #include "esp_heap_caps.h"
+#include <cstddef>
 #include <string.h>
 
 static const char *TAG = "ble_protocol";
@@ -28,7 +29,7 @@ static void ble_recv_callback(const uint8_t *data, uint16_t len, void *context)
     // ESP_LOG_BUFFER_HEXDUMP("BLE_RX", data, len, ESP_LOG_INFO);
     size_t sent = xStreamBufferSend(stream, data, len, 0);
     if (sent != len) {
-        ESP_LOGE("BLE_RX", "Stream buffer full, lost %d bytes", len - sent);
+        ESP_LOGE("BLE_RX", "Stream buffer full, lost %d bytes", (size_t)len - sent);
     }
 }
 
@@ -67,7 +68,7 @@ void ble_parse_flush(void)
 int ble_protocol_init()
 {
     // 创建接收流缓冲区
-    s_ble_recv_stream = my_stream_buffer_create(1024 * 10, 1);
+    s_ble_recv_stream = my_stream_buffer_create_psram(1024 * 10, 1);
     if (s_ble_recv_stream == NULL) {
         ESP_LOGE(TAG, "Failed to create BLE receive stream buffer");
         return -1;

@@ -304,6 +304,7 @@ extern "C" void app_main()
         (void)self;
         fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
     }, nullptr);
+    my_lidar_start(s_lidar_handle);
     
     // 二维码 ble  wifi
     print_mem_info();
