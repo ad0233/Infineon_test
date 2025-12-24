@@ -667,7 +667,7 @@ void my_ble_init(const char *device_name)
     }
 
     // 创建发送缓冲区
-    s_send_stream_buffer = my_stream_buffer_create(1024 * 5, 1);
+    s_send_stream_buffer = my_stream_buffer_create_psram(1024 * 5, 1);
     if (s_send_stream_buffer == NULL) {
         ESP_LOGE(GATTS_TAG, "Failed to create send stream buffer");
         return;

@@ -241,7 +241,7 @@ QueueHandle_t my_queue_create(UBaseType_t uxQueueLength, UBaseType_t uxItemSize)
     return handle;
 }
 
-StreamBufferHandle_t my_stream_buffer_create(size_t xBufferSizeBytes, size_t xTriggerLevelBytes)
+StreamBufferHandle_t my_stream_buffer_create_psram(size_t xBufferSizeBytes, size_t xTriggerLevelBytes)
 {
     if (xBufferSizeBytes == 0) {
         ESP_LOGE(TAG, "Invalid stream buffer size");

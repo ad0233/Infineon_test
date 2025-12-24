@@ -61,7 +61,7 @@
 #include "my_mqtt.h"
 #include "broadcast.h"
 
-#include "rust_lunawake.h"
+#include "single_parse.h"
 #include "cmd_parse.h"
 
 #include "fsm_main.h"
@@ -200,8 +200,8 @@ extern "C" void app_main()
     ESP_LOGI(TAG, "Initialize board peripherals");
     
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
-    esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
     periph_cfg.extern_stack = true;
+    esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
 
     esp_err_t ret = audio_board_sdcard_init(set, SD_MODE_4_LINE);
     if (ret != ESP_OK) {
@@ -223,7 +223,7 @@ extern "C" void app_main()
     // 打印 iot_config 分区中的密钥
     my_nvs_print_iot_config_keys();
     
-    rust_lib_init();
+    single_parse_lib_init();
     my_lcd_init();
     my_h264_init([](const uint8_t *rgb565_buf, uint32_t rgb565_buf_len, void *context) {
         my_ui_canvas_update(rgb565_buf, rgb565_buf_len);
@@ -304,6 +304,7 @@ extern "C" void app_main()
         (void)self;
         fsm_main_event_trig(F_MAIN_E_LIDAR_MOVE_TRIG, nullptr);
     }, nullptr);
+    my_lidar_start(s_lidar_handle);
     
     // 二维码 ble  wifi
     print_mem_info();

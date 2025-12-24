@@ -85,7 +85,7 @@ QueueHandle_t my_queue_create(UBaseType_t uxQueueLength, UBaseType_t uxItemSize)
  * @param xTriggerLevelBytes Number of bytes that must be in buffer before read unblocks
  * @return Stream buffer handle on success, NULL on failure
  */
-StreamBufferHandle_t my_stream_buffer_create(size_t xBufferSizeBytes, size_t xTriggerLevelBytes);
+StreamBufferHandle_t my_stream_buffer_create_psram(size_t xBufferSizeBytes, size_t xTriggerLevelBytes);
 
 /**
  * @brief Create a message buffer with storage allocated in PSRAM
