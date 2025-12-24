@@ -436,6 +436,9 @@ extern "C" void app_main()
     fsm_main_event_trig(F_MAIN_E_INIT, nullptr);
     xTaskCreate(encoder_test, "encoder_test", 1024 * 6, nullptr, 10, nullptr);
    
+#if defined(ENABLE_TASK_MONITOR)
+    xTaskCreate(monitor_task, "monitor_task", 1024 * 4, nullptr, 10, nullptr);
+#endif
 
     print_mem_info();
     return;
