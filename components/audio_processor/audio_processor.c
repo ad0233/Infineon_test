@@ -366,6 +366,11 @@ esp_err_t player_pipeline_get_progress(uint32_t *played_ms)
         return ESP_OK;
     }
     
+    // 如果 s_audio_player 存在但不在运行状态（播放完成或未开始），直接返回 0
+    if (s_audio_player != NULL) {
+        return ESP_OK;  // 播放已完成或未开始，返回 0 是合理的
+    }
+    
     // 其次使用 player_pipeline
     if (s_player_pipeline != NULL) {
         // 计算播放时间（毫秒）
@@ -598,17 +603,20 @@ esp_err_t audio_tone_play(const char *uri)
     // 设置切换标志
     s_audio_player->is_switching = true;
     
-    // 无论状态如何，都先停止并强制终止管道，确保 ADF 内部状态机彻底回归初始态
-    audio_pipeline_stop(s_audio_player->pipeline);
-    audio_pipeline_wait_for_stop(s_audio_player->pipeline);
-    audio_pipeline_terminate(s_audio_player->pipeline);
-    
-    // 强制清除事件队列中所有残留消息，必须在 terminate 之后执行
-    audio_event_iface_msg_t msg;
-    while (audio_event_iface_listen(s_audio_player->evt, &msg, 0) == ESP_OK) {
-        // 持续读取直到队列为空
+    // 只有在运行状态时才需要停止和终止
+    if (s_audio_player->player_state == PIPE_STATE_RUNNING) {
+        // 停止管道
+        audio_pipeline_stop(s_audio_player->pipeline);
+        audio_pipeline_wait_for_stop(s_audio_player->pipeline);
+        audio_pipeline_terminate(s_audio_player->pipeline);
+        
+        // 强制清除事件队列中所有残留消息，必须在 terminate 之后执行
+        audio_event_iface_msg_t msg;
+        while (audio_event_iface_listen(s_audio_player->evt, &msg, 0) == ESP_OK) {
+            // 持续读取直到队列为空
+        }
     }
-
+    
     // 重置管道
     audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
     audio_pipeline_reset_elements(s_audio_player->pipeline);
@@ -659,20 +667,8 @@ esp_err_t audio_tone_stop(void)
     
     // 停止管道
     audio_pipeline_stop(s_audio_player->pipeline);
-    
-    // 非阻塞等待：最多等待100ms
-    int wait_count = 0;
-    const int max_wait = 10;  // 最多等待10次，每次10ms
-    while (s_audio_player->player_state == PIPE_STATE_RUNNING && wait_count < max_wait) {
-        vTaskDelay(pdMS_TO_TICKS(10));
-        wait_count++;
-    }
-    
-    // 如果还没停止，强制终止
-    if (s_audio_player->player_state == PIPE_STATE_RUNNING) {
-        ESP_LOGW(TAG, "Force terminate audio pipeline");
-        audio_pipeline_terminate(s_audio_player->pipeline);
-    }
+    audio_pipeline_wait_for_stop(s_audio_player->pipeline);
+    audio_pipeline_terminate(s_audio_player->pipeline);
     
     // 重置管道
     audio_pipeline_reset_ringbuffer(s_audio_player->pipeline);
