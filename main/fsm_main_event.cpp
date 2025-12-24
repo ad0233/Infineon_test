@@ -28,11 +28,9 @@
 // ⚠不能在这里的函数使用fsm_event_handle ⚠
 // ⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠⚠
 /*------------------------------------------------------------------------------找人------------------------------------------------------------------------------------------*/
-// 静态变量：失败开始时间戳、保存的检测结果
+// 静态变量：失败开始时间戳
 static uint32_t s_fail_start_time = 0;  // 失败状态开始的时间戳（ms）
 #define FIND_TIMEOUT_MS 15000  // 15秒超时
-static bool s_person_detected = false;  // 体动检测结果（边播放边检测时设置）
-static bool s_timeout_detected = false;  // 超时检测结果（边播放边检测时设置）
 
 // 静态变量：闹钟开关状态
 static bool s_alarm_enabled = true;  // true=有闹钟, false=无闹钟
@@ -40,45 +38,34 @@ static bool s_alarm_state_initialized = false;  // 状态是否已初始化
 
 //找人
 uint8_t fm_has_h_fd_state(void) {
-    // 如果边播放边检测时已经检测到超时，直接返回超时
-    if (s_timeout_detected) {
-        return FM_H_F_TOUT;
-    }
-    
-    // 如果边播放边检测时已经检测到体动，直接返回成功
-    if (s_person_detected) {
-        return FM_H_F_SUC;
-    }
-    
     my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
+    if (lidar_handle == NULL) {
+        ESP_LOGW(TAG, "fm_has_h_fd_state: lidar_handle is NULL");
+        return FM_H_F_FAI;
+    }
+    
+    // 检测是否有人
     if(my_lidar_have_human(lidar_handle)) {
-        ESP_LOGI(TAG, "person found");
+        ESP_LOGI(TAG, "fm_has_h_fd_state: person found");
         return FM_H_F_SUC;
     } else {
-        ESP_LOGI(TAG, "person not found");
+        ESP_LOGI(TAG, "fm_has_h_fd_state: person not found");
     }
 
-    if(esp_log_timestamp() - s_fail_start_time > FIND_TIMEOUT_MS) {
+    // 检测是否超时
+    uint32_t elapsed = esp_log_timestamp() - s_fail_start_time;
+    if(elapsed > FIND_TIMEOUT_MS) {
+        ESP_LOGI(TAG, "fm_has_h_fd_state: timeout (elapsed=%lu ms)", elapsed);
         return FM_H_F_TOUT;
     }
     
-    // 返回保存的结果
+    // 返回失败（继续检测）
     return FM_H_F_FAI;
 }
 
-// 获取失败开始时间戳（供外部任务使用）
+// 获取失败开始时间戳
 uint32_t fsm_main_get_fail_start_time(void) {
     return s_fail_start_time;
-}
-
-// 设置体动检测结果（供encoder_test任务使用）
-void fsm_main_set_person_detected(bool detected) {
-    s_person_detected = detected;
-}
-
-// 设置超时检测结果（供encoder_test任务使用）
-void fsm_main_set_timeout_detected(bool detected) {
-    s_timeout_detected = detected;
 }
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 //网络
@@ -779,24 +766,15 @@ void fsm_main_lidar_find_playing(void *arg, uint8_t last_state, uint8_t next_sta
         ESP_LOGI(TAG, "First time entering find person animation, start timeout timer");
     }
     
-    // 重置检测结果标志位
-    s_person_detected = false;
-    s_timeout_detected = false;
-    
     // 启动动画
     my_h264_start(MY_H264_ANIM_PROCESSING,100);
 }
 //找到人动画
 void fsm_main_find_someone(void *arg, uint8_t last_state, uint8_t next_state){
-    s_person_detected = false;  // 清除标志位
-    s_timeout_detected = false;
     my_h264_start(MY_H264_ANIM_HUMAN_RECOGNIZED,100);
 }
 //没找到人动画
 void fsm_main_no_find_someone(void *arg, uint8_t last_state, uint8_t next_state){
-    // 清除标志位，因为已经进入失败流程
-    s_person_detected = false;
-    s_timeout_detected = false;
     my_h264_start(MY_H264_ANIM_FAIL2,100);
 }
 

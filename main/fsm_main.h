@@ -59,8 +59,6 @@ enum fsm_clock_need_cfg {
 };
 uint8_t fm_has_h_fd_state(void); //雷达找人检测
 uint32_t fsm_main_get_fail_start_time(void); //获取失败开始时间戳
-void fsm_main_set_person_detected(bool detected); //设置体动检测结果
-void fsm_main_set_timeout_detected(bool detected); //设置超时检测结果
 uint8_t fm_has_w_c_state(void);//wifi检测
 uint8_t fm_has_rtc_state(void); //RTC检测
 uint8_t fm_has_memu_state(void); //菜单状态检测
