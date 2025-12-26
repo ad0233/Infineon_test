@@ -53,7 +53,6 @@ extern const uint8_t _binary_swan__static_h264_start[];
 extern const uint8_t _binary_swan__static_h264_end[];
 
 static QueueHandle_t h264_queue = NULL;
-static QueueHandle_t s_rgb_ready_queue = NULL;
 static QueueHandle_t s_rgb_free_queue = NULL;
 static my_h264_callback_t s_callback = NULL;
 static void *s_context = NULL;
@@ -62,12 +61,6 @@ static void *s_done_context = NULL;
 static volatile bool s_abort = false;
 static TaskHandle_t s_decode_task_handle = NULL;
 
-typedef struct {
-    uint8_t *buf;
-    size_t len;
-    bool is_end;
-    bool is_abort;
-} rgb565_frame_t;
 
 #define RGB565_BUFFER_COUNT (2)
 #define CLIP_TABLE_SIZE     (2048)
@@ -80,8 +73,7 @@ static void ConvertYUV420SPToRGB565_LUT(const unsigned char *src,
                                         int src_height,
                                         int dst_width,
                                         int dst_height);
-static void i420_decode_thread(void *arg);
-static void playback_thread(void *arg);
+static void h264_decode_playback_thread(void *arg);
 static TickType_t fps_to_ticks(uint32_t fps);
 static TickType_t wait_timeout_to_ticks(uint32_t timeout_ms);
 
@@ -163,9 +155,8 @@ void my_h264_init(my_h264_callback_t callback, void *context, my_h264_done_callb
     s_done_callback = done_callback;
     s_done_context = done_context;
     h264_queue = xQueueCreate(1, sizeof(esp_h264_dec_in_frame_t));
-    s_rgb_ready_queue = xQueueCreate(RGB565_BUFFER_COUNT, sizeof(rgb565_frame_t));
     s_rgb_free_queue = xQueueCreate(RGB565_BUFFER_COUNT, sizeof(uint8_t *));
-    if (h264_queue == NULL || s_rgb_ready_queue == NULL || s_rgb_free_queue == NULL) {
+    if (h264_queue == NULL || s_rgb_free_queue == NULL) {
         ESP_LOGE("h264", "Failed to create queues");
         return;
     }
@@ -194,12 +185,8 @@ void my_h264_init(my_h264_callback_t callback, void *context, my_h264_done_callb
     }
     
     s_frame_interval_ticks = fps_to_ticks(s_target_fps);
-    if (my_task_create_pinned_psram(playback_thread, "h264_play_thread", 1024 * 6, NULL, 5, NULL, 0) != ESP_OK) {
-        ESP_LOGE("h264", "Failed to create playback task");
-        return;
-    }
-    if (my_task_create_pinned_psram(i420_decode_thread, "i420_decode_thread", 1024 * 10, NULL, 5, &s_decode_task_handle, 1) != ESP_OK) {
-        ESP_LOGE("h264", "Failed to create decode task");
+    if (my_task_create_pinned_psram(h264_decode_playback_thread, "h264_decode_playback", 1024 * 12, NULL, 5, &s_decode_task_handle, 1) != ESP_OK) {
+        ESP_LOGE("h264", "Failed to create decode playback task");
     }
 }
 
@@ -243,7 +230,7 @@ int my_h264_start(my_h264_animation_t animation, uint32_t timeout_ms)
     return 0;
 }
 
-static void i420_decode_thread(void *arg) {
+static void h264_decode_playback_thread(void *arg) {
     esp_h264_err_t ret = ESP_H264_ERR_FAIL;
     esp_h264_dec_handle_t dec = NULL;
     esp_h264_dec_cfg_sw_t cfg;
@@ -282,8 +269,8 @@ static void i420_decode_thread(void *arg) {
     s_src_height = align16(res.height);
     s_rgb_frame_bytes = (size_t)s_dst_width * s_dst_height * 2;
 
-    if (s_rgb_free_queue == NULL || s_rgb_ready_queue == NULL) {
-        ESP_LOGE("h264", "RGB queues are not ready");
+    if (s_rgb_free_queue == NULL) {
+        ESP_LOGE("h264", "RGB free queue is not ready");
         vTaskDelete(NULL);
         return;
     }
@@ -308,8 +295,13 @@ static void i420_decode_thread(void *arg) {
 
     esp_h264_dec_out_frame_t out_frame;
     esp_h264_dec_in_frame_t in_frame;
+    TickType_t last_wake_time = 0;
+    bool has_last_wake_time = false;
+    bool local_abort = false;
+    
     while (1) {
         if (xQueueReceive(h264_queue, &in_frame, portMAX_DELAY) == pdPASS) {
+            local_abort = false;
             while (in_frame.raw_data.len > 0 && !s_abort) {
                 ret = esp_h264_dec_process(dec, &in_frame, &out_frame);
                 in_frame.raw_data.buffer += in_frame.consume;
@@ -326,32 +318,43 @@ static void i420_decode_thread(void *arg) {
                                                 s_src_height,
                                                 s_dst_width,
                                                 s_dst_height);
-                    rgb565_frame_t frame = {
-                        .buf = rgb565_buf,
-                        .len = s_rgb_frame_bytes,
-                        .is_end = false,
-                        .is_abort = false,
-                    };
-                    if (xQueueSend(s_rgb_ready_queue, &frame, portMAX_DELAY) != pdPASS) {
-                        ESP_LOGE("h264", "Failed to enqueue RGB frame");
+                    
+                    // Check abort before playback
+                    if (s_abort) {
+                        local_abort = true;
                         xQueueSend(s_rgb_free_queue, &rgb565_buf, portMAX_DELAY);
                         break;
+                    }
+                    
+                    // Playback the frame immediately
+                    if (s_callback != NULL) {
+                        s_callback(rgb565_buf, s_rgb_frame_bytes, s_context);
+                    }
+                    
+                    // Return buffer to free queue
+                    xQueueSend(s_rgb_free_queue, &rgb565_buf, portMAX_DELAY);
+                    
+                    // Frame rate control
+                    TickType_t interval = s_frame_interval_ticks;
+                    if (interval > 0) {
+                        if (!has_last_wake_time) {
+                            last_wake_time = xTaskGetTickCount();
+                            has_last_wake_time = true;
+                        }
+                        vTaskDelayUntil(&last_wake_time, interval);
+                    } else {
+                        has_last_wake_time = false;
                     }
                 } else {
                     ESP_LOGE("h264", "decode failed. line %d \n", __LINE__);
                     break;
                 }
             }
-            rgb565_frame_t end_frame = {
-                .buf = NULL,
-                .len = 0,
-                .is_end = true,
-                .is_abort = s_abort,
-            };
-            if (s_rgb_ready_queue != NULL) {
-                if (xQueueSend(s_rgb_ready_queue, &end_frame, portMAX_DELAY) != pdPASS) {
-                    ESP_LOGE("h264", "Failed to enqueue end frame");
-                }
+            
+            // End of animation
+            has_last_wake_time = false;
+            if (s_done_callback != NULL && !local_abort && !s_abort) {
+                s_done_callback(s_done_context);
             }
         }
     }
@@ -482,95 +485,30 @@ static void ConvertYUV420SPToRGB565_LUT(const unsigned char *src,
     }
 }
 
-static void playback_thread(void *arg)
-{
-    rgb565_frame_t frame;
-    TickType_t last_wake_time = 0;
-    bool has_last_wake_time = false;
-    bool local_abort = false;
-    while (1) {
-        if (s_rgb_ready_queue == NULL || s_rgb_free_queue == NULL) {
-            vTaskDelay(pdMS_TO_TICKS(10));
-            continue;
-        }
-        if (xQueueReceive(s_rgb_ready_queue, &frame, portMAX_DELAY) == pdPASS) {
-            if (frame.is_abort) {
-                local_abort = true;
-                if (frame.buf) {
-                    xQueueSend(s_rgb_free_queue, &frame.buf, portMAX_DELAY);
-                }
-                continue;
-            }
-
-            if (frame.is_end) {
-                has_last_wake_time = false;
-                if (s_done_callback != NULL && !local_abort) {
-                    s_done_callback(s_done_context);
-                }
-                local_abort = false;
-                continue;
-            }
-
-            if (local_abort) {
-                if (frame.buf) {
-                    xQueueSend(s_rgb_free_queue, &frame.buf, portMAX_DELAY);
-                }
-                continue;
-            }
-
-            if (s_callback != NULL) {
-                s_callback(frame.buf, frame.len, s_context);
-            }
-            xQueueSend(s_rgb_free_queue, &frame.buf, portMAX_DELAY);
-            TickType_t interval = s_frame_interval_ticks;
-            if (interval > 0) {
-                if (!has_last_wake_time) {
-                    last_wake_time = xTaskGetTickCount();
-                    has_last_wake_time = true;
-                }
-                vTaskDelayUntil(&last_wake_time, interval);
-            } else {
-                has_last_wake_time = false;
-            }
-        }
-    }
-}
 
 void my_h264_stop(void)
 {
-    if (h264_queue == NULL || s_rgb_ready_queue == NULL) {
+    if (h264_queue == NULL) {
         return;
     }
 
-    // Check if already done: both queues are empty
-    if (uxQueueMessagesWaiting(h264_queue) == 0 && uxQueueMessagesWaiting(s_rgb_ready_queue) == 0) {
+    // Check if already done: queue is empty
+    if (uxQueueMessagesWaiting(h264_queue) == 0) {
         return;
     }
 
     s_abort = true;
 
-    // Send abort frame to playback_thread through queue
-    rgb565_frame_t abort_frame = {
-        .buf = NULL,
-        .len = 0,
-        .is_end = false,
-        .is_abort = true,
-    };
-    if (xQueueSend(s_rgb_ready_queue, &abort_frame, portMAX_DELAY) != pdPASS) {
-        ESP_LOGE("h264", "%s: Failed to send abort frame", __func__);
-    }
-
-    // Drain h264_queue to stop i420_decode_thread from starting new segments
+    // Drain h264_queue to stop decode thread from starting new segments
     esp_h264_dec_in_frame_t in_frame;
     while (xQueueReceive(h264_queue, &in_frame, 0) == pdPASS) {
         // Data is in s_h264_shared_buf, no need to free
     }
 
-    // Wait for i420_decode_thread to finish processing (queue empty means it's waiting)
-    // and playback_thread to drain s_rgb_ready_queue
+    // Wait for decode thread to finish processing (queue empty means it's waiting)
     TickType_t timeout = xTaskGetTickCount() + pdMS_TO_TICKS(1000);
     while (xTaskGetTickCount() < timeout) {
-        if (uxQueueMessagesWaiting(h264_queue) == 0 && uxQueueMessagesWaiting(s_rgb_ready_queue) == 0) {
+        if (uxQueueMessagesWaiting(h264_queue) == 0) {
             break;
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -587,7 +525,7 @@ void my_h264_set_fps(uint32_t fps)
 
 int my_h264_wait_done(uint32_t timeout_ms)
 {
-    if (h264_queue == NULL || s_rgb_ready_queue == NULL) {
+    if (h264_queue == NULL) {
         return -1;
     }
     
@@ -595,7 +533,7 @@ int my_h264_wait_done(uint32_t timeout_ms)
     TickType_t start_ticks = xTaskGetTickCount();
     
     while (xTaskGetTickCount() - start_ticks < wait_ticks) {
-        if (uxQueueMessagesWaiting(h264_queue) == 0 && uxQueueMessagesWaiting(s_rgb_ready_queue) == 0) {
+        if (uxQueueMessagesWaiting(h264_queue) == 0) {
             return 0;
         }
         vTaskDelay(pdMS_TO_TICKS(10));

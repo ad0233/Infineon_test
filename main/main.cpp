@@ -503,12 +503,14 @@ void encoder_test(void *arg)
     TickType_t last_ota_flush = 0;
     TickType_t last_wifi_flush = 0;
     TickType_t last_alarm_check_flush = 0;
+    TickType_t last_thread_heart_log_flush = 0;
     const TickType_t fsm_flush_interval = pdMS_TO_TICKS(100);    // 100ms
     const TickType_t ble_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t lidar_flush_interval = pdMS_TO_TICKS(1000);      // 1000ms
     const TickType_t ota_flush_interval = pdMS_TO_TICKS(10);      // 10ms
     const TickType_t wifi_flush_interval = pdMS_TO_TICKS(200);    // 200ms
     const TickType_t alarm_check_interval = pdMS_TO_TICKS(1000 * 30); // 30秒检查一次即可
+    const TickType_t thread_heart_log_interval = pdMS_TO_TICKS(2000); // 2s
     
     // WiFi状态检测（用于避免重复触发）
     static wifi_state_t last_wifi_state = WIFI_STATE_IDLE;
@@ -516,6 +518,11 @@ void encoder_test(void *arg)
     while (1)
     {
         TickType_t current_tick = xTaskGetTickCount();
+
+        if ((current_tick - last_thread_heart_log_flush) >= thread_heart_log_interval) {
+            print_mem_info();
+            last_thread_heart_log_flush = current_tick;
+        }
         
         static TickType_t last_bs814_poll = 0;
         if (current_tick - last_bs814_poll >= pdMS_TO_TICKS(20)) {
@@ -539,22 +546,22 @@ void encoder_test(void *arg)
             // KEY3 处理（音量加，已在 btn.c 中处理）
             bs814_key3_update();
         }
-
+        
         // 处理编码器事件
         if(xQueueReceive(event_queue, &e, 0) == pdTRUE) {
             switch (e.type)
             {
                 case RE_ET_BTN_CLICKED:
+                    ESP_LOGI(TAG, "F_MAIN_E_BTN_CLICKED");
                     fsm_main_event_trig(F_MAIN_E_BTN_CLICKED, nullptr);
-                    ESP_LOGI(TAG, "RE_ET_BTN_CLICKED");
                     break;
                 case RE_ET_BTN_LONG_PRESSED:
-                    fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, nullptr);
                     ESP_LOGI(TAG, "F_MAIN_E_BTN_L_CLICKED");
+                    fsm_main_event_trig(F_MAIN_E_BTN_L_CLICKED, nullptr);
                     break;
                 case RE_ET_CHANGED:
                     // 传递旋钮变化量，正数=右旋(增加)，负数=左旋(减少)
-                    ESP_LOGI(TAG, "RE_ET_CHANGED, diff: %" PRId32 ", current state: %s", e.diff, fsm_main_get_current_state_str());
+                    ESP_LOGI(TAG, "F_MAIN_E_KNOB_CW, diff: %" PRId32 ", current state: %s", e.diff, fsm_main_get_current_state_str());
                     fsm_main_event_trig(F_MAIN_E_KNOB_CW, (void *)(&e.diff));
                     break; 
                 default:
@@ -562,20 +569,20 @@ void encoder_test(void *arg)
             }
         }
         my_lidar_flush(s_lidar_handle, 100);
-        
+
         // 定时刷新FSM超时（每100ms）
         if ((current_tick - last_fsm_flush) >= fsm_flush_interval) {
             fsm_main_timeout_flush();
             last_fsm_flush = current_tick;
         }
-        
+
         // 定时刷新BLE发送（每10ms）
         if ((current_tick - last_ble_flush) >= ble_flush_interval) {
             ble_send_flush();
             ble_parse_flush();  // 同时处理BLE解析
             last_ble_flush = current_tick;
         }
-
+        
         // 定时发送mqtt LIDAR数据（每1000ms）
         if ((current_tick - last_lidar_flush) >= lidar_flush_interval) {
             radar_latest_data_t data;
@@ -588,7 +595,7 @@ void encoder_test(void *arg)
             }
             last_lidar_flush = current_tick;
         }
-
+        
         // 定时刷新OTA（每10ms）
         if ((current_tick - last_ota_flush) >= ota_flush_interval) {
             my_ota_flush_v1();
@@ -597,7 +604,7 @@ void encoder_test(void *arg)
         
         // 定时刷新RTC（每100ms）
         my_rtc_flush(s_rtc_handle, 100);
-        
+
         //FIXME: 好像wifi没有定时。
         // 定时检查WiFi状态（每200ms）
         if ((current_tick - last_wifi_flush) >= wifi_flush_interval) {
