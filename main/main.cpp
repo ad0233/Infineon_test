@@ -399,7 +399,7 @@ extern "C" void app_main()
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
     board_handle = audio_board_init();
-    audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_BOTH, AUDIO_HAL_CTRL_START);
+    audio_hal_ctrl_codec(board_handle->audio_hal, AUDIO_HAL_CODEC_MODE_DECODE, AUDIO_HAL_CTRL_START);
     audio_hal_set_volume(board_handle->audio_hal, 25);
 
     vTaskDelay(100 / portTICK_PERIOD_MS);
