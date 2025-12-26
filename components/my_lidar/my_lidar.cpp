@@ -373,7 +373,7 @@ int my_lidar_flush(my_lidar_handle_t self, uint32_t interval_ms) {
     radar_latest_data_t data;
     if (r60abd1_get_latest_data(&data)) {
         uint32_t current_time = esp_log_timestamp();
-        uint32_t heart_rate_age = current_time - data.heart_rate_timestamp;
+        uint32_t heart_rate_age = current_time - data.heart_rate_system_timestamp;
         
         if (data.movement_param > self->movement_threshold || 
             heart_rate_age < self->heart_rate_timeout_ms) {
@@ -385,7 +385,7 @@ int my_lidar_flush(my_lidar_handle_t self, uint32_t interval_ms) {
         // 检查是否触发 move_trig 事件
         // 条件：体动参数大于阈值，且数据是1秒内的，且距离上次触发至少1秒
         if (self->move_trig_cb != NULL) {
-            uint32_t movement_age = current_time - data.movement_system_timestamp;
+            uint32_t movement_age = current_time - data.movement_system_timestamp * 1000;
             uint32_t time_since_last_trig = current_time - self->last_move_trig_time;
             
             if (data.movement_param > self->movement_threshold && 

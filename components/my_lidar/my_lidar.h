@@ -206,9 +206,9 @@ typedef struct {
     uint32_t respiratory_timestamp; // 呼吸数据更新时间戳 (s)
     uint8_t heart_rate_value;    // 心率数值 (60-120, 次/分)
     uint32_t heart_rate_timestamp; // 心率数据更新时间戳 (s)
-    uint32_t heart_rate_system_timestamp;   // 心率系统时间戳 (s)
-    uint32_t respiratory_system_timestamp;   // 呼吸系统时间戳 (s)
-    uint32_t movement_system_timestamp;   // 体动系统时间戳 (s)
+    uint32_t heart_rate_system_timestamp;   // 心率系统时间戳 (ms)
+    uint32_t respiratory_system_timestamp;   // 呼吸系统时间戳 (ms)
+    uint32_t movement_system_timestamp;   // 体动系统时间戳 (ms)
 } radar_latest_data_t;
 
 // 句柄声明 struct my_lidar_impl* 是在源文件内部实现，这里隐式声明，避免使用空指针
