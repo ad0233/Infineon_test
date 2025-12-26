@@ -40,35 +40,35 @@ void ui_MianNoPerson_screen_init(void)
     ui_MainHour = lv_label_create(ui_MianNoPerson);
     lv_obj_set_width(ui_MainHour, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_MainHour, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_MainHour, -60);
+    lv_obj_set_x(ui_MainHour, -55);
     lv_obj_set_y(ui_MainHour, 15);
     lv_obj_set_align(ui_MainHour, LV_ALIGN_CENTER);
     lv_label_set_text(ui_MainHour, "06");
     lv_obj_set_style_text_color(ui_MainHour, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_MainHour, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_MainHour, &ui_font_sfprodisplay60, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_MainHour, &ui_font_roboto72, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_MianNoPersonLabel1 = lv_label_create(ui_MianNoPerson);
     lv_obj_set_width(ui_MianNoPersonLabel1, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_MianNoPersonLabel1, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_MianNoPersonLabel1, 0);
-    lv_obj_set_y(ui_MianNoPersonLabel1, 10);
+    lv_obj_set_y(ui_MianNoPersonLabel1, 5);
     lv_obj_set_align(ui_MianNoPersonLabel1, LV_ALIGN_CENTER);
     lv_label_set_text(ui_MianNoPersonLabel1, ":");
     lv_obj_set_style_text_color(ui_MianNoPersonLabel1, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_MianNoPersonLabel1, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_MianNoPersonLabel1, &ui_font_sfprodisplay60, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_MianNoPersonLabel1, &ui_font_sfprodisplay36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_MainMinute = lv_label_create(ui_MianNoPerson);
     lv_obj_set_width(ui_MainMinute, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_MainMinute, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_MainMinute, 60);
+    lv_obj_set_x(ui_MainMinute, 55);
     lv_obj_set_y(ui_MainMinute, 15);
     lv_obj_set_align(ui_MainMinute, LV_ALIGN_CENTER);
     lv_label_set_text(ui_MainMinute, "24");
     lv_obj_set_style_text_color(ui_MainMinute, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_MainMinute, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_MainMinute, &ui_font_sfprodisplay60, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_MainMinute, &ui_font_roboto72, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_MainNightAlarm = lv_label_create(ui_MianNoPerson);
     lv_obj_set_width(ui_MainNightAlarm, LV_SIZE_CONTENT);   /// 1
