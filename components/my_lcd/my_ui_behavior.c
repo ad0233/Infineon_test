@@ -1271,11 +1271,11 @@ void my_ui_sleep_mode_ready(void) {
         lv_obj_set_height(s_night_mode_circle, 300);
         lv_obj_set_align(s_night_mode_circle, LV_ALIGN_CENTER);
         
-        // 设置背景圆圈：完整的360度，白色，细边框（2px）
+        // 设置背景圆圈：完整的360度，浅灰色，细边框（2px）
         lv_arc_set_bg_angles(s_night_mode_circle, 0, 360);
-        lv_obj_set_style_arc_color(s_night_mode_circle, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_arc_width(s_night_mode_circle, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_color(s_night_mode_circle, lv_color_hex(0xDBDBDB), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_opa(s_night_mode_circle, 77, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_width(s_night_mode_circle, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
         
         // 设置背景为透明（镂空效果）
         lv_obj_set_style_bg_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -1344,11 +1344,11 @@ void my_ui_sleep_mode_to_night_mode(void) {
         lv_obj_set_height(s_night_mode_circle, 300);
         lv_obj_set_align(s_night_mode_circle, LV_ALIGN_CENTER);
         
-        // 设置背景圆圈：完整的360度，白色，细边框（2px）
+        // 设置背景圆圈：完整的360度，浅灰色，细边框（2px）
         lv_arc_set_bg_angles(s_night_mode_circle, 0, 360);
-        lv_obj_set_style_arc_color(s_night_mode_circle, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_arc_width(s_night_mode_circle, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_color(s_night_mode_circle, lv_color_hex(0xDBDBDB), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_opa(s_night_mode_circle, 77, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_width(s_night_mode_circle, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
         
         // 设置背景为透明（镂空效果）
         lv_obj_set_style_bg_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -1494,7 +1494,8 @@ static void night_mode_progress_task(void* param) {
                 if (seg->is_low_movement) {
                     lv_obj_set_style_arc_color(arc, lv_color_hex(0xA86F2A), LV_PART_INDICATOR | LV_STATE_DEFAULT);  // 棕色
                 } else {
-                    lv_obj_set_style_arc_color(arc, lv_color_hex(0xFFFFFF), LV_PART_INDICATOR | LV_STATE_DEFAULT);  // 白色
+                    lv_obj_set_style_arc_color(arc, lv_color_hex(0xDBDBDB), LV_PART_INDICATOR | LV_STATE_DEFAULT);  // 浅灰色
+                    lv_obj_set_style_arc_opa(arc, 77, LV_PART_INDICATOR | LV_STATE_DEFAULT);  // 30%透明度
                 }
                 
                 // 隐藏旋钮
