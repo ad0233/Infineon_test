@@ -78,6 +78,7 @@ fonts/ui_font_sfprodisplay14.c
 fonts/ui_font_sfprodisplay18.c
 fonts/ui_font_sfprodisplay20.c
 fonts/ui_font_sfprodisplay24.c
+fonts/ui_font_sfprodisplay32.c
 fonts/ui_font_sfprodisplay36.c
 fonts/ui_font_sfprodisplay45.c
 fonts/ui_font_sfprodisplay60.c

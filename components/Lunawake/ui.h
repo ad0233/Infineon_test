@@ -157,6 +157,7 @@ LV_FONT_DECLARE(ui_font_sfprodisplay14);
 LV_FONT_DECLARE(ui_font_sfprodisplay18);
 LV_FONT_DECLARE(ui_font_sfprodisplay20);
 LV_FONT_DECLARE(ui_font_sfprodisplay24);
+LV_FONT_DECLARE(ui_font_sfprodisplay32);
 LV_FONT_DECLARE(ui_font_sfprodisplay36);
 LV_FONT_DECLARE(ui_font_sfprodisplay45);
 LV_FONT_DECLARE(ui_font_sfprodisplay60);

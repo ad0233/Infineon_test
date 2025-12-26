@@ -47,10 +47,11 @@ void ui_DetectionN1_screen_init(void)
     lv_obj_set_x(ui_DetectionN1Label, 0);
     lv_obj_set_y(ui_DetectionN1Label, 60);
     lv_obj_set_align(ui_DetectionN1Label, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_DetectionN1Label, " Try adjusting the device \n position for best coverage");
+    lv_label_set_text(ui_DetectionN1Label, "Reposition for best \n coverage ");
     lv_obj_set_style_text_color(ui_DetectionN1Label, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_DetectionN1Label, 180, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_DetectionN1Label, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_DetectionN1Label, &ui_font_sfprodisplay18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_align(ui_DetectionN1Label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 }
 

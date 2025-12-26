@@ -35,11 +35,11 @@ void ui_DetectionY_screen_init(void)
     lv_obj_set_x(ui_DetectionYLabel, 0);
     lv_obj_set_y(ui_DetectionYLabel, 60);
     lv_obj_set_align(ui_DetectionYLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_DetectionYLabel, " You are within my \nsensing range");
+    lv_label_set_text(ui_DetectionYLabel, " Got you.");
     lv_obj_set_style_text_color(ui_DetectionYLabel, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_DetectionYLabel, 180, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(ui_DetectionYLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_DetectionYLabel, &ui_font_sfprodisplay18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_DetectionYLabel, &ui_font_sfprodisplay32, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 }
 
