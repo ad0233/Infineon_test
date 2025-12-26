@@ -65,7 +65,7 @@ int my_lcd_init() {
     bsp_lcd_init();
     bsp_lcd_bl_init();
     lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
-    lvgl_cfg.task_affinity = 0;
+    lvgl_cfg.task_affinity = 1;
     lvgl_port_init(&lvgl_cfg);
 
     /* Add LCD screen */
