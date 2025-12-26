@@ -8,6 +8,8 @@
 */
  
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -582,6 +584,18 @@ _exit_open:
 esp_err_t audio_tone_play(const char *uri)
 {
     ESP_RETURN_ON_FALSE(s_audio_player != NULL, ESP_FAIL, TAG, "audio tone not initialized");
+    ESP_RETURN_ON_FALSE(uri != NULL, ESP_ERR_INVALID_ARG, TAG, "uri is NULL");
+    
+    // 检查文件是否存在
+    struct stat file_stat;
+    if (stat(uri, &file_stat) != 0) {
+        ESP_LOGE(TAG, "File not found: %s", uri);
+        return ESP_ERR_NOT_FOUND;
+    }
+    if (!S_ISREG(file_stat.st_mode)) {
+        ESP_LOGE(TAG, "Path is not a regular file: %s", uri);
+        return ESP_ERR_INVALID_ARG;
+    }
     
     // 防止重复调用：如果正在切换，等待一小段时间后重试
     if (s_audio_player->is_switching) {
@@ -590,7 +604,7 @@ esp_err_t audio_tone_play(const char *uri)
         int retry_count = 0;
         const int max_retry = 10;
         while (s_audio_player->is_switching && retry_count < max_retry) {
-            vTaskDelay(pdMS_TO_TICKS(10));
+            vTaskDelay(1);
             retry_count++;
         }
         // 如果还是切换中，强制清除标志（可能是卡住了）
@@ -632,9 +646,6 @@ esp_err_t audio_tone_play(const char *uri)
     // 设置新的URI
     audio_element_set_uri(s_audio_player->fatfs_stream, uri);
     
-    // 等待一下，确保所有操作完成
-    vTaskDelay(pdMS_TO_TICKS(20));
-    
     // 启动新的音频
     esp_err_t ret = audio_pipeline_run(s_audio_player->pipeline);
     if (ret == ESP_OK) {
@@ -645,9 +656,6 @@ esp_err_t audio_tone_play(const char *uri)
         ESP_LOGE(TAG, "Failed to run audio pipeline: %s", esp_err_to_name(ret));
         s_audio_player->player_state = PIPE_STATE_IDLE;
     }
-    
-    // 给系统一点时间处理初始事件
-    vTaskDelay(pdMS_TO_TICKS(10));
     
     // 清除切换标志
     s_audio_player->is_switching = false;
