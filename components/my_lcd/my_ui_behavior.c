@@ -1280,9 +1280,9 @@ void my_ui_sleep_mode_ready(void) {
         // 设置背景为透明（镂空效果）
         lv_obj_set_style_bg_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
         
-        // 初始化指示器：从270度（最上方）开始，宽度2px，初始为0度
+        // 初始化指示器：从270度（最上方）开始，宽度5px，初始为0度
         lv_arc_set_angles(s_night_mode_circle, 270, 270);
-        lv_obj_set_style_arc_width(s_night_mode_circle, 2, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_width(s_night_mode_circle, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
         lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
         
         // 隐藏旋钮
@@ -1353,9 +1353,9 @@ void my_ui_sleep_mode_to_night_mode(void) {
         // 设置背景为透明（镂空效果）
         lv_obj_set_style_bg_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
         
-        // 初始化指示器：从270度（最上方）开始，宽度2px，初始为0度
+        // 初始化指示器：从270度（最上方）开始，宽度5px，初始为0度
         lv_arc_set_angles(s_night_mode_circle, 270, 270);
-        lv_obj_set_style_arc_width(s_night_mode_circle, 2, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+        lv_obj_set_style_arc_width(s_night_mode_circle, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
         lv_obj_set_style_arc_opa(s_night_mode_circle, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT);
         
         // 隐藏旋钮
@@ -1401,8 +1401,8 @@ static void night_mode_progress_task(void* param) {
     
     const uint32_t TOTAL_TIME_MS = 180000;  // 3分钟 = 180秒 = 180000毫秒
     const uint8_t MOVEMENT_THRESHOLD = 30;  // 体动阈值
-    static uint8_t last_movement = 255;  // 记录上一次体动值，用于检测状态变化
-    static bool last_is_low = false;  // 上一次是否为低体动（<30）
+    uint8_t last_movement = 255;  // 记录上一次体动值，用于检测状态变化（改为非静态，每次任务开始时重置）
+    bool last_is_low = false;  // 上一次是否为低体动（<30）（改为非静态，每次任务开始时重置）
     
     while (fsm_main_get_current_state() == F_MAIN_S_NIGHTMODE) {
         // 轮询获取体动数据
@@ -1487,7 +1487,7 @@ static void night_mode_progress_task(void* param) {
                 
                 // 设置指示器角度和颜色
                 lv_arc_set_angles(arc, start_angle, end_angle);
-                lv_obj_set_style_arc_width(arc, 2, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+                lv_obj_set_style_arc_width(arc, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT);
                 lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_DEFAULT);
                 
                 // 根据体动值设置颜色
@@ -1533,10 +1533,19 @@ static void night_mode_progress_task(void* param) {
 
 // 启动夜间模式进度条更新任务
 void my_ui_night_mode_start_progress(void) {
-    // 如果任务已存在，先停止
+    // 如果任务已存在且正在运行，直接返回（任务会自动处理状态重置）
     if (s_night_mode_task_handle != NULL) {
-        vTaskDelete(s_night_mode_task_handle);
-        s_night_mode_task_handle = NULL;
+        TaskHandle_t handle = s_night_mode_task_handle;
+        // 检查任务是否真的在运行
+        eTaskState state = eTaskGetState(handle);
+        if (state != eDeleted && state != eInvalid) {
+            // 任务正在运行，直接返回（因为状态已在 my_ui_sleep_mode_to_night_mode 中重置）
+            ESP_LOGI(TAG, "night_mode_progress_task already running, skip creating new task");
+            return;
+        } else {
+            // 任务已经结束，清除句柄
+            s_night_mode_task_handle = NULL;
+        }
     }
     
     // 创建新任务
