@@ -34,7 +34,7 @@ static board_lcd_pin_t lcd_pins;
 #define EXAMPLE_LCD_H_RES           (360)
 #define EXAMPLE_LCD_V_RES           (360)
 #define EXAMPLE_LCD_BIT_PER_PIXEL   (16)
-#define LCD_BUFFER_SIZE (EXAMPLE_LCD_H_RES * 20)
+#define LCD_BUFFER_SIZE (EXAMPLE_LCD_H_RES * 10)
 
 // 亮度映射表（10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%）
 static const uint16_t bl_map[10] = {

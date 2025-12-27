@@ -1,7 +1,7 @@
 {
   "cmd": "wifi_connect",
   "params": {
-    "ssid": "CNMXGS",
+    "ssid": "aaa",
     "password": "12345678"
   }
 }
