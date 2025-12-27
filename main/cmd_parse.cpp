@@ -56,6 +56,8 @@ static int parse_json_cmd(const char *json_str) {
             ret = cmd_handle_set_binding_jwt(params);
         } else if (cmd == "test_set_time") {
             ret = cmd_handle_test_set_time(params);
+        } else if (cmd == "test_get_music") {
+            ret = cmd_handle_test_get_music(params);
         } else {
             ESP_LOGW(TAG, "Unknown command: %s", cmd.c_str());
             ret = -1;

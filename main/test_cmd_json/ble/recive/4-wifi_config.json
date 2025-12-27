@@ -1,7 +1,7 @@
 {
   "cmd": "wifi_connect",
   "params": {
-    "ssid": "lunawake",
+    "ssid": "CNMXGS",
     "password": "12345678"
   }
 }

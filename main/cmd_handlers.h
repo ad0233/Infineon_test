@@ -71,6 +71,14 @@ int cmd_handle_set_binding_jwt(const nlohmann::json &params);
  */
 int cmd_handle_test_set_time(const nlohmann::json &params);
 
+/**
+ * @brief 处理获取音乐命令
+ * 
+ * @param params JSON params 对象，包含 url
+ * @return int 0成功，-1失败
+ */
+int cmd_handle_test_get_music(const nlohmann::json &params);
+
 #ifdef __cplusplus
 }
 #endif

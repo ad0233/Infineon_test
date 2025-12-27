@@ -58,6 +58,7 @@ enum fsm_clock_need_cfg {
     FM_MEMU_SETTIME,
 };
 uint8_t fm_has_h_fd_state(void); //雷达找人检测
+uint8_t fm_has_movement_state(void); //体动检测（只检测体动，阈值15，无超时）
 uint32_t fsm_main_get_fail_start_time(void); //获取失败开始时间戳
 uint8_t fm_has_w_c_state(void);//wifi检测
 uint8_t fm_has_rtc_state(void); //RTC检测

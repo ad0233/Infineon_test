@@ -67,6 +67,34 @@ uint8_t fm_has_h_fd_state(void) {
 uint32_t fsm_main_get_fail_start_time(void) {
     return s_fail_start_time;
 }
+
+// 体动检测（只检测体动，不检测心率，无超时）
+uint8_t fm_has_movement_state(void) {
+    my_lidar_handle_t lidar_handle = fsm_main_get_lidar_handle();
+    if (lidar_handle == NULL) {
+        ESP_LOGW(TAG, "fm_has_movement_state: lidar_handle is NULL");
+        return FM_H_F_FAI;
+    }
+    
+    // 获取最新的雷达数据
+    radar_latest_data_t data;
+    if (my_lidar_get_latest_data(lidar_handle, &data) != ESP_OK) {
+        ESP_LOGW(TAG, "fm_has_movement_state: failed to get latest data");
+        return FM_H_F_FAI;
+    }
+    
+    // 只检测体动参数，阈值设为15
+    const uint8_t MOVEMENT_THRESHOLD = 15;
+    if (data.movement_param > MOVEMENT_THRESHOLD) {
+        ESP_LOGI(TAG, "fm_has_movement_state: movement detected (value=%d > %d)", 
+                 data.movement_param, MOVEMENT_THRESHOLD);
+        return FM_H_F_SUC;
+    } else {
+        ESP_LOGD(TAG, "fm_has_movement_state: no movement (value=%d <= %d)", 
+                 data.movement_param, MOVEMENT_THRESHOLD);
+        return FM_H_F_FAI;
+    }
+}
 /*------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 //网络
 uint8_t fm_has_w_c_state(void) {

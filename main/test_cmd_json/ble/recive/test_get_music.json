@@ -1,0 +1,7 @@
+{
+    "cmd": "test_get_music",
+    "params": {
+        "url": "https://internal-api-drive-stream.feishu.cn/space/api/box/stream/download/all/H5hRbH4oGoD1CLxIfGQcuPLzn5g/?mount_node_token=FvoHdOJQ9oWUd7xtcyIcaqyhnHb&mount_point=docx_file"
+    }
+}
+

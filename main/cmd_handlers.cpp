@@ -16,12 +16,24 @@
 #include "my_rtc.h"
 #include "my_ui_behavior.h"
 #include "fsm_main.h"
+#include "my_download.h"
+#include <stdio.h>
+#include <string.h>
 
 static const char *TAG = "cmd_handlers";
 
 // 获取无冒号大写 MAC 地址
 static const char *get_mac_no_colon() {
     return my_ble_get_mac(false);
+}
+
+// 下载回调：写入文件
+static void download_chunk_cb(uint8_t *data, int len, void *user_ctx) {
+    FILE *fp = (FILE *)user_ctx;
+    if (fp) {
+        fwrite(data, 1, len, fp);
+        fflush(fp);
+    }
 }
 
 // 处理 WiFi 连接命令
@@ -405,6 +417,142 @@ int cmd_handle_test_set_time(const nlohmann::json &params) {
     ble_send_response(json_str.c_str());
     
     ESP_LOGI(TAG, "Set time completed");
+    return 0;
+}
+
+// 处理获取音乐命令
+int cmd_handle_test_get_music(const nlohmann::json &params) {
+    if (params.is_null() || !params.contains("url") || !params["url"].is_string()) {
+        ESP_LOGE(TAG, "test_get_music: url not found or invalid");
+        return -1;
+    }
+    
+    std::string url = params["url"].get<std::string>();
+    ESP_LOGI(TAG, "Get music from URL: %s", url.c_str());
+    
+    // // 检查 WiFi 连接
+    // my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    // if (!wifi_handle || !my_wifi_is_connected(wifi_handle)) {
+    //     ESP_LOGE(TAG, "WiFi not connected");
+        
+    //     nlohmann::json response = {
+    //         {"type", "test_get_music_result"},
+    //         {"data", {
+    //             {"status", "failed"},
+    //             {"error", "WiFi not connected"}
+    //         }}
+    //     };
+    //     std::string json_str = response.dump();
+    //     ble_send_response(json_str.c_str());
+    //     return -1;
+    // }
+    
+    // 保存文件路径（固定文件名，会覆盖）
+    const char *save_path = "/sdcard/V001-morning.wav";
+    FILE *fp = fopen(save_path, "wb");
+    if (!fp) {
+        ESP_LOGE(TAG, "Failed to open file for writing: %s", save_path);
+        
+        nlohmann::json response = {
+            {"type", "test_get_music_result"},
+            {"data", {
+                {"status", "failed"},
+                {"error", "Failed to open file"}
+            }}
+        };
+        std::string json_str = response.dump();
+        ble_send_response(json_str.c_str());
+        return -1;
+    }
+    
+    // 下载配置
+    my_download_handle_t download_handle = NULL;
+    if (my_download_init(&download_handle) != 0) {
+        ESP_LOGE(TAG, "Failed to init download");
+        fclose(fp);
+        
+        nlohmann::json response = {
+            {"type", "test_get_music_result"},
+            {"data", {
+                {"status", "failed"},
+                {"error", "Failed to init download"}
+            }}
+        };
+        std::string json_str = response.dump();
+        ble_send_response(json_str.c_str());
+        return -1;
+    }
+    
+    my_download_config_t cfg = {
+        .url = url.c_str(),
+        .timeout_ms = 30000,
+        .on_chunk = download_chunk_cb,
+        .on_progress = nullptr,
+        .user_ctx = fp
+    };
+    
+    if (my_download_begin(download_handle, &cfg) != 0) {
+        ESP_LOGE(TAG, "Failed to begin download");
+        fclose(fp);
+        my_download_destroy(download_handle);
+        
+        nlohmann::json response = {
+            {"type", "test_get_music_result"},
+            {"data", {
+                {"status", "failed"},
+                {"error", "Failed to begin download"}
+            }}
+        };
+        std::string json_str = response.dump();
+        ble_send_response(json_str.c_str());
+        return -1;
+    }
+    
+    // 下载数据
+    int ret = 0;
+    while (true) {
+        ret = my_download_flush(download_handle);
+        if (ret < 0) {
+            ESP_LOGE(TAG, "Download error");
+            break;
+        } else if (ret > 0) {
+            ESP_LOGI(TAG, "Download completed");
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    
+    fclose(fp);
+    my_download_destroy(download_handle);
+    
+    if (ret < 0) {
+        ESP_LOGE(TAG, "Download failed");
+        
+        nlohmann::json response = {
+            {"type", "test_get_music_result"},
+            {"data", {
+                {"status", "failed"},
+                {"error", "Download failed"}
+            }}
+        };
+        std::string json_str = response.dump();
+        ble_send_response(json_str.c_str());
+        return -1;
+    }
+    
+    ESP_LOGI(TAG, "Music downloaded successfully to %s", save_path);
+    
+    // 发送成功响应
+    nlohmann::json response = {
+        {"type", "test_get_music_result"},
+        {"data", {
+            {"status", "success"},
+            {"file_path", save_path}
+        }}
+    };
+    std::string json_str = response.dump();
+    ble_send_response(json_str.c_str());
+    
     return 0;
 }
 

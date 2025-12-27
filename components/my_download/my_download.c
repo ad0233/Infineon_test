@@ -23,7 +23,7 @@ static esp_err_t http_event_cb(esp_http_client_event_t *evt)
 
     if (evt->event_id == HTTP_EVENT_ON_HEADER) {
         if (evt->header_key &&
-            strncmp(evt->header_key, "Content-Length", evt->header_key_len) == 0) {
+            strcmp(evt->header_key, "Content-Length") == 0) {
 
             self->total = atoi(evt->header_value);
             ESP_LOGI(TAG, "Total size = %d", self->total);
