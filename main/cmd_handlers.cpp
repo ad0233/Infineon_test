@@ -28,6 +28,7 @@
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_crt_bundle.h"
+#include "audio_processor.h"
 
 static const char *TAG = "cmd_handlers";
 
@@ -591,6 +592,7 @@ int cmd_handle_test_get_music(const nlohmann::json &params) {
                 std::string json_str = response.dump();
                 ble_send_response(json_str.c_str());
             } else {
+                audio_tone_play("/sdcard/V001-morning.wav");
                 nlohmann::json response = {
                     {"type", "test_get_music_result"},
                     {"data", {

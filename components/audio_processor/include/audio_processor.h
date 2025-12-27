@@ -13,6 +13,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include "audio_pipeline.h"
+#include "audio_recorder.h"
 
 #ifdef __cplusplus
 extern "C" {
