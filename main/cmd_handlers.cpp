@@ -490,138 +490,135 @@ int cmd_handle_test_get_music(const nlohmann::json &params) {
     std::string url = params["url"].get<std::string>();
     ESP_LOGI(TAG, "Get music from URL: %s", url.c_str());
     
-    // // 检查 WiFi 连接
-    // my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
-    // if (!wifi_handle || !my_wifi_is_connected(wifi_handle)) {
-    //     ESP_LOGE(TAG, "WiFi not connected");
+    // 检查 WiFi 连接
+    my_wifi_handle_t wifi_handle = fsm_main_get_wifi_handle();
+    if (!wifi_handle || !my_wifi_is_connected(wifi_handle)) {
+        ESP_LOGE(TAG, "WiFi not connected");
         
-    //     nlohmann::json response = {
-    //         {"type", "test_get_music_result"},
-    //         {"data", {
-    //             {"status", "failed"},
-    //             {"error", "WiFi not connected"}
-    //         }}
-    //     };
-    //     std::string json_str = response.dump();
-    //     ble_send_response(json_str.c_str());
-    //     return -1;
-    // }
-    static char *url_buf = NULL;
-    if(!url_buf) {
-        url_buf = (char *)heap_caps_malloc(256, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        if (!url_buf) {
-            ESP_LOGE(TAG, "Failed to allocate URL buffer");
-            return -1;
-        }
+        nlohmann::json response = {
+            {"type", "test_get_music_result"},
+            {"data", {
+                {"status", "failed"},
+                {"error", "WiFi not connected"}
+            }}
+        };
+        std::string json_str = response.dump();
+        ble_send_response(json_str.c_str());
+        return -1;
+    } else if(fsm_main_get_current_state() != F_MAIN_S_GoodMorning_DEMO) {
+        nlohmann::json response = {
+            {"type", "test_get_music_result"},
+            {"data", {
+                {"status", "failed"},
+                {"error", "Not in GoodMorning_DEMO state"}
+            }}
+        };
+        std::string json_str = response.dump();
+        ble_send_response(json_str.c_str());
+        return -1;
     }
-    strncpy(url_buf, url.c_str(), 255);
-    url_buf[255] = '\0';
     
-    xTaskCreate([](void *arg){
-        char *url = (char *)arg;
-        const char *save_path = "/sdcard/V001-morning.wav.tmp";
-        
-        // 创建下载上下文
-        struct download_ctx ctx;
-        memset(&ctx, 0, sizeof(ctx));
-        ctx.save_path = save_path;
-        ctx.success = false;
-        ctx.error = false;
-        ctx.total_written = 0;
-        ctx.last_log_size = 0;
-        
-        // 打开文件
-        ctx.fp = fopen(save_path, "wb");
-        if (!ctx.fp) {
-            ESP_LOGE(TAG, "Failed to open file for writing: %s", save_path);
+    const char *save_path = "/sdcard/V001-morning.wav.tmp";
+    
+    // 创建下载上下文
+    struct download_ctx ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.save_path = save_path;
+    ctx.success = false;
+    ctx.error = false;
+    ctx.total_written = 0;
+    ctx.last_log_size = 0;
+    
+    // 打开文件
+    ctx.fp = fopen(save_path, "wb");
+    if (!ctx.fp) {
+        ESP_LOGE(TAG, "Failed to open file for writing: %s", save_path);
+        nlohmann::json response = {
+            {"type", "test_get_music_result"},
+            {"data", {
+                {"status", "failed"},
+                {"error", "Failed to open file"}
+            }}
+        };
+        std::string json_str = response.dump();
+        ble_send_response(json_str.c_str());
+        return 0;
+    }
+    
+    // 配置 HTTP 客户端（同步模式，已在独立任务中运行）
+    esp_http_client_config_t config;
+    memset(&config, 0, sizeof(esp_http_client_config_t));
+    config.url = url.c_str();
+    config.timeout_ms = 30 * 1000;
+    config.event_handler = http_event_handler;
+    config.user_data = &ctx;
+    config.crt_bundle_attach = esp_crt_bundle_attach;
+    config.keep_alive_enable = true;
+    config.buffer_size = 100 * 1024;
+    void print_mem_info(void);
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (!client) {
+        ESP_LOGE(TAG, "Failed to init HTTP client");
+        fclose(ctx.fp);
+        return 0;
+    }
+    print_mem_info();
+    // 使用 perform 执行请求（同步模式，通过事件处理器接收数据）
+    esp_err_t err = esp_http_client_perform(client);
+    print_mem_info();
+    
+    // 确保文件已关闭（最后刷新一次）
+    if (ctx.fp) {
+        fflush(ctx.fp);
+        fclose(ctx.fp);
+        ctx.fp = NULL;
+        ESP_LOGI(TAG, "Total downloaded: %d KB", ctx.total_written / 1024);
+    }
+    
+    // 处理结果
+    if (err == ESP_OK && ctx.success) {
+        // 传输成功，重命名文件
+        ESP_LOGI(TAG, "Rename file: %s to %s", save_path, "/sdcard/V001-morning.wav");
+        if(rename_with_overwrite(save_path, "/sdcard/V001-morning.wav") == false) {
+            ESP_LOGE(TAG, "Failed to rename file: %s", save_path);
             nlohmann::json response = {
                 {"type", "test_get_music_result"},
                 {"data", {
                     {"status", "failed"},
-                    {"error", "Failed to open file"}
+                    {"error", "Failed to rename file"}
                 }}
             };
             std::string json_str = response.dump();
             ble_send_response(json_str.c_str());
-            vTaskDelete(NULL);
-        }
-        
-        // 配置 HTTP 客户端（同步模式，已在独立任务中运行）
-        esp_http_client_config_t config;
-        memset(&config, 0, sizeof(esp_http_client_config_t));
-        config.url = url;
-        config.timeout_ms = 30 * 1000;
-        config.event_handler = http_event_handler;
-        config.user_data = &ctx;
-        config.crt_bundle_attach = esp_crt_bundle_attach;
-        config.keep_alive_enable = true;
-        config.buffer_size = 100 * 1024;
-        void print_mem_info(void);
-        esp_http_client_handle_t client = esp_http_client_init(&config);
-        if (!client) {
-            ESP_LOGE(TAG, "Failed to init HTTP client");
-            fclose(ctx.fp);
-            vTaskDelete(NULL);
-        }
-        print_mem_info();
-        // 使用 perform 执行请求（同步模式，通过事件处理器接收数据）
-        esp_err_t err = esp_http_client_perform(client);
-        print_mem_info();
-        
-        // 确保文件已关闭（最后刷新一次）
-        if (ctx.fp) {
-            fflush(ctx.fp);
-            fclose(ctx.fp);
-            ctx.fp = NULL;
-            ESP_LOGI(TAG, "Total downloaded: %d KB", ctx.total_written / 1024);
-        }
-        
-        // 处理结果
-        if (err == ESP_OK && ctx.success) {
-            // 传输成功，重命名文件
-            ESP_LOGI(TAG, "Rename file: %s to %s", save_path, "/sdcard/V001-morning.wav");
-            if(rename_with_overwrite(save_path, "/sdcard/V001-morning.wav") == false) {
-                ESP_LOGE(TAG, "Failed to rename file: %s", save_path);
-                nlohmann::json response = {
-                    {"type", "test_get_music_result"},
-                    {"data", {
-                        {"status", "failed"},
-                        {"error", "Failed to rename file"}
-                    }}
-                };
-                std::string json_str = response.dump();
-                ble_send_response(json_str.c_str());
-            } else {
-                audio_tone_play("/sdcard/V001-morning.wav");
-                nlohmann::json response = {
-                    {"type", "test_get_music_result"},
-                    {"data", {
-                        {"status", "success"},
-                        {"file_path", "/sdcard/V001-morning.wav"}
-                    }}
-                };
-                std::string json_str = response.dump();
-                ble_send_response(json_str.c_str());
-            }
         } else {
-            // 传输失败
-            ESP_LOGE(TAG, "HTTP client perform failed: %s", esp_err_to_name(err));
+            audio_tone_play("/sdcard/V001-morning.wav");
             nlohmann::json response = {
                 {"type", "test_get_music_result"},
                 {"data", {
-                    {"status", "failed"},
-                    {"error", ctx.error ? ctx.error_msg : esp_err_to_name(err)}
+                    {"status", "success"},
+                    {"file_path", "/sdcard/V001-morning.wav"}
                 }}
             };
             std::string json_str = response.dump();
             ble_send_response(json_str.c_str());
         }
-        
-        esp_http_client_close(client);
-        esp_http_client_cleanup(client);
-        vTaskDelete(NULL);
-    }, "test_get_music", 1024 * 4, url_buf, 5, NULL);
+    } else {
+        // 传输失败
+        ESP_LOGE(TAG, "HTTP client perform failed: %s", esp_err_to_name(err));
+        nlohmann::json response = {
+            {"type", "test_get_music_result"},
+            {"data", {
+                {"status", "failed"},
+                {"error", ctx.error ? ctx.error_msg : esp_err_to_name(err)}
+            }}
+        };
+        std::string json_str = response.dump();
+        ble_send_response(json_str.c_str());
+    }
     
+    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
+
     return 0;
 }
 

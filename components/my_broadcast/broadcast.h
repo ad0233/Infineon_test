@@ -51,3 +51,9 @@ void initMorningAnimationLyrics(const std::string& filePath);
  */
 void updateMorningAnimationLyrics(int currentMS);
 
+/**
+ * @brief 刷新早安动画的歌词
+ * 
+ * @param interval_ms 刷新间隔 (ms)
+ */
+int MorningAnimationLyricsFlush(uint32_t interval_ms);

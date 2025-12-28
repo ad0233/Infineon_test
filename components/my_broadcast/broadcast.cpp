@@ -2,7 +2,11 @@
 #include <cstdio>
 #include <cstring>
 #include "esp_log.h"
+#include "esp_log_timestamp.h"
 #include "ui.h"
+#include "fsm_main.h"
+#include "audio_processor.h"
+#include "esp_lvgl_port.h"
 
 static const char *TAG = "LRC";
 
@@ -163,4 +167,22 @@ void updateMorningAnimationLyrics(int currentMS) {
 
         s_lrc_mgr.current_index = index;
     }
+}
+
+int MorningAnimationLyricsFlush(uint32_t interval_ms) {
+    static uint32_t last_time = 0;
+    if(last_time + interval_ms > esp_log_timestamp()) {
+        return 0;
+    }
+    last_time = esp_log_timestamp();
+    if (fsm_main_get_current_state() == F_MAIN_S_GoodMorning_DEMO) {
+        uint32_t played_ms = 0;
+        // 获取硬件层真实的音频播放进度
+        if (player_pipeline_get_progress(&played_ms) == ESP_OK) {
+            lvgl_port_lock(0);
+            updateMorningAnimationLyrics((int)played_ms);
+            lvgl_port_unlock();
+        }
+    }
+    return 0;
 }

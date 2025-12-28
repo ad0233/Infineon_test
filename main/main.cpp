@@ -239,6 +239,10 @@ extern "C" void app_main()
     }, nullptr);
     my_h264_set_fps(15);
 
+    lvgl_port_lock(0);
+    initMorningAnimationLyrics("/sdcard/V001-morning_Voice.lrc");
+    lvgl_port_unlock();
+
     print_mem_info();
 
     // 初始化RTC
@@ -631,6 +635,8 @@ void encoder_test(void *arg)
             
             last_wifi_flush = current_tick;
         }
+
+        MorningAnimationLyricsFlush(100);
 
         // 定时检查闹钟（每30s检查一次，内部有分钟变化检测）
         if ((current_tick - last_alarm_check_flush) >= alarm_check_interval) {

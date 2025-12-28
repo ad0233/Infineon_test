@@ -1082,28 +1082,6 @@ void fsm_main_in_night_mode(void *arg, uint8_t last_state, uint8_t next_state) {
     my_ui_night_mode_start_progress();
 }
 
-/**
- * @brief 歌词实时刷新任务 (高频 10ms 轮询)
- */
-static void lyric_update_task(void* param) {
-    uint8_t target_state = (uint8_t)(uintptr_t)param;
-    ESP_LOGI(TAG, "lyric_update_task started (10ms mode)");
-    
-    while (fsm_main_get_current_state() == target_state) {
-        uint32_t played_ms = 0;
-        // 获取硬件层真实的音频播放进度
-        if (player_pipeline_get_progress(&played_ms) == ESP_OK) {
-            lvgl_port_lock(0);
-            updateMorningAnimationLyrics((int)played_ms);
-            lvgl_port_unlock();
-        }
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
-    
-    ESP_LOGI(TAG, "lyric_update_task finished");
-    vTaskDelete(NULL);
-}
-
 void fsm_main_in_MorningAnimation(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "Entering MorningAnimation...");
     
@@ -1114,15 +1092,10 @@ void fsm_main_in_MorningAnimation(void *arg, uint8_t last_state, uint8_t next_st
     
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_MorningAnimation);
-    // 确保使用正确的文件名：/sdcard/V001-morning_Voice.lrc
-    initMorningAnimationLyrics("/sdcard/V001-morning_Voice.lrc");
     lvgl_port_unlock();
     
     // 播放音频
     audio_tone_play("/sdcard/V001-morning.wav");
-    
-    // 创建歌词更新任务
-    xTaskCreate(lyric_update_task, "lyric_update", 4096, (void*)(uintptr_t)next_state, 5, NULL);
 }
 
 void fsm_main_in_OTA(void *arg, uint8_t last_state, uint8_t next_state) {
