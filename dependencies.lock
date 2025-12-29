@@ -5,24 +5,78 @@ dependencies:
       path: /home/cnmxgs/boya/BY001-ESP32/dependencies/espressif__cmake_utilities
       type: local
     version: 0.5.3
+  espressif/eppp_link:
+    component_hash: 9472e6825f4bb71eca2b39cf1bc92659c1ac60bfd7416560ad033a7dd8641b17
+    dependencies:
+    - name: espressif/esp_serial_slave_link
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^1.1.0
+    - name: idf
+      require: private
+      version: '>=5.2'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.1.4
   espressif/esp-dsp:
     dependencies: []
     source:
       path: /home/cnmxgs/boya/BY001-ESP32/dependencies/espressif__esp-dsp
       type: local
     version: 1.6.0
+  espressif/esp_hosted:
+    component_hash: ec3737beb3bb6a2772e1a33a0cec7dfba372794942e2ba0f5f589e1644ed65ec
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.3'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 2.8.3
   espressif/esp_secure_cert_mgr:
     dependencies: []
     source:
       path: /home/cnmxgs/boya/BY001-ESP32/dependencies/espressif__esp_secure_cert_mgr
       type: local
     version: 2.6.1
+  espressif/esp_serial_slave_link:
+    component_hash: ac1776806de0a6e371c84e87898bb983e19ce62aa7f1e2e5c4a3b0234a575d2c
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.1.2
   espressif/esp_websocket_client:
     dependencies: []
     source:
       path: /home/cnmxgs/boya/BY001-ESP32/dependencies/espressif__esp_websocket_client
       type: local
     version: 1.5.0
+  espressif/esp_wifi_remote:
+    component_hash: 655ca258940f71c102e035af65181f24f4bd989e0b60c8e96a1c70513b81fb25
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.3'
+    - name: espressif/esp_hosted
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: target in [esp32h2, esp32p4]
+      version: '>=0.0.6'
+    - name: espressif/wifi_remote_over_eppp
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=0.1'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.2.2
   espressif/jsmn:
     dependencies: []
     source:
@@ -35,6 +89,20 @@ dependencies:
       path: /home/cnmxgs/boya/BY001-ESP32/dependencies/espressif__nghttp
       type: local
     version: 1.65.0
+  espressif/wifi_remote_over_eppp:
+    component_hash: e1b4c485ed5afe36615b9b555dfdcbe4be33898dc3732b5bedf235bba45bd286
+    dependencies:
+    - name: espressif/eppp_link
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=0.1'
+    - name: idf
+      require: private
+      version: '>=5.3'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 0.3.0
   espressif/zlib:
     dependencies: []
     source:
@@ -54,13 +122,15 @@ dependencies:
 direct_dependencies:
 - espressif/cmake_utilities
 - espressif/esp-dsp
+- espressif/esp_hosted
 - espressif/esp_secure_cert_mgr
 - espressif/esp_websocket_client
+- espressif/esp_wifi_remote
 - espressif/jsmn
 - espressif/nghttp
 - espressif/zlib
 - idf
 - lvgl/lvgl
-manifest_hash: 195ab4ef78e24ba890e8a17a1d59c7ef0de3558a9f31ad0cf9fb7b3ea9d6fc94
-target: esp32s3
+manifest_hash: 64c438956d80458dcf95cd28c355e00fa5bcf757db0cfa0e201bd513120f1023
+target: esp32p4
 version: 2.0.0

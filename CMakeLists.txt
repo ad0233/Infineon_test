@@ -13,4 +13,7 @@ set(EXTRA_COMPONENT_DIRS
 )
 
 project(Lunawake)
+
+# Disable stringop-overflow warning for all components
+idf_build_set_property(COMPILE_OPTIONS "-Wno-error=stringop-overflow;-Wno-stringop-overflow" APPEND)
  

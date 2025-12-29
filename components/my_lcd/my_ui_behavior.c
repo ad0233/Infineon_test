@@ -1209,7 +1209,7 @@ void my_ui_light_prev(void) {
 static lv_obj_t *s_night_mode_circle = NULL;  // 背景圆圈（白色边框）
 static TaskHandle_t s_night_mode_task_handle = NULL;
 static uint32_t s_night_mode_start_time = 0;  // 夜间模式开始时间（毫秒）
-static bool s_night_mode_movement_valid = false;  // 体动数据是否有效
+__attribute__((unused)) static bool s_night_mode_movement_valid = false;  // 体动数据是否有效
 
 // 时间段结构：记录体动值变化的时间点
 typedef struct {

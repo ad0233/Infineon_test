@@ -33,12 +33,12 @@
 #define SDCARD_INTR_GPIO            GPIO_NUM_NC
 #define SDCARD_PWR_CTRL             GPIO_NUM_NC
 // MKDV4GCL-ABB SD卡引脚定义
-#define ESP_SD_PIN_CLK              GPIO_NUM_20 // CLK
-#define ESP_SD_PIN_CMD              GPIO_NUM_21 // CMD
-#define ESP_SD_PIN_D0               GPIO_NUM_19 // DATA0
-#define ESP_SD_PIN_D1               GPIO_NUM_17 // DATA1
-#define ESP_SD_PIN_D2               GPIO_NUM_16 // DATA2
-#define ESP_SD_PIN_D3               GPIO_NUM_18 // DATA3
+#define ESP_SD_PIN_CLK              GPIO_NUM_10 // CLK
+#define ESP_SD_PIN_CMD              GPIO_NUM_8 // CMD
+#define ESP_SD_PIN_D0               GPIO_NUM_11 // DATA0
+#define ESP_SD_PIN_D1               GPIO_NUM_13 // DATA1
+#define ESP_SD_PIN_D2               GPIO_NUM_12 // DATA2
+#define ESP_SD_PIN_D3               GPIO_NUM_9 // DATA3
 #define ESP_SD_PIN_D4               GPIO_NUM_NC
 #define ESP_SD_PIN_D5               GPIO_NUM_NC
 #define ESP_SD_PIN_D6               GPIO_NUM_NC
@@ -58,34 +58,34 @@
  * @brief LCD Function Definition
  */
 #define FUNC_LCD_EN                (1)
-#define LCD_BL_PWM                 GPIO_NUM_3
-#define LCD_RESET                  -1
+#define LCD_BL_PWM                 GPIO_NUM_49
+#define LCD_RESET                  GPIO_NUM_41
 #define LCD_CS                     GPIO_NUM_39
-#define LCD_SCK                    GPIO_NUM_8
-#define LCD_DA0                     GPIO_NUM_6
-#define LCD_DA1                     GPIO_NUM_2
-#define LCD_DA2                     GPIO_NUM_4
-#define LCD_DA3                     GPIO_NUM_7
+#define LCD_SCK                    GPIO_NUM_40
+#define LCD_DA0                     GPIO_NUM_42
+#define LCD_DA1                     GPIO_NUM_43
+#define LCD_DA2                     GPIO_NUM_44
+#define LCD_DA3                     GPIO_NUM_45
 
 /**
  * @brief Encoder Function Definition
  */
 #define FUNC_ENCODER_EN            (1)
-#define ENCODER_PIN_A               GPIO_NUM_14
-#define ENCODER_PIN_B               GPIO_NUM_1
-#define ENCODER_PIN_BTN             GPIO_NUM_38
+#define ENCODER_PIN_A               GPIO_NUM_47
+#define ENCODER_PIN_B               GPIO_NUM_48
+#define ENCODER_PIN_BTN             GPIO_NUM_20
 
 /**
  * @brief BS814 Button Chip Function Definition
  */
 #define FUNC_BS814_EN               (1)
-#define BS814_CLK_PIN               GPIO_NUM_5
-#define BS814_DATA_PIN              GPIO_NUM_38
+#define BS814_CLK_PIN               GPIO_NUM_21
+#define BS814_DATA_PIN              GPIO_NUM_20
 
 /**
  * @brief PCF8574RGTR I2C IO Expander Function Definition
  */
-#define FUNC_PCF8574_EN             (1)
+#define FUNC_PCF8574_EN             (0)
 #define PCF8574_I2C_ADDR            (0x20)  /* I2C address (A0=A1=A2=0) */
 #define PCF8574_P1_LCD_RESET        (1)     /* P1 pin controls LCD_RESET */
 

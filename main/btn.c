@@ -10,7 +10,9 @@
 static board_bs814_pin_t bs814_pins;
 
 // ---- 兼容新旧 IDF 的 delay 头文件 ----
-#if __has_include("esp_rom/esp_rom_sys.h")
+#if __has_include("esp_rom_sys.h")
+    #include "esp_rom_sys.h"
+#elif __has_include("esp_rom/esp_rom_sys.h")
     #include "esp_rom/esp_rom_sys.h"
 #elif __has_include("esp32s3/rom/ets_sys.h")
     #include "esp32s3/rom/ets_sys.h"

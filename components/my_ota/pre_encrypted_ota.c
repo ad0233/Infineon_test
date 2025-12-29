@@ -40,7 +40,7 @@ static int s_ota_total_size = 0;
 extern const char rsa_private_pem_start[] asm("_binary_rsa_priv_key_pem_start");
 extern const char rsa_private_pem_end[]   asm("_binary_rsa_priv_key_pem_end");
 
-static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
+__attribute__((unused)) static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
 {
     if (new_app_info == NULL) {
         return ESP_ERR_INVALID_ARG;

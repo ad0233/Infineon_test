@@ -3,5 +3,6 @@ sdkconfig.old
 .vscode/
 .DS_Store
 .cache/
+managed_components/
 tools/__pycache__/
 dependencies.lock
