@@ -932,6 +932,7 @@ void fsm_main_in_offline(void *arg, uint8_t last_state, uint8_t next_state) {
 
 void fsm_main_in_memu(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "in menu...");
+    audio_tone_stop();
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_Memu);
     lvgl_port_unlock();
@@ -1052,6 +1053,7 @@ void fsm_main_in_GoodMorning_demo(void *arg, uint8_t last_state, uint8_t next_st
 }
 void fsm_main_in_reminder_tomorrow(void *arg, uint8_t last_state, uint8_t next_state) {
     ESP_LOGI(TAG, "inreminder_tomorrow mode...");
+    audio_tone_stop();
     lvgl_port_lock(0);
     lv_disp_load_scr(ui_ReminderTomorrow);
     lvgl_port_unlock();

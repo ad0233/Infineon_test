@@ -220,8 +220,8 @@ static struct StateTable fsm_user_table[] = {
     {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_RadarInfo                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
     {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_REMINDER                  , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
     {nullptr             ,0                     ,F_MAIN_E_ALARM_MORNING      , F_MAIN_S_SLEEPMODE                 , F_MAIN_S_GoodMorning_DEMO    ,0  ,false    ,fsm_main_in_MorningAnimation},
-
-    {nullptr             ,0                     ,F_MAIN_E_WAV_PLAY_FINISHED  , F_MAIN_S_GoodMorning_DEMO          , F_MAIN_S_CLOCK               ,0  ,false    ,fsm_main_to_clock},             // 播放完毕回主页面
+    //本意是闹钟结束回到主页面，
+    // {nullptr             ,0                     ,F_MAIN_E_WAV_PLAY_FINISHED  , F_MAIN_S_GoodMorning_DEMO          , F_MAIN_S_CLOCK               ,0  ,false    ,fsm_main_to_clock},             // 播放完毕回主页面
 
     // 睡眠时间跳转
     // {nullptr             ,0                     ,F_MAIN_E_ALARM_SLEEP        , F_MAIN_S_CLOCK                     , F_MAIN_S_SLEEPMODE           ,0  ,false    ,fsm_main_in_sleep_mode},
