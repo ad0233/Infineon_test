@@ -26,7 +26,6 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "esp_bt.h"
 
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
@@ -34,6 +33,9 @@
 #include "esp_bt_main.h"
 #include "esp_bt_device.h"
 #include "esp_gatt_common_api.h"
+
+#include "esp_hosted.h"
+#include "esp_hosted_bluedroid.h"
 
 #include "sdkconfig.h"
 
@@ -602,20 +604,31 @@ void my_ble_init(const char *device_name)
         #endif
     }
 
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+    // 连接 ESP32-C6 从机
+    esp_hosted_connect_to_slave();
 
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    ret = esp_bt_controller_init(&bt_cfg);
-    if (ret) {
-        ESP_LOGE(GATTS_TAG, "%s initialize controller failed: %s", __func__, esp_err_to_name(ret));
+    // 初始化蓝牙控制器（通过从机）
+    if (ESP_OK != esp_hosted_bt_controller_init()) {
+        ESP_LOGE(GATTS_TAG, "failed to init bt controller");
         return;
     }
 
-    ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
-    if (ret) {
-        ESP_LOGE(GATTS_TAG, "%s enable controller failed: %s", __func__, esp_err_to_name(ret));
+    // 使能蓝牙控制器
+    if (ESP_OK != esp_hosted_bt_controller_enable()) {
+        ESP_LOGE(GATTS_TAG, "failed to enable bt controller");
         return;
     }
+
+    // 打开 HCI 驱动
+    hosted_hci_bluedroid_open();
+
+    // 注册 HCI 驱动操作
+    esp_bluedroid_hci_driver_operations_t operations = {
+        .send = hosted_hci_bluedroid_send,
+        .check_send_available = hosted_hci_bluedroid_check_send_available,
+        .register_host_callback = hosted_hci_bluedroid_register_host_callback,
+    };
+    esp_bluedroid_attach_hci_driver(&operations);
 
     ret = esp_bluedroid_init();
     if (ret) {
