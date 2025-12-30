@@ -50,6 +50,10 @@
 #define PROCESSING_TASK_STACK_SIZE          (configMINIMAL_STACK_SIZE * 4)
 #define PROCESSING_TASK_PRIORITY            (configMAX_PRIORITIES - 2)
 
+/* Debug options */
+#define ENABLE_DATA_LOG                     1  // Set to 1 to enable data logging
+#define DATA_LOG_INTERVAL_MS                1000  // Log interval in milliseconds
+
 #define CLI_TASK_NAME                       "cli_task"
 #define CLI_TASK_STACK_SIZE                 (configMINIMAL_STACK_SIZE * 10)
 #define CLI_TASK_PRIORITY                   (tskIDLE_PRIORITY)
@@ -144,6 +148,7 @@ static void radar_task(void *pvParameters)
 
     if (init_sensor() != 0)
     {
+        ESP_LOGE(__func__, "Sensor initialization failed. Check hardware connections and chip ID.");
         ESP_ERROR_CHECK(ESP_FAIL);
     }
 
@@ -177,12 +182,34 @@ static void radar_task(void *pvParameters)
                                            bgt60_buffer,
                                            NUM_SAMPLES_PER_FRAME) == XENSIV_BGT60TRXX_STATUS_OK)
         {
+#if ENABLE_DATA_LOG
+            static uint32_t frame_count = 0;
+            static uint32_t last_log_time = 0;
+            uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+            
+            frame_count++;
+            if (current_time - last_log_time >= DATA_LOG_INTERVAL_MS) {
+                // Calculate statistics
+                uint16_t min_val = 0xFFFF, max_val = 0;
+                uint32_t sum = 0;
+                for (int i = 0; i < NUM_SAMPLES_PER_FRAME; i++) {
+                    if (bgt60_buffer[i] < min_val) min_val = bgt60_buffer[i];
+                    if (bgt60_buffer[i] > max_val) max_val = bgt60_buffer[i];
+                    sum += bgt60_buffer[i];
+                }
+                uint16_t avg_val = sum / NUM_SAMPLES_PER_FRAME;
+                
+                ESP_LOGI("radar_task", "Frame #%" PRIu32 ": min=%u, max=%u, avg=%u, samples=%d", 
+                         frame_count, min_val, max_val, avg_val, NUM_SAMPLES_PER_FRAME);
+                last_log_time = current_time;
+            }
+#endif
             /* Tell processing task to take over */
             xTaskNotifyGive(processing_task_handler);
         }
         else
         {
-            printf("Error receiving fifo data\n");
+            ESP_LOGE("radar_task", "Error receiving fifo data");
         }
     }
 }
@@ -281,8 +308,85 @@ static void processing_task(void *pvParameters)
         dsps_mulc_f32(avg_chirp, avg_chirp, NUM_SAMPLES_PER_CHIRP, 1.0f / (float32_t) NUM_CHIRPS_PER_FRAME,
                         1, 1);
 
+#if ENABLE_DATA_LOG
+        static uint32_t process_count = 0;
+        static uint32_t last_process_log_time = 0;
+        uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+        
+        process_count++;
+        if (current_time - last_process_log_time >= DATA_LOG_INTERVAL_MS) {
+            // Log avg_chirp statistics
+            float32_t chirp_min = avg_chirp[0], chirp_max = avg_chirp[0], chirp_sum = 0.0f;
+            for (int i = 0; i < NUM_SAMPLES_PER_CHIRP; i++) {
+                if (avg_chirp[i] < chirp_min) chirp_min = avg_chirp[i];
+                if (avg_chirp[i] > chirp_max) chirp_max = avg_chirp[i];
+                chirp_sum += avg_chirp[i];
+            }
+            float32_t chirp_avg = chirp_sum / NUM_SAMPLES_PER_CHIRP;
+            ESP_LOGI("processing_task", "Frame #%" PRIu32 ": avg_chirp min=%.4f, max=%.4f, avg=%.4f, samples=%d", 
+                     process_count, chirp_min, chirp_max, chirp_avg, NUM_SAMPLES_PER_CHIRP);
+            
+            // Calculate distance information (simplified)
+            // Range resolution = c / (2 * bandwidth)
+            // Each bin represents a distance increment
+            float32_t bandwidth = 460E6;  // 460 MHz from config
+            float32_t c = 299792458.0f;   // Speed of light
+            float32_t range_resolution = c / (2.0f * bandwidth);  // ~0.326 meters per bin
+            int32_t max_idx = 0;
+            float32_t max_val = chirp_max;
+            for (int i = 0; i < NUM_SAMPLES_PER_CHIRP; i++) {
+                if (avg_chirp[i] > max_val) {
+                    max_val = avg_chirp[i];
+                    max_idx = i;
+                }
+            }
+            float32_t estimated_distance = max_idx * range_resolution;
+            ESP_LOGI("processing_task", "  -> Max at bin %d, estimated distance: %.2f m (%.1f cm)", 
+                     max_idx, estimated_distance, estimated_distance * 100.0f);
+            
+            last_process_log_time = current_time;
+        }
+#endif
+
         xensiv_radar_presence_process_frame(handle, avg_chirp, xTaskGetTickCount() * portTICK_PERIOD_MS);
 #else
+#if ENABLE_DATA_LOG
+        static uint32_t process_count = 0;
+        static uint32_t last_process_log_time = 0;
+        uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+        
+        process_count++;
+        if (current_time - last_process_log_time >= DATA_LOG_INTERVAL_MS) {
+            // Log frame statistics
+            float32_t frame_min = frame[0], frame_max = frame[0], frame_sum = 0.0f;
+            for (int i = 0; i < NUM_SAMPLES_PER_FRAME; i++) {
+                if (frame[i] < frame_min) frame_min = frame[i];
+                if (frame[i] > frame_max) frame_max = frame[i];
+                frame_sum += frame[i];
+            }
+            float32_t frame_avg = frame_sum / NUM_SAMPLES_PER_FRAME;
+            ESP_LOGI("processing_task", "Frame #%" PRIu32 ": min=%.4f, max=%.4f, avg=%.4f, samples=%d", 
+                     process_count, frame_min, frame_max, frame_avg, NUM_SAMPLES_PER_FRAME);
+            
+            // Calculate distance information
+            float32_t bandwidth = 460E6;
+            float32_t c = 299792458.0f;
+            float32_t range_resolution = c / (2.0f * bandwidth);
+            int32_t max_idx = 0;
+            float32_t max_val = frame_max;
+            for (int i = 0; i < NUM_SAMPLES_PER_FRAME; i++) {
+                if (frame[i] > max_val) {
+                    max_val = frame[i];
+                    max_idx = i;
+                }
+            }
+            float32_t estimated_distance = (max_idx / 2) * range_resolution;  // FFT reduces to half
+            ESP_LOGI("processing_task", "  -> Max at bin %d, estimated distance: %.2f m", 
+                     max_idx, estimated_distance);
+            
+            last_process_log_time = current_time;
+        }
+#endif
         xensiv_radar_presence_process_frame(handle, frame, xTaskGetTickCount() * portTICK_PERIOD_MS);
 #endif        
     }
