@@ -1,0 +1,6 @@
+# Todo: IDF version testing, working on v5.0.1
+dependencies:
+  idf: '>=?'
+description: XENSIV™ BGT60TRxx radar sensor driver
+url: '???'
+version: 1.1.0+esp32-1

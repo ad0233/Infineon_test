@@ -1,0 +1,10 @@
+idf_component_register(
+    SRCS
+        "my_lidar_inf.c"
+        "cli_task.c"
+        "FreeRTOS_CLI.c"
+    INCLUDE_DIRS
+        .
+    REQUIRES
+        main
+)

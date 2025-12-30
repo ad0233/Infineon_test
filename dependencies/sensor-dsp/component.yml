@@ -1,0 +1,5 @@
+dependencies:
+  idf: '>=5.0'
+description: Sensor-DSP library
+url: '???'
+version: 1.0.0+esp32-1
