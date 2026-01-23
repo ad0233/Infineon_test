@@ -15,44 +15,44 @@
 
 #if defined(XENSIV_BGT60TRXX_CONF_IMPL)
 const uint32_t register_list[] = { 
-    0x001e8270UL,  // MAIN 0x0000
-    0x020a0210UL,  // ADC0 0x0001
-    0x04e967fdUL,  // PACR1 0x0004
-    0x060805b4UL,  // PACR2 0x0005
-    0x081027ffUL,  // SFCTL 0x0006
-    0x0a010d00UL,  // SADC_CTRL 0x0007
-    0x0c000000UL,  // CSP_I_0 0x0008
-    0x0e000000UL,  // CSP_I_1 0x0009
-    0x10000000UL,  // CSP_I_2 0x000a
-    0x12000be0UL,  // CSCI 0x000b
-    0x14000000UL,  // CSP_D_0 0x000c
-    0x16000000UL,  // CSP_D_1 0x000d
-    0x18000000UL,  // CSP_D_2 0x000e
-    0x1a000b60UL,  // CSCDS 0x000f
-    0x1c13fc51UL,  // CS1_U_0 0x0010
-    0x1e7ff41fUL,  // CS1_U_1 0x0011
-    0x20701ce7UL,  // CS1_U_2 0x0012
-    0x22000490UL,  // CS1 0x0016
-    0x24000480UL,  // CS2 0x001d
-    0x26000480UL,  // CS3 0x0024
-    0x28000480UL,  // CS4 0x002b
-    0x2a11be0eUL,  // CCR0 0x002c
-    0x2c62fc0aUL,  // CCR1 0x002d
-    0x2e03f000UL,  // CCR2 0x002e
-    0x30787e1eUL,  // CCR3 0x002f
-    0x32a2a850UL,  // PLL1_0 0x0030
-    0x34000c88UL,  // PLL1_1 0x0031
-    0x36000172UL,  // PLL1_2 0x0032
-    0x38000040UL,  // PLL1_3 0x0033
-    0x3a000000UL,  // PLL1_4 0x0034
-    0x3c000000UL,  // PLL1_5 0x0035
-    0x3e000000UL,  // PLL1_6 0x0036
-    0x40393b10UL,  // PLL1_7 0x0037
-    0x42000100UL,  // PLL2_7 0x003f
-    0x44000100UL,  // PLL3_7 0x0047
-    0x46000100UL,  // PLL4_7 0x004f
-    0x48000000UL,  // RFT1 0x0056
-    0x4a000000UL   // SDFT0 0x005b
+    0x11e8270UL, 
+    0x30a0210UL, 
+    0x9e967fdUL, 
+    0xb0805b4UL, 
+    0xd1027ffUL, 
+    0xf010d00UL, 
+    0x11000000UL, 
+    0x13000000UL, 
+    0x15000000UL, 
+    0x17000be0UL, 
+    0x19000000UL, 
+    0x1b000000UL, 
+    0x1d000000UL, 
+    0x1f000b60UL, 
+    0x2113fc51UL, 
+    0x237ff41fUL, 
+    0x25701ce7UL, 
+    0x2d000490UL, 
+    0x3b000480UL, 
+    0x49000480UL, 
+    0x57000480UL, 
+    0x5911be0eUL, 
+    0x5b62fc0aUL, 
+    0x5d03f000UL, 
+    0x5f787e1eUL, 
+    0x61a2a850UL, 
+    0x63000c88UL, 
+    0x65000172UL, 
+    0x67000040UL, 
+    0x69000000UL, 
+    0x6b000000UL, 
+    0x6d000000UL, 
+    0x6f393b10UL, 
+    0x7f000100UL, 
+    0x8f000100UL, 
+    0x9f000100UL, 
+    0xad000000UL, 
+    0xb7000000UL
 };
 #endif /* XENSIV_BGT60TRXX_CONF_IMPL */
 
