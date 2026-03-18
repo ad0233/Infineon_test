@@ -60,6 +60,7 @@
 #include "my_mqtt.h"
 #include "my_mqtt.h"
 #include "broadcast.h"
+#include "my_board.h"
 
 #include "single_parse.h"
 #include "cmd_parse.h"
@@ -173,8 +174,9 @@ static char *t_radar = nullptr;
 
 extern "C" void app_main()
 {
-    my_lidar_inf_init();
-    print_mem_info();
+    bsp_audio_init();
+    // my_lidar_inf_init();
+    // print_mem_info();
     return;
 }
 
