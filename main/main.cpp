@@ -79,6 +79,7 @@
 #include "my_lidar_inf.h"
 
 #include "my_aht20.h"
+#include "my_light.h"
 static const char *TAG = "main";
 
 // 时间调整函数 - 根据编码器变化调整时间
@@ -126,6 +127,20 @@ static audio_board_handle_t board_handle = NULL;  // 音频板句柄
 
 
 static my_aht20_handle_t aht20 = NULL;   //温湿度传感器句柄
+static my_light_handle_t light = NULL;   //环境光传感器句柄
+
+static void light_task(void *arg)
+{
+    const uint32_t interval_ms = 1000;
+    float lux = 0.f;
+    vTaskDelay(pdMS_TO_TICKS(300));  /* 等 BH1750 就绪，避免首次 one-shot 259 */
+    while (1) {
+        if (light != NULL && my_light_read_block(light, &lux, 200) == 0) {
+            ESP_LOGI(TAG, "环境光 %.1f lx", lux);
+        }
+        vTaskDelay(pdMS_TO_TICKS(interval_ms));
+    }
+}
 
 static void aht20_task(void *arg)
 {
@@ -191,11 +206,15 @@ static char *t_radar = nullptr;
 extern "C" void app_main()
 {
     bsp_audio_bus_init();
-    bsp_audio_codec_init();
+    // bsp_audio_codec_init();
     bsp_i2c_scan();
-    my_aht20_init(&aht20, bsp_i2c_get_bus_handle());
-    if (aht20 != NULL) {
-        xTaskCreate(aht20_task, "aht20", 2048, NULL, 5, NULL);
+    // my_aht20_init(&aht20, bsp_i2c_get_bus_handle());
+    // if (aht20 != NULL) {
+    //     xTaskCreate(aht20_task, "aht20", 4096, NULL, 5, NULL);
+    // }
+    my_light_init(&light, bsp_i2c_get_bus_handle());
+    if (light != NULL) {
+        xTaskCreate(light_task, "light", 4096, NULL, 5, NULL);
     }
     // my_lidar_inf_init();
     // print_mem_info();
