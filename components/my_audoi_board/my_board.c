@@ -14,6 +14,7 @@
 static const char *TAG = "AUDIO_BSP";
 
 static esp_codec_dev_handle_t play_dev_handle = NULL;
+static esp_codec_dev_handle_t play_dev_handle_2 = NULL;
 static i2s_chan_handle_t i2s_tx_chan = NULL;
 static i2s_chan_handle_t i2s_rx_chan = NULL;
 
@@ -37,19 +38,21 @@ esp_err_t bsp_i2c_init(void)
     return i2c_new_master_bus(&i2c_bus_config, &bus_handle);
 }
 
-esp_err_t bsp_audio_init(void)
+i2c_master_bus_handle_t bsp_i2c_get_bus_handle(void)
 {
-    // 1. 初始化 I2C
+    return bus_handle;
+}
+
+esp_err_t bsp_audio_bus_init(void)
+{
     if (bsp_i2c_init() != ESP_OK) {
         ESP_LOGE(TAG, "I2C Init Failed");
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "I2C bus initialized: SDA=GPIO%d, SCL=GPIO%d", BSP_I2C_SDA, BSP_I2C_SCL);
 
-    // 2. 初始化 I2S 
     i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(BSP_I2S_NUM, I2S_ROLE_MASTER);
     ESP_ERROR_CHECK(i2s_new_channel(&chan_cfg, &i2s_tx_chan, &i2s_rx_chan));
-
     i2s_std_config_t std_cfg = {
         .clk_cfg  = I2S_STD_CLK_DEFAULT_CONFIG(CODEC_DEFAULT_SAMPLE_RATE),
         .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(CODEC_DEFAULT_BIT_WIDTH, CODEC_DEFAULT_CHANNEL),
@@ -63,7 +66,15 @@ esp_err_t bsp_audio_init(void)
     };
     ESP_ERROR_CHECK(i2s_channel_init_std_mode(i2s_tx_chan, &std_cfg));
     ESP_ERROR_CHECK(i2s_channel_enable(i2s_tx_chan));
+    return ESP_OK;
+}
 
+esp_err_t bsp_audio_codec_init(void)
+{
+    if (bus_handle == NULL || i2s_tx_chan == NULL) {
+        ESP_LOGE(TAG, "Call bsp_audio_bus_init() first");
+        return ESP_FAIL;
+    }
 
     audio_codec_i2s_cfg_t i2s_data_cfg = {
         .port = BSP_I2S_NUM,
@@ -75,7 +86,7 @@ esp_err_t bsp_audio_init(void)
 
     audio_codec_i2c_cfg_t i2c_ctrl_cfg = {
         .port = BSP_I2C_NUM,
-        .addr = 0x18,
+        .addr = 0x30,
         .bus_handle = bus_handle,
     };
     ESP_LOGI(TAG, "Attempting to connect ES8311 at I2C address 0x18");
@@ -117,10 +128,98 @@ esp_err_t bsp_audio_init(void)
         .bits_per_sample = 16,
         .channel = I2S_SLOT_MODE_STEREO,
     };
-    return esp_codec_dev_open(play_dev_handle, &fs);
+    esp_err_t ret = esp_codec_dev_open(play_dev_handle, &fs);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    /* 第二颗 ES8311，7-bit 地址 0x19 -> 8-bit 写地址 0x32 */
+    audio_codec_i2c_cfg_t i2c_ctrl_cfg_2 = {
+        .port = BSP_I2C_NUM,
+        .addr = 0x32,
+        .bus_handle = bus_handle,
+    };
+    ESP_LOGI(TAG, "Attempting to connect ES8311 #2 at I2C 7-bit addr 0x19");
+    const audio_codec_ctrl_if_t *i2c_ctrl_if_2 = audio_codec_new_i2c_ctrl(&i2c_ctrl_cfg_2);
+    if (i2c_ctrl_if_2 == NULL) {
+        ESP_LOGE(TAG, "Failed to create I2C control for ES8311 at 0x19");
+        return ESP_FAIL;
+    }
+    es8311_codec_cfg_t es8311_cfg_2 = {
+        .ctrl_if = i2c_ctrl_if_2,
+        .gpio_if = gpio_if,
+        .codec_mode = ESP_CODEC_DEV_WORK_MODE_DAC,
+        .pa_pin = BSP_POWER_AMP_IO,
+        .pa_reverted = false,
+        .master_mode = false,
+        .use_mclk = true,
+        .digital_mic = false,
+        .invert_mclk = false,
+        .invert_sclk = false,
+        .hw_gain = { .pa_voltage = 5.0, .codec_dac_voltage = 3.3 },
+    };
+    const audio_codec_if_t *codec_if_2 = es8311_codec_new(&es8311_cfg_2);
+    esp_codec_dev_cfg_t dev_cfg_2 = {
+        .dev_type = ESP_CODEC_DEV_TYPE_OUT,
+        .codec_if = codec_if_2,
+        .data_if = data_if,
+    };
+    play_dev_handle_2 = esp_codec_dev_new(&dev_cfg_2);
+    ret = esp_codec_dev_open(play_dev_handle_2, &fs);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "ES8311 #2 (0x19) open failed");
+        return ret;
+    }
+    ESP_LOGI(TAG, "ES8311 #2 at 0x19 opened OK");
+    return ESP_OK;
+}
+
+esp_err_t bsp_audio_init(void)
+{
+    esp_err_t ret = bsp_audio_bus_init();
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    return bsp_audio_codec_init();
 }
 
 esp_codec_dev_handle_t bsp_audio_get_play_handle(void)
 {
     return play_dev_handle;
+}
+
+esp_codec_dev_handle_t bsp_audio_get_play_handle_2(void)
+{
+    return play_dev_handle_2;
+}
+
+esp_err_t bsp_i2c_scan(void)
+{
+    if (bsp_i2c_init() != ESP_OK) {
+        return ESP_FAIL;
+    }
+    const int timeout_ms = 50;
+    int found = 0;
+    ESP_LOGI(TAG, "I2C scan (SDA=%d, SCL=%d) 0x08~0x77:", BSP_I2C_SDA, BSP_I2C_SCL);
+    for (uint8_t addr = 0x08; addr <= 0x77; addr++) {
+        i2c_device_config_t dev_cfg = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address = addr,
+            .scl_speed_hz = BSP_I2C_FREQ_HZ,
+        };
+        i2c_master_dev_handle_t dev = NULL;
+        esp_err_t ret = i2c_master_bus_add_device(bus_handle, &dev_cfg, &dev);
+        if (ret != ESP_OK) {
+            continue;
+        }
+        uint8_t dummy = 0;
+        ret = i2c_master_transmit(dev, &dummy, 1, timeout_ms);
+        i2c_master_bus_rm_device(dev);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "  0x%02X", addr);
+            found++;
+        }
+    }
+    ESP_LOGI(TAG, "I2C scan done, found %d device(s)", found);
+    return ESP_OK;
 }

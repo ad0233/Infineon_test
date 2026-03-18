@@ -3,6 +3,7 @@
 
 #include "esp_err.h"
 #include "driver/gpio.h"
+#include "driver/i2c_master.h"
 #include "driver/i2s_std.h"
 #include "esp_codec_dev.h"
 
@@ -25,7 +26,7 @@ extern "C" {
 #define BSP_I2S_DSIN            GPIO_NUM_NC 
 
 // --- 功率放大器 (PA) 控制 ---
-#define BSP_POWER_AMP_IO        GPIO_NUM_NC  // 如果没有引脚控制PA，保持NC
+#define BSP_POWER_AMP_IO        GPIO_NUM_NC 
 
 // --- 默认音频参数 ---
 #define CODEC_DEFAULT_SAMPLE_RATE    (16000)
@@ -33,14 +34,40 @@ extern "C" {
 #define CODEC_DEFAULT_CHANNEL        (I2S_SLOT_MODE_STEREO)
 
 /**
- * @brief 初始化音频外设及编解码器
+ * @brief 获取 I2C 主机总线句柄（需在 bsp_audio_bus_init 之后调用）
+ */
+i2c_master_bus_handle_t bsp_i2c_get_bus_handle(void);
+
+/**
+ * @brief 初始化 I2C 总线和 I2S（需先于 codec 调用）
+ */
+esp_err_t bsp_audio_bus_init(void);
+
+/**
+ * @brief 初始化两颗 ES8311 codec（依赖 bsp_audio_bus_init 已执行）
+ */
+esp_err_t bsp_audio_codec_init(void);
+
+/**
+ * @brief 初始化音频外设及编解码器（等价于 bus_init + codec_init）
  */
 esp_err_t bsp_audio_init(void);
 
 /**
- * @brief 获取音频操作句柄
+ * @brief 获取音频操作句柄 (ES8311 @ 0x18)
  */
 esp_codec_dev_handle_t bsp_audio_get_play_handle(void);
+
+/**
+ * @brief 获取第二路音频操作句柄 (ES8311 @ 0x19)
+ */
+esp_codec_dev_handle_t bsp_audio_get_play_handle_2(void);
+
+/**
+ * @brief 扫描 I2C 总线并打印所有应答的 7-bit 地址 (0x08~0x77)
+ * @return ESP_OK 成功
+ */
+esp_err_t bsp_i2c_scan(void);
 
 #ifdef __cplusplus
 }

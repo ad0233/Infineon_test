@@ -78,6 +78,7 @@
 
 #include "my_lidar_inf.h"
 
+#include "my_aht20.h"
 static const char *TAG = "main";
 
 // 时间调整函数 - 根据编码器变化调整时间
@@ -122,6 +123,21 @@ static my_rtc_handle_t s_rtc_handle = NULL;  // RTC句柄，仅在main.cpp中使
 static my_lidar_handle_t s_lidar_handle = NULL;  // 雷达句柄，仅在main.cpp中使用
 static my_wifi_handle_t s_wifi_handle = NULL;  // WiFi句柄
 static audio_board_handle_t board_handle = NULL;  // 音频板句柄
+
+
+static my_aht20_handle_t aht20 = NULL;   //温湿度传感器句柄
+
+static void aht20_task(void *arg)
+{
+    const uint32_t interval_ms = 1000;
+    float temp = 0.f, rh = 0.f;
+    while (1) {
+        if (aht20 != NULL && my_aht20_read_block(aht20, &temp, &rh, 300) == 0) {
+            ESP_LOGI(TAG, "温湿度 T=%.1f℃ RH=%.1f%%", temp, rh);
+        }
+        vTaskDelay(pdMS_TO_TICKS(interval_ms));
+    }
+}
 
 #if defined(ENABLE_TASK_MONITOR)
 static void monitor_task(void *arg)
@@ -174,7 +190,13 @@ static char *t_radar = nullptr;
 
 extern "C" void app_main()
 {
-    bsp_audio_init();
+    bsp_audio_bus_init();
+    bsp_audio_codec_init();
+    bsp_i2c_scan();
+    my_aht20_init(&aht20, bsp_i2c_get_bus_handle());
+    if (aht20 != NULL) {
+        xTaskCreate(aht20_task, "aht20", 2048, NULL, 5, NULL);
+    }
     // my_lidar_inf_init();
     // print_mem_info();
     return;
