@@ -80,6 +80,9 @@
 
 #include "my_aht20.h"
 #include "my_light.h"
+#include "my_bmp580.h"
+#include "my_veml7700.h"
+#include "audio_processor.h"
 static const char *TAG = "main";
 
 // 时间调整函数 - 根据编码器变化调整时间
@@ -128,6 +131,34 @@ static audio_board_handle_t board_handle = NULL;  // 音频板句柄
 
 static my_aht20_handle_t aht20 = NULL;   //温湿度传感器句柄
 static my_light_handle_t light = NULL;   //环境光传感器句柄
+static my_bmp580_handle_t bmp580 = NULL; //气压传感器句柄
+static my_veml7700_handle_t veml7700 = NULL; //VEML7700 环境光句柄
+
+static void veml7700_task(void *arg)
+{
+    const uint32_t interval_ms = 1500;
+    float lux = 0.f;
+    vTaskDelay(pdMS_TO_TICKS(400));
+    while (1) {
+        if (veml7700 != NULL && my_veml7700_read_block(veml7700, &lux, 300) == 0) {
+            ESP_LOGI(TAG, "VEML7700 环境光 %.1f lx", lux);
+        }
+        vTaskDelay(pdMS_TO_TICKS(interval_ms));
+    }
+}
+
+static void bmp580_task(void *arg)
+{
+    const uint32_t interval_ms = 2000;
+    float pa = 0.f, temp_c = 0.f;
+    vTaskDelay(pdMS_TO_TICKS(500));
+    while (1) {
+        if (bmp580 != NULL && my_bmp580_read_block(bmp580, &pa, &temp_c, 500) == 0) {
+            ESP_LOGI(TAG, "气压 %.1f Pa (%.2f hPa) 温度 %.1f ℃", pa, pa / 100.f, temp_c);
+        }
+        vTaskDelay(pdMS_TO_TICKS(interval_ms));
+    }
+}
 
 static void light_task(void *arg)
 {
@@ -206,16 +237,28 @@ static char *t_radar = nullptr;
 extern "C" void app_main()
 {
     bsp_audio_bus_init();
-    // bsp_audio_codec_init();
+    bsp_audio_codec_init();
     bsp_i2c_scan();
     // my_aht20_init(&aht20, bsp_i2c_get_bus_handle());
     // if (aht20 != NULL) {
     //     xTaskCreate(aht20_task, "aht20", 4096, NULL, 5, NULL);
     // }
-    my_light_init(&light, bsp_i2c_get_bus_handle());
-    if (light != NULL) {
-        xTaskCreate(light_task, "light", 4096, NULL, 5, NULL);
-    }
+
+    // my_light_init(&light, bsp_i2c_get_bus_handle());
+    // if (light != NULL) {
+    //     xTaskCreate(light_task, "light", 4096, NULL, 5, NULL);
+    // }
+
+    // my_bmp580_init(&bmp580, bsp_i2c_get_bus_handle());
+    // if (bmp580 != NULL) {
+    //     xTaskCreate(bmp580_task, "bmp580", 4096, NULL, 5, NULL);
+    // }
+
+    // my_veml7700_init(&veml7700, bsp_i2c_get_bus_handle());
+    // if (veml7700 != NULL) {
+    //     xTaskCreate(veml7700_task, "veml7700", 4096, NULL, 5, NULL);
+    // }
+
     // my_lidar_inf_init();
     // print_mem_info();
     return;

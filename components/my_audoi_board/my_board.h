@@ -26,7 +26,7 @@ extern "C" {
 #define BSP_I2S_DSIN            GPIO_NUM_NC 
 
 // --- 功率放大器 (PA) 控制 ---
-#define BSP_POWER_AMP_IO        GPIO_NUM_NC 
+#define BSP_POWER_AMP_IO        GPIO_NUM_46
 
 // --- 默认音频参数 ---
 #define CODEC_DEFAULT_SAMPLE_RATE    (16000)
