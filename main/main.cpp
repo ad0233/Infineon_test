@@ -82,6 +82,8 @@
 #include "my_light.h"
 #include "my_bmp580.h"
 #include "my_veml7700.h"
+#include "my_spiffs.h"
+
 #include "audio_processor.h"
 static const char *TAG = "main";
 
@@ -238,7 +240,10 @@ extern "C" void app_main()
 {
     bsp_audio_bus_init();
     bsp_audio_codec_init();
+    bsp_gpio46_set_level(1); //功放的使能，拉高
+    bsp_spiffs_mount();
     bsp_i2c_scan();
+    bsp_audio_stream_play("/spiffs/V001-breath.wav");
     // my_aht20_init(&aht20, bsp_i2c_get_bus_handle());
     // if (aht20 != NULL) {
     //     xTaskCreate(aht20_task, "aht20", 4096, NULL, 5, NULL);

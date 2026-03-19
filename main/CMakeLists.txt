@@ -14,4 +14,4 @@ idf_component_add_link_dependency(FROM main TO my_light)
 idf_component_add_link_dependency(FROM main TO my_bmp580)
 idf_component_add_link_dependency(FROM main TO my_veml7700)
 
-# spiffs_create_partition_image(spiffs_data ../spiffs FLASH_IN_PROJECT)
+spiffs_create_partition_image(spiffs_data ../spiffs FLASH_IN_PROJECT)

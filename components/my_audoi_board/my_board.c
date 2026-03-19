@@ -223,3 +223,13 @@ esp_err_t bsp_i2c_scan(void)
     ESP_LOGI(TAG, "I2C scan done, found %d device(s)", found);
     return ESP_OK;
 }
+
+esp_err_t bsp_gpio46_set_level(int level)
+{
+    const gpio_num_t pin = GPIO_NUM_47;
+    ESP_ERROR_CHECK(gpio_reset_pin(pin));
+    ESP_ERROR_CHECK(gpio_set_direction(pin, GPIO_MODE_OUTPUT));
+    ESP_ERROR_CHECK(gpio_set_drive_capability(pin, GPIO_DRIVE_CAP_3));  // 最大驱动能力
+    ESP_ERROR_CHECK(gpio_set_level(pin, level ? 1 : 0));
+    return ESP_OK;
+}

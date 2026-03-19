@@ -26,7 +26,7 @@ extern "C" {
 #define BSP_I2S_DSIN            GPIO_NUM_NC 
 
 // --- 功率放大器 (PA) 控制 ---
-#define BSP_POWER_AMP_IO        GPIO_NUM_46
+#define BSP_POWER_AMP_IO        GPIO_NUM_NC
 
 // --- 默认音频参数 ---
 #define CODEC_DEFAULT_SAMPLE_RATE    (16000)
@@ -68,6 +68,13 @@ esp_codec_dev_handle_t bsp_audio_get_play_handle_2(void);
  * @return ESP_OK 成功
  */
 esp_err_t bsp_i2c_scan(void);
+
+/**
+ * @brief 将 GPIO 46 配置为输出并设置电平
+ * @param level 0 拉低，1 拉高
+ * @return ESP_OK 成功
+ */
+esp_err_t bsp_gpio46_set_level(int level);
 
 #ifdef __cplusplus
 }
