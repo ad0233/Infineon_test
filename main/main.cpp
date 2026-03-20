@@ -84,6 +84,7 @@
 #include "my_bmp580.h"
 #include "my_veml7700.h"
 #include "my_spiffs.h"
+#include "my_bdm.h"
 
 #include "audio_processor.h"
 static const char *TAG = "main";
@@ -188,6 +189,24 @@ static void aht20_task(void *arg)
     }
 }
 
+
+void mic_debug_task(void *args) {
+    int16_t *data = (int16_t *)malloc(2048); // 增加缓冲区大小以容纳更多麦克风数据
+    size_t bytes_read = 0;
+    extern i2s_chan_handle_t rx_handle; 
+
+    printf("开始监控麦克风数据...\n");
+    printf("格式: Mic1 L | Mic1 R | Mic2 L | Mic2 R\n");
+    while (1) {
+        
+        if (i2s_channel_read(rx_handle, data, 2048, &bytes_read, portMAX_DELAY) == ESP_OK) {
+            // 打印两个麦克风的数据
+            printf("%5d | %5d | %5d | %5d\n", data[0], data[1], data[2], data[3]);
+        }
+        vTaskDelay(pdMS_TO_TICKS(200)); 
+    }
+}
+
 #if defined(ENABLE_TASK_MONITOR)
 static void monitor_task(void *arg)
 {
@@ -247,20 +266,21 @@ extern "C" void app_main()
     ESP_ERROR_CHECK(esp_ldo_acquire_channel(&ldo_config, &ldo_handle));
     printf("VDD_IO4 已配置为 3.3V\n");
 
-    bsp_audio_bus_init();       //i2c  i2s 初始化
-    bsp_audio_codec_init();    //es8311 
-    bsp_gpio46_set_level(1); //功放的使能，拉高
-    bsp_spiffs_mount();     //spiffs 初始化
-    bsp_i2c_scan();          //i2c地址扫描
-    bsp_audio_stream_play("/spiffs/V001-breath.wav"); //播放音频    
-    
+    // bsp_audio_bus_init();       //i2c  i2s 初始化
+    init_pdm_mic();          //pdm麦克风初始化
+    // bsp_audio_codec_init();    //es8311 
+    // bsp_gpio46_set_level(1); //功放的使能，拉高
+    // bsp_spiffs_mount();     //spiffs 初始化
+    // bsp_i2c_scan();          //i2c地址扫描
+    // bsp_audio_stream_play("/spiffs/V001-breath.wav"); //播放音频    
+
     // my_aht20_init(&aht20, bsp_i2c_get_bus_handle());
     // if (aht20 != NULL) {
     //     xTaskCreate(aht20_task, "aht20", 4096, NULL, 5, NULL);
     // }
 
     // my_light_init(&light, bsp_i2c_get_bus_handle());
-    // if (light != NULL) {
+    // if (light != NULL) {     
     //     xTaskCreate(light_task, "light", 4096, NULL, 5, NULL);
     // }
 
@@ -273,6 +293,8 @@ extern "C" void app_main()
     // if (veml7700 != NULL) {
     //     xTaskCreate(veml7700_task, "veml7700", 4096, NULL, 5, NULL);
     // }
+
+    xTaskCreate(mic_debug_task, "mic_debug", 4096, NULL, 5, NULL);
 
     // my_lidar_inf_init();
     // print_mem_info();

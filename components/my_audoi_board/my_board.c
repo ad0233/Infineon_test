@@ -170,6 +170,11 @@ esp_err_t bsp_audio_codec_init(void)
         ESP_LOGE(TAG, "ES8311 #2 (0x19) open failed");
         return ret;
     }
+
+    esp_codec_dev_write_reg(play_dev_handle, 0x09, 0x0C);
+
+    esp_codec_dev_write_reg(play_dev_handle_2, 0x09, 0x8C);
+
     ESP_LOGI(TAG, "ES8311 #2 at 0x19 opened OK");
     return ESP_OK;
 }
