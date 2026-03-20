@@ -46,25 +46,20 @@ esp_err_t bsp_spiffs_mount(void)
  */
 esp_err_t bsp_audio_stream_play(const char *path)
 {
-    // 1. 获取你在 bsp_audio_codec_init 中初始化好的句柄
     esp_codec_dev_handle_t play_handle = bsp_audio_get_play_handle();
     if (play_handle == NULL) {
         ESP_LOGE(TAG, "播放句柄为空，请检查初始化");
         return ESP_FAIL;
     }
 
-    // 2. 打开文件
     FILE *f = fopen(path, "rb");
     if (f == NULL) {
         ESP_LOGE(TAG, "无法打开文件: %s", path);
         return ESP_FAIL;
     }
 
-    // 3. 跳过 WAV 文件头 (标准WAV头为44字节)
-    // 直接播放 PCM 数据，避免文件头的杂音
     fseek(f, 44, SEEK_SET);
 
-    // 4. 分配缓冲区 (4KB 比较稳妥，能防止 I2S 断流)
     const size_t chunk_size = 4096;
     uint8_t *buffer = (uint8_t *)malloc(chunk_size);
     if (buffer == NULL) {
@@ -72,7 +67,6 @@ esp_err_t bsp_audio_stream_play(const char *path)
         return ESP_ERR_NO_MEM;
     }
 
-    // 5. 两颗 codec 共用同一路 I2S，喇叭可能接在任一路，两路都设音量和取消静音
     esp_codec_dev_set_out_vol(play_handle, 70);
     esp_codec_dev_set_out_mute(play_handle, false);
     esp_codec_dev_handle_t play_handle_2 = bsp_audio_get_play_handle_2();

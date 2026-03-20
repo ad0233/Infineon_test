@@ -27,6 +27,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
+#include "esp_ldo_regulator.h"
 
 #include "audio_sys.h"
 #include "audio_thread.h"
@@ -238,12 +239,21 @@ static char *t_radar = nullptr;
 
 extern "C" void app_main()
 {
-    bsp_audio_bus_init();
-    bsp_audio_codec_init();
+    esp_ldo_channel_handle_t ldo_handle;
+    esp_ldo_channel_config_t ldo_config = {
+        .chan_id = 4,
+        .voltage_mv = 3300,
+    };
+    ESP_ERROR_CHECK(esp_ldo_acquire_channel(&ldo_config, &ldo_handle));
+    printf("VDD_IO4 已配置为 3.3V\n");
+
+    bsp_audio_bus_init();       //i2c  i2s 初始化
+    bsp_audio_codec_init();    //es8311 
     bsp_gpio46_set_level(1); //功放的使能，拉高
-    bsp_spiffs_mount();
-    bsp_i2c_scan();
-    bsp_audio_stream_play("/spiffs/V001-breath.wav");
+    bsp_spiffs_mount();     //spiffs 初始化
+    bsp_i2c_scan();          //i2c地址扫描
+    bsp_audio_stream_play("/spiffs/V001-breath.wav"); //播放音频    
+    
     // my_aht20_init(&aht20, bsp_i2c_get_bus_handle());
     // if (aht20 != NULL) {
     //     xTaskCreate(aht20_task, "aht20", 4096, NULL, 5, NULL);
