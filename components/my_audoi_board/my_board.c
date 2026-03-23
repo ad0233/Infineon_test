@@ -237,3 +237,70 @@ esp_err_t bsp_gpio46_set_level(int level)
     ESP_ERROR_CHECK(gpio_set_level(pin, level ? 1 : 0));
     return ESP_OK;
 }
+
+esp_err_t bsp_es8311_write_reg(uint8_t slave_addr, uint8_t reg_addr, uint8_t data)
+{
+    i2c_master_bus_handle_t bus = bsp_i2c_get_bus_handle();
+    if (bus == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // 配置临时设备句柄
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = slave_addr,
+        .scl_speed_hz = BSP_I2C_FREQ_HZ,
+    };
+
+    i2c_master_dev_handle_t dev_handle;
+    esp_err_t ret = i2c_master_bus_add_device(bus, &dev_cfg, &dev_handle);
+    if (ret != ESP_OK) return ret;
+
+    // ES8311 写协议: [SlaveAddr + W] -> [Reg Addr] -> [Data]
+    uint8_t write_buf[2] = {reg_addr, data};
+    ret = i2c_master_transmit(dev_handle, write_buf, sizeof(write_buf), -1);
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "ES8311 Write Err [0x%02X]: Reg 0x%02X, Val 0x%02X, Error: %s", 
+                 slave_addr, reg_addr, data, esp_err_to_name(ret));
+    }
+
+    i2c_master_bus_rm_device(dev_handle);
+    return ret;
+}
+
+/**
+ * @brief 从 ES8311 读取寄存器
+ * @param slave_addr ES8311 的 7位 I2C 地址
+ * @param reg_addr   寄存器地址
+ * @param data       存放读回数据的指针
+ */
+esp_err_t bsp_es8311_read_reg(uint8_t slave_addr, uint8_t reg_addr, uint8_t *data)
+{
+    if (data == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    i2c_master_bus_handle_t bus = bsp_i2c_get_bus_handle();
+    if (bus == NULL) return ESP_ERR_INVALID_STATE;
+
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = slave_addr,
+        .scl_speed_hz = BSP_I2C_FREQ_HZ,
+    };
+
+    i2c_master_dev_handle_t dev_handle;
+    esp_err_t ret = i2c_master_bus_add_device(bus, &dev_cfg, &dev_handle);
+    if (ret != ESP_OK) return ret;
+
+    // ES8311 读协议: 先发送寄存器地址，再接收数据
+    ret = i2c_master_transmit_receive(dev_handle, &reg_addr, 1, data, 1, -1);
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "ES8311 Read Err [0x%02X]: Reg 0x%02X", slave_addr, reg_addr);
+    }
+
+    i2c_master_bus_rm_device(dev_handle);
+    return ret;
+}

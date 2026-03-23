@@ -18,7 +18,7 @@ extern "C" {
 #define BSP_I2C_FREQ_HZ         100000
 
 // --- I2S 配置 ---
-#define BSP_I2S_NUM             I2S_NUM_0
+#define BSP_I2S_NUM             I2S_NUM_1
 #define BSP_I2S_MCLK            GPIO_NUM_9
 #define BSP_I2S_SCLK            GPIO_NUM_8
 #define BSP_I2S_LCLK            GPIO_NUM_7
@@ -75,6 +75,10 @@ esp_err_t bsp_i2c_scan(void);
  * @return ESP_OK 成功
  */
 esp_err_t bsp_gpio46_set_level(int level);
+
+esp_err_t bsp_es8311_write_reg(uint8_t slave_addr, uint8_t reg_addr, uint8_t data);
+
+esp_err_t bsp_es8311_read_reg(uint8_t slave_addr, uint8_t reg_addr, uint8_t *data);
 
 #ifdef __cplusplus
 }
