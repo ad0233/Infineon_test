@@ -258,33 +258,33 @@ static char *t_radar = nullptr;
 
 extern "C" void app_main()
 {
-    esp_ldo_channel_handle_t ldo_handle;
-    esp_ldo_channel_config_t ldo_config = {
-        .chan_id = 4,
-        .voltage_mv = 3300,
-    };
-    ESP_ERROR_CHECK(esp_ldo_acquire_channel(&ldo_config, &ldo_handle));
-    printf("VDD_IO4 已配置为 3.3V\n");
+    // esp_ldo_channel_handle_t ldo_handle;
+    // esp_ldo_channel_config_t ldo_config = {
+    //     .chan_id = 4,
+    //     .voltage_mv = 3300,
+    // };
+    // ESP_ERROR_CHECK(esp_ldo_acquire_channel(&ldo_config, &ldo_handle));
+    // printf("VDD_IO4 已配置为 3.3V\n");
 
-    bsp_audio_bus_init();       //i2c  i2s 初始化
-    // init_pdm_mic();          //pdm麦克风初始化
-    bsp_audio_codec_init();    //es8311 
-    bsp_gpio46_set_level(1); //功放的使能，拉高
-    bsp_spiffs_mount();     //spiffs 初始化
-    bsp_i2c_scan();          //i2c地址扫描
+    // bsp_audio_bus_init();       //i2c  i2s 初始化
+    // // init_pdm_mic();          //pdm麦克风初始化
+    // bsp_audio_codec_init();    //es8311 
+    // bsp_gpio46_set_level(1); //功放的使能，拉高
+    // bsp_spiffs_mount();     //spiffs 初始化
+    // bsp_i2c_scan();          //i2c地址扫描
 
-    bsp_es8311_write_reg(0x18, 0x09, 0x0C);
-    bsp_es8311_write_reg(0x19, 0x09, 0x0C);
+    // bsp_es8311_write_reg(0x18, 0x09, 0x0C);
+    // bsp_es8311_write_reg(0x19, 0x09, 0x0C);
 
-    uint8_t reg_val1, reg_val2;
-    bsp_es8311_read_reg(0x18, 0x09, &reg_val1);
-    bsp_es8311_read_reg(0x19, 0x09, &reg_val2);
-    ESP_LOGI(TAG, "ES8311 #1 (0x18) reg 0x09 value: 0x%02X", reg_val1);
-    ESP_LOGI(TAG, "ES8311 #2 (0x19) reg 0x09 value: 0x%02X", reg_val2);
-    while (1)
-    {
-        bsp_audio_stream_play("/spiffs/bb.wav"); //播放音频    
-    }
+    // uint8_t reg_val1, reg_val2;
+    // bsp_es8311_read_reg(0x18, 0x09, &reg_val1);
+    // bsp_es8311_read_reg(0x19, 0x09, &reg_val2);
+    // ESP_LOGI(TAG, "ES8311 #1 (0x18) reg 0x09 value: 0x%02X", reg_val1);
+    // ESP_LOGI(TAG, "ES8311 #2 (0x19) reg 0x09 value: 0x%02X", reg_val2);
+    // while (1)
+    // {
+    //     bsp_audio_stream_play("/spiffs/bb.wav"); //播放音频    
+    // }
     
    
 
@@ -310,8 +310,8 @@ extern "C" void app_main()
 
     // xTaskCreate(mic_debug_task, "mic_debug", 4096, NULL, 5, NULL);
 
-    // my_lidar_inf_init();
-    // print_mem_info();
+    my_lidar_inf_init();
+    print_mem_info();
     return;
 }
 

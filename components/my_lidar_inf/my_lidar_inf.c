@@ -310,22 +310,22 @@ static int32_t init_sensor(void)
     }
 
 
-    /* Enable the LDO. */
-    gpio_config_t ldo_cfg = {
-        .intr_type = GPIO_INTR_DISABLE,
-        .mode = GPIO_MODE_DEF_OUTPUT,
-        .pin_bit_mask = (1ULL << PIN_XENSIV_BGT60TRXX_LDO_EN),
-        .pull_down_en = 0,
-        .pull_up_en = 1
-    };
+    // /* Enable the LDO. */
+    // gpio_config_t ldo_cfg = {
+    //     .intr_type = GPIO_INTR_DISABLE,
+    //     .mode = GPIO_MODE_DEF_OUTPUT,
+    //     .pin_bit_mask = (1ULL << PIN_XENSIV_BGT60TRXX_LDO_EN),
+    //     .pull_down_en = 0,
+    //     .pull_up_en = 1
+    // };
 
-    if (gpio_config(&ldo_cfg) != ESP_OK)
-    {
-        printf("ERROR: LDO gpio_config failed\n");
-        return -1;
-    }
+    // if (gpio_config(&ldo_cfg) != ESP_OK)
+    // {
+    //     printf("ERROR: LDO gpio_config failed\n");
+    //     return -1;
+    // }
 
-    gpio_set_level(PIN_XENSIV_BGT60TRXX_LDO_EN, 1);
+    // gpio_set_level(PIN_XENSIV_BGT60TRXX_LDO_EN, 1);
 
     /* Wait LDO stable */
     vTaskDelay(pdMS_TO_TICKS(50));
