@@ -1,6 +1,8 @@
 #ifndef MY_BOARD_H
 #define MY_BOARD_H
 
+#include <stdint.h>
+
 #include "esp_err.h"
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"

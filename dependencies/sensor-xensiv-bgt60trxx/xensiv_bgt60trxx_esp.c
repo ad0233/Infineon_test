@@ -29,6 +29,8 @@
 #include <inttypes.h>
 #include <string.h>
 
+#include "esp_heap_caps.h"
+
 #define SAMPLE_REM_0_BIT_MASK       0xFFF0
 #define SAMPLE_REM_0_BIT_SHIFT      4U
 #define SAMPLE_REM_1_MSB_BIT_MASK   0x000F
@@ -40,6 +42,9 @@
 #define SAMPLE_REM_2_MSB_BIT_SHIFT  4U
 #define SAMPLE_REM_2_LSB_BIT_SHIFT  12U
 #define SAMPLE_REM_3_BIT_MASK       0x0FFF
+
+static uint8_t *s_fifo_dummy_tx = NULL;
+static size_t s_fifo_dummy_tx_size = 0;
 
 /* Static Function Prototypes */
 static void unpack_samples(uint16_t* rx_data, uint32_t rx_data_sample_relative_idx, uint32_t sample_num);
@@ -203,7 +208,29 @@ int32_t xensiv_bgt60trxx_platform_spi_fifo_read(void* iface,
     xensiv_bgt60trxx_platform_assert(rx_data != NULL);
 
     const xensiv_bgt60trxx_esp_iface_t* esp_iface = iface;    
-    esp_err_t status = ESP_OK;       
+    esp_err_t status = ESP_OK;
+    size_t packed_len_bytes = (len * 12U + 7U) / 8U;
+
+    /* The sensor expects MOSI to stay high during FIFO burst reads.
+     * Supplying a NULL tx_buffer causes zeros to be shifted out on ESP-IDF,
+     * which triggers SPI_BURST_ERR / CLK_NUM_ERR on the radar. */
+    if (s_fifo_dummy_tx_size < packed_len_bytes)
+    {
+        if (s_fifo_dummy_tx != NULL)
+        {
+            heap_caps_free(s_fifo_dummy_tx);
+            s_fifo_dummy_tx = NULL;
+            s_fifo_dummy_tx_size = 0;
+        }
+
+        s_fifo_dummy_tx = heap_caps_malloc(packed_len_bytes, MALLOC_CAP_DMA);
+        if (s_fifo_dummy_tx == NULL)
+        {
+            return XENSIV_BGT60TRXX_STATUS_COM_ERROR;
+        }
+        memset(s_fifo_dummy_tx, 0xFF, packed_len_bytes);
+        s_fifo_dummy_tx_size = packed_len_bytes;
+    }
     
     
     /* Single DMA transaction implementation with in-place unpacking */
@@ -213,7 +240,7 @@ int32_t xensiv_bgt60trxx_platform_spi_fifo_read(void* iface,
         memset(&t, 0, sizeof(t));
         t.length = len * 12;
         t.rxlength = len * 12;
-        t.tx_buffer = NULL;
+        t.tx_buffer = s_fifo_dummy_tx;
         t.rx_buffer = rx_data; 
 
         spi_device_acquire_bus(esp_iface->spi, portMAX_DELAY);
@@ -251,7 +278,6 @@ int32_t xensiv_bgt60trxx_platform_spi_fifo_read(void* iface,
         memset(&t, 0, sizeof(t));
         t.length = max_single_trans_sample_num * 12;
         t.rxlength = max_single_trans_sample_num * 12;
-        t.tx_buffer = NULL;
 
         /* Do looped transactions of up to maximum allowable size for FIFO */
         spi_device_acquire_bus(esp_iface->spi, portMAX_DELAY);
@@ -261,9 +287,8 @@ int32_t xensiv_bgt60trxx_platform_spi_fifo_read(void* iface,
             {
                 t.length = leftover_trans_sample_num * 12;
                 t.rxlength = leftover_trans_sample_num * 12;
-                t.tx_buffer = NULL;                        
             }
-            
+            t.tx_buffer = s_fifo_dummy_tx;
             t.rx_buffer = rx_data + trans_num * max_single_trans_sample_num;    
             status = spi_device_polling_transmit(esp_iface->spi, &t);         
 

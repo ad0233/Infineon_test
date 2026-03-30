@@ -314,9 +314,10 @@ float32_t xensiv_radar_presence_get_bin_length(const xensiv_radar_presence_handl
     if (!handle) return 0.0f;
     
     radar_presence_context_t *ctx = (radar_presence_context_t*)handle;
-    // Calculate bin length: c / (2 * bandwidth * num_samples_per_chirp)
-    // Simplified: return approximate bin length based on bandwidth
-    float32_t bin_length = IFX_LIGHT_SPEED_M_S / (2.0f * ctx->config.bandwidth * ctx->config.num_samples_per_chirp);
+    // The public API defines bin length purely from the configured bandwidth.
+    // Dividing by num_samples_per_chirp again shrinks the value by 64x and
+    // makes the log print 0.000m even when the radar is configured correctly.
+    float32_t bin_length = IFX_LIGHT_SPEED_M_S / (2.0f * ctx->config.bandwidth);
     return bin_length;
 }
 
@@ -347,5 +348,26 @@ bool xensiv_radar_presence_get_max_micro(const xensiv_radar_presence_handle_t ha
                                          float* micro, int* index) {
     // Simplified: return same as macro for now
     return xensiv_radar_presence_get_max_macro(handle, micro, index);
+}
+
+void xensiv_radar_presence_init_config(xensiv_radar_presence_config_t* config) {
+    if (!config) return;
+
+    config->bandwidth                         = 460e6f;
+    config->num_samples_per_chirp             = 128;
+    config->micro_fft_decimation_enabled      = false;
+    config->micro_fft_size                    = 128;
+    config->macro_threshold                   = 0.5f;
+    config->micro_threshold                   = 12.5f;
+    config->min_range_bin                     = 1;
+    config->max_range_bin                     = 5;
+    config->macro_compare_interval_ms         = 250;
+    config->macro_movement_validity_ms        = 1000;
+    config->micro_movement_validity_ms        = 4000;
+    config->macro_movement_confirmations      = 0;
+    config->macro_trigger_range               = 1;
+    config->mode                              = XENSIV_RADAR_PRESENCE_MODE_MICRO_IF_MACRO;
+    config->macro_fft_bandpass_filter_enabled = false;
+    config->micro_movement_compare_idx        = 5;
 }
 

@@ -85,6 +85,13 @@ static xensiv_bgt60trxx_device_t detect_device_type(uint32_t chipid)
     {
         return XENSIV_DEVICE_BGT60TR13C;
     }
+    else if ((chip_id_digital == 0x0208U) && (chip_id_rf == 0xACU))
+    {
+        /* New silicon revision of BGT60TR13C (chipid=0x0208AC).
+         * Infineon's Arduino library does not check chip ID at all,
+         * suggesting multiple silicon revisions exist with different IDs. */
+        return XENSIV_DEVICE_BGT60TR13C;
+    }
     else if ((chip_id_digital == 6U) &&
              ((chip_id_rf == 6U) || (chip_id_rf == 11U)))
     {
@@ -147,9 +154,12 @@ int32_t xensiv_bgt60trxx_init(xensiv_bgt60trxx_t* dev,
         }
         else
         {
-            printf("Unknown device\n");
-            dev->type = NULL;
-            status = XENSIV_BGT60TRXX_STATUS_DEV_ERROR;
+            printf("Unknown device (chipid=0x%06lX, DIGITAL_ID=%lu, RF_ID=%lu)\n",
+                   (unsigned long)chipid,
+                   (unsigned long)((chipid >> 8) & 0xFFFF),
+                   (unsigned long)(chipid & 0xFF));
+            printf("Proceeding as BGT60TR13C for compatibility with the official Arduino driver.\n");
+            dev->type = &bgt60trxx_types[XENSIV_DEVICE_BGT60TR13C];
         }
     }
 
@@ -237,16 +247,39 @@ int32_t xensiv_bgt60trxx_get_reg(const xensiv_bgt60trxx_t* dev, uint32_t reg_add
 
     temp = xensiv_bgt60trxx_platform_word_reverse(temp);
 
+    {
+        uint8_t* tx = (uint8_t*)&temp;
+        printf("SPI TX: %02X %02X %02X %02X (addr=0x%02lX)\n",
+               tx[0], tx[1], tx[2], tx[3],
+               (unsigned long)((reg_addr << XENSIV_BGT60TRXX_SPI_REGADR_POS) >> XENSIV_BGT60TRXX_SPI_REGADR_POS));
+    }
+
     xensiv_bgt60trxx_platform_spi_cs_set(dev->iface, 0);
     int32_t status = xensiv_bgt60trxx_platform_spi_transfer(dev->iface,
                                                             (uint8_t*)&temp,
                                                             (uint8_t*)data,
                                                             XENSIV_BGT60TRXX_SPI_REG_XFER_LEN_BYTES);
     xensiv_bgt60trxx_platform_spi_cs_set(dev->iface, 1);
+
+    {
+        uint8_t* rx = (uint8_t*)data;
+        printf("SPI RX raw: %02X %02X %02X %02X\n", rx[0], rx[1], rx[2], rx[3]);
+    }
+
     if (XENSIV_BGT60TRXX_STATUS_OK == status)
     {
-        *data = xensiv_bgt60trxx_platform_word_reverse(*data);
-        *data &= XENSIV_BGT60TRXX_SPI_DATA_MSK;
+        uint32_t reversed = xensiv_bgt60trxx_platform_word_reverse(*data);
+        uint32_t gsr0 = (reversed & XENSIV_BGT60TRXX_SPI_GSR0_MSK) >>
+                        XENSIV_BGT60TRXX_SPI_GSR0_POS;
+        if (gsr0 != 0U)
+        {
+            printf("SPI GSR0=0x%lX%s%s%s\n",
+                   (unsigned long)gsr0,
+                   (gsr0 & XENSIV_BGT60TRXX_REG_GSR0_FOU_ERR_MSK) ? " FOU_ERR" : "",
+                   (gsr0 & XENSIV_BGT60TRXX_REG_GSR0_SPI_BURST_ERR_MSK) ? " SPI_BURST_ERR" : "",
+                   (gsr0 & XENSIV_BGT60TRXX_REG_GSR0_CLK_NUM_ERR_MSK) ? " CLK_NUM_ERR" : "");
+        }
+        *data = reversed & XENSIV_BGT60TRXX_SPI_DATA_MSK;
     }
 
     return status;
