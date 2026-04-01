@@ -214,62 +214,81 @@ int32_t xensiv_radar_presence_process_frame(xensiv_radar_presence_handle_t handl
     
     // State machine logic
     uint32_t time_since_compare = time_ms - ctx->last_compare_time;
-    
+
     if (time_since_compare >= ctx->config.macro_compare_interval_ms) {
         ctx->last_compare_time = time_ms;
-        
-        // Macro movement detection
-        bool macro_detected = (max_power > ctx->config.macro_threshold);
-        
-        if (macro_detected) {
-            ctx->macro_confirm_count++;
-            ctx->last_macro_time = time_ms;
-            
-            if (ctx->macro_confirm_count > ctx->config.macro_movement_confirmations) {
-                if (ctx->current_state == XENSIV_RADAR_PRESENCE_STATE_ABSENCE) {
-                    trigger_event(ctx, XENSIV_RADAR_PRESENCE_STATE_MACRO_PRESENCE, 
-                                max_range_bin, time_ms);
-                }
+
+        bool macro_enabled = (ctx->config.mode != XENSIV_RADAR_PRESENCE_MODE_MICRO_ONLY);
+        bool micro_enabled = (ctx->config.mode != XENSIV_RADAR_PRESENCE_MODE_MACRO_ONLY);
+        bool macro_detected = macro_enabled && (max_power > ctx->config.macro_threshold);
+        bool micro_detected = false;
+
+        if (micro_enabled) {
+            if (ctx->config.mode == XENSIV_RADAR_PRESENCE_MODE_MICRO_ONLY) {
+                micro_detected = (max_power > ctx->config.micro_threshold);
+            } else {
+                micro_detected = (max_power > ctx->config.micro_threshold) &&
+                                 (max_power < ctx->config.macro_threshold);
             }
-        } else {
-            ctx->macro_confirm_count = 0;
-            
-            // Check if macro movement timeout
-            if (ctx->current_state == XENSIV_RADAR_PRESENCE_STATE_MACRO_PRESENCE) {
-                uint32_t time_since_macro = time_ms - ctx->last_macro_time;
-                if (time_since_macro > ctx->config.macro_movement_validity_ms) {
-                    trigger_event(ctx, XENSIV_RADAR_PRESENCE_STATE_ABSENCE, 
-                                0, time_ms);
+        }
+
+        if (macro_enabled) {
+            if (macro_detected) {
+                ctx->macro_confirm_count++;
+                ctx->last_macro_time = time_ms;
+
+                if (ctx->macro_confirm_count > ctx->config.macro_movement_confirmations) {
+                    if (ctx->current_state != XENSIV_RADAR_PRESENCE_STATE_MACRO_PRESENCE) {
+                        trigger_event(ctx,
+                                      XENSIV_RADAR_PRESENCE_STATE_MACRO_PRESENCE,
+                                      max_range_bin,
+                                      time_ms);
+                    }
+                }
+            } else {
+                ctx->macro_confirm_count = 0;
+
+                if (ctx->current_state == XENSIV_RADAR_PRESENCE_STATE_MACRO_PRESENCE) {
+                    uint32_t time_since_macro = time_ms - ctx->last_macro_time;
+                    if (time_since_macro > ctx->config.macro_movement_validity_ms) {
+                        if (micro_enabled && micro_detected) {
+                            ctx->last_micro_time = time_ms;
+                            trigger_event(ctx,
+                                          XENSIV_RADAR_PRESENCE_STATE_MICRO_PRESENCE,
+                                          max_range_bin,
+                                          time_ms);
+                        } else {
+                            trigger_event(ctx,
+                                          XENSIV_RADAR_PRESENCE_STATE_ABSENCE,
+                                          0,
+                                          time_ms);
+                        }
+                    }
                 }
             }
         }
-        
-        // Micro movement detection (simplified)
-        if (ctx->config.mode == XENSIV_RADAR_PRESENCE_MODE_MICRO_IF_MACRO ||
-            ctx->config.mode == XENSIV_RADAR_PRESENCE_MODE_MICRO_AND_MACRO) {
-            
-            if (ctx->current_state == XENSIV_RADAR_PRESENCE_STATE_MACRO_PRESENCE ||
-                ctx->current_state == XENSIV_RADAR_PRESENCE_STATE_MICRO_PRESENCE) {
-                
-                // Simple micro detection: check if power is below macro threshold but above micro
-                bool micro_detected = (max_power < ctx->config.macro_threshold) &&
-                                     (max_power > ctx->config.micro_threshold);
-                
-                if (micro_detected) {
-                    ctx->last_micro_time = time_ms;
-                    if (ctx->current_state == XENSIV_RADAR_PRESENCE_STATE_MACRO_PRESENCE) {
-                        trigger_event(ctx, XENSIV_RADAR_PRESENCE_STATE_MICRO_PRESENCE,
-                                    max_range_bin, time_ms);
-                    }
-                } else {
-                    // Check micro timeout
-                    uint32_t time_since_micro = time_ms - ctx->last_micro_time;
-                    if (time_since_micro > ctx->config.micro_movement_validity_ms) {
-                        if (ctx->current_state == XENSIV_RADAR_PRESENCE_STATE_MICRO_PRESENCE) {
-                            trigger_event(ctx, XENSIV_RADAR_PRESENCE_STATE_ABSENCE,
-                                        0, time_ms);
-                        }
-                    }
+
+        if (micro_enabled) {
+            bool allow_micro_from_absence =
+                (ctx->config.mode == XENSIV_RADAR_PRESENCE_MODE_MICRO_ONLY) ||
+                (ctx->config.mode == XENSIV_RADAR_PRESENCE_MODE_MICRO_AND_MACRO);
+            bool allow_micro_from_presence =
+                (ctx->current_state == XENSIV_RADAR_PRESENCE_STATE_MACRO_PRESENCE) ||
+                (ctx->current_state == XENSIV_RADAR_PRESENCE_STATE_MICRO_PRESENCE);
+
+            if (micro_detected && (allow_micro_from_absence || allow_micro_from_presence)) {
+                ctx->last_micro_time = time_ms;
+                if (!macro_detected &&
+                    (ctx->current_state != XENSIV_RADAR_PRESENCE_STATE_MICRO_PRESENCE)) {
+                    trigger_event(ctx,
+                                  XENSIV_RADAR_PRESENCE_STATE_MICRO_PRESENCE,
+                                  max_range_bin,
+                                  time_ms);
+                }
+            } else if (ctx->current_state == XENSIV_RADAR_PRESENCE_STATE_MICRO_PRESENCE) {
+                uint32_t time_since_micro = time_ms - ctx->last_micro_time;
+                if (time_since_micro > ctx->config.micro_movement_validity_ms) {
+                    trigger_event(ctx, XENSIV_RADAR_PRESENCE_STATE_ABSENCE, 0, time_ms);
                 }
             }
         }
@@ -357,8 +376,8 @@ void xensiv_radar_presence_init_config(xensiv_radar_presence_config_t* config) {
     config->num_samples_per_chirp             = 128;
     config->micro_fft_decimation_enabled      = false;
     config->micro_fft_size                    = 128;
-    config->macro_threshold                   = 0.5f;
-    config->micro_threshold                   = 12.5f;
+    config->macro_threshold                   = 0.18f;
+    config->micro_threshold                   = 0.08f;
     config->min_range_bin                     = 1;
     config->max_range_bin                     = 5;
     config->macro_compare_interval_ms         = 250;
@@ -366,7 +385,7 @@ void xensiv_radar_presence_init_config(xensiv_radar_presence_config_t* config) {
     config->micro_movement_validity_ms        = 4000;
     config->macro_movement_confirmations      = 0;
     config->macro_trigger_range               = 1;
-    config->mode                              = XENSIV_RADAR_PRESENCE_MODE_MICRO_IF_MACRO;
+    config->mode                              = XENSIV_RADAR_PRESENCE_MODE_MICRO_AND_MACRO;
     config->macro_fft_bandpass_filter_enabled = false;
     config->micro_movement_compare_idx        = 5;
 }

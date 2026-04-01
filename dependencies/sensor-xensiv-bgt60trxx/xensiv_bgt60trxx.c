@@ -80,7 +80,7 @@ static xensiv_bgt60trxx_device_t detect_device_type(uint32_t chipid)
                                XENSIV_BGT60TRXX_REG_CHIP_ID_DIGITAL_ID_POS;
     uint32_t chip_id_rf = (chipid & XENSIV_BGT60TRXX_REG_CHIP_ID_RF_ID_MSK) >>
                           XENSIV_BGT60TRXX_REG_CHIP_ID_RF_ID_POS;
-    
+
     if ((chip_id_digital == 3U) && (chip_id_rf == 3U))
     {
         return XENSIV_DEVICE_BGT60TR13C;
@@ -343,9 +343,11 @@ int32_t xensiv_bgt60trxx_get_fifo_data(const xensiv_bgt60trxx_t* dev, uint16_t* 
 
     if (XENSIV_BGT60TRXX_STATUS_OK == retval)
     {
-        if ((gsr0 & (XENSIV_BGT60TRXX_REG_GSR0_FOU_ERR_MSK |
-                     XENSIV_BGT60TRXX_REG_GSR0_SPI_BURST_ERR_MSK |
-                     XENSIV_BGT60TRXX_REG_GSR0_CLK_NUM_ERR_MSK)) == 0U)
+        /* Only abort FIFO read on FOU_ERR (FIFO overflow/underflow = data corrupted).
+         * SPI_BURST_ERR and CLK_NUM_ERR are sticky flags from previous transactions
+         * and do not indicate a problem with the current burst read. Rejecting on
+         * these caused the first FIFO read to always fail after start_frame. */
+        if ((gsr0 & XENSIV_BGT60TRXX_REG_GSR0_FOU_ERR_MSK) == 0U)
         {
             retval = xensiv_bgt60trxx_platform_spi_fifo_read(dev->iface,
                                                              data,
