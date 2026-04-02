@@ -17,6 +17,9 @@
 #include "my_lidar_inf.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
+#include "dsps_biquad.h"
+#include "dsps_biquad_gen.h"
+#include "dsps_fft2r.h"
 
 #define XENSIV_BGT60TRXX_CONF_IMPL
 /* Defaults to tr13c, uncomment for utr11 */
@@ -44,7 +47,7 @@
 #define RADAR_PROFILE_VGA_GAIN_RX1          (5U)              /* VGA=5 -> IF 43dB */
 
 #define RADAR_DISTANCE_THRESHOLD_DB         (-5.0f)           /* 基于实测信号水平调整 */
-#define RADAR_DISTANCE_LOG_INTERVAL_MS      (250U)
+#define RADAR_DISTANCE_LOG_INTERVAL_MS      (1000U)           /* 综合日志 1Hz */
 #define RADAR_IRQ_WAIT_HIGH_TIMEOUT_MS      (250U)
 #define RADAR_IRQ_WAIT_LOW_TIMEOUT_MS       (20U)
 #define RADAR_MEASUREMENT_REARM_DELAY_MS    (100U)
@@ -54,7 +57,7 @@
 #define RADAR_RANGE_TRACK_LOCAL_RADIUS_BINS (3)
 #define RADAR_RANGE_TRACK_SWITCH_RATIO      (1.35f)
 #define RADAR_RANGE_TRACK_MAX_STEP_BINS     (1)
-#define RADAR_PRESENCE_HISTORY_LEN          (100U)            /* 10Hz * 10s */
+#define RADAR_PRESENCE_HISTORY_LEN          (200U)            /* 10Hz * 20s, 足够心率分析 */
 #define RADAR_PRESENCE_FRAME_RATE_HZ        (10.0f)
 #define RADAR_PRESENCE_ENERGY_RADIUS_BINS   (2)
 #define RADAR_PHASE_WINDOW_SECONDS          (6.0f)
@@ -70,6 +73,8 @@
 #define RADAR_PHASE_DIFF_CLIP               (0.30f)
 #define RADAR_PHASE_SMOOTH_LEN              (7U)
 #define RADAR_WAVELENGTH_MM                 (5.0f)            /* c / 60GHz */
+#define RADAR_VITALS_FFT_SIZE               (1024U)           /* 200 samples × 4 零填充 → 对齐 1024 */
+#define RADAR_VITALS_INTERVAL_FRAMES        (200U)            /* 每 200 帧 (20s) 做一次 vitals 估算 */
 #define RADAR_PI_F                          (3.14159265358979323846f)
 
 /* FIFO 分片读取：BGT60TR13C FIFO 上限 8192 样本，24576 总样本需分 6 片
@@ -112,7 +117,7 @@
 
 /* RTOS tasks */
 #define RADAR_TASK_NAME                     "radar_task"
-#define RADAR_TASK_STACK_SIZE               (configMINIMAL_STACK_SIZE * 8)
+#define RADAR_TASK_STACK_SIZE               (configMINIMAL_STACK_SIZE * 16)
 #define RADAR_TASK_PRIORITY                 (configMAX_PRIORITIES - 1)
 
 #define TAG                                 "radar_task"
@@ -147,10 +152,6 @@ static int32_t radar_select_tracked_range_bin(const float32_t *range_energy,
                                               int32_t bin_min,
                                               int32_t bin_max,
                                               int32_t tracked_bin);
-static void radar_append_float_history(float32_t *buffer,
-                                       uint32_t *count,
-                                       uint32_t capacity,
-                                       float32_t value);
 static void radar_append_int_history(int32_t *buffer,
                                      uint32_t *count,
                                      uint32_t capacity,
@@ -170,6 +171,19 @@ static uint32_t radar_count_peaks(const float32_t *values,
                                   float32_t threshold,
                                   bool positive_peaks);
 static void radar_update_presence(void *result_ptr);
+static void radar_vitals_init_filters(void);
+static void radar_filtfilt_biquad(float32_t *data, uint32_t len,
+                                  float coefs[][5], uint32_t num_stages,
+                                  float32_t *temp);
+static float32_t radar_estimate_rate_hz(const float32_t *signal, uint32_t len,
+                                         float32_t fs,
+                                         float32_t freq_min, float32_t freq_max);
+static void radar_remove_breath_harmonics(float32_t *heart_sig, uint32_t len,
+                                           float32_t breath_hz, float32_t fs);
+static void radar_linearize_float(const float32_t *ring, uint32_t ring_len,
+                                   uint32_t head, uint32_t total, uint32_t want,
+                                   float32_t *out);
+static float32_t radar_small_median(const float32_t *arr, uint32_t n);
 
 
 typedef struct
@@ -191,8 +205,13 @@ typedef struct
     bool phase_present;
     bool amplitude_present;
     bool bin_present;
+    float32_t breath_rate_bpm;
+    float32_t heart_rate_bpm;
+    float32_t breath_wave;              /* 实时呼吸波形 */
+    float32_t heart_wave;               /* 实时心率波形 */
 } radar_frame_result_t;
 
+static void radar_estimate_vitals(radar_frame_result_t *result);
 
 typedef struct
 {
@@ -202,10 +221,35 @@ typedef struct
     float32_t amplitude_history[RADAR_PRESENCE_HISTORY_LEN];
     int32_t bin_history[RADAR_PRESENCE_HISTORY_LEN];
     uint32_t history_count;
+    uint32_t history_head;              /* 循环缓冲区写入位置 */
     bool has_unwrapped_phase;
     float32_t last_unwrapped_phase;
     bool presence_latched;
     uint32_t presence_misses;
+
+    /* ---- 生命体征 IIR 滤波器 ---- */
+    float breath_bpf_coef[2][5];        /* 呼吸 BPF: 2 级二阶节 */
+    float breath_bpf_w[2][2];           /* 延迟线 */
+    float heart_bpf_coef[3][5];         /* 心率 BPF: 3 级二阶节 */
+    float heart_bpf_w[3][2];            /* 延迟线 */
+
+    /* 频率估算结果中值平滑历史 */
+    float breath_hz_history[3];
+    float heart_hz_history[5];
+    uint32_t breath_hz_count;
+    uint32_t heart_hz_count;
+
+    /* 最终输出 BPM */
+    float32_t breath_rate_bpm;
+    float32_t heart_rate_bpm;
+    uint32_t vitals_frame_counter;      /* 用于控制 vitals 计算频率 */
+    bool vitals_filters_inited;
+
+    /* 实时波形 IIR 延迟线（单向因果滤波，每帧更新） */
+    float rt_breath_w[2][2];            /* 呼吸 BPF 2 级延迟线 */
+    float rt_heart_w[3][2];             /* 心率 BPF 3 级延迟线 */
+    float32_t rt_breath_wave;           /* 当前帧呼吸波形值 */
+    float32_t rt_heart_wave;            /* 当前帧心率波形值 */
 } radar_presence_state_t;
 
 
@@ -228,6 +272,9 @@ static cfloat32_t distance_range_fft[NUM_SAMPLES_PER_CHIRP / 2U];
 static float32_t range_energy_accum[NUM_SAMPLES_PER_CHIRP / 2U];
 static cfloat32_t coherent_range_accum[NUM_SAMPLES_PER_CHIRP / 2U];
 static cfloat32_t coherent_range_avg[NUM_SAMPLES_PER_CHIRP / 2U];
+
+/* 生命体征 FFT 工作缓冲区（1024 点复数 = 2048 float = 8KB，静态分配） */
+static float32_t vitals_fft_buf[RADAR_VITALS_FFT_SIZE * 2U];
 
 static TaskHandle_t radar_task_handler;
 static uint32_t radar_frame_counter = 0;
@@ -419,50 +466,37 @@ static void radar_task(void *pvParameters)
         s_radar_data.phase_present = frame_result.phase_present ? 1U : 0U;
         s_radar_data.amplitude_present = frame_result.amplitude_present ? 1U : 0U;
         s_radar_data.bin_present = frame_result.bin_present ? 1U : 0U;
+        s_radar_data.breath_rate_bpm = frame_result.breath_rate_bpm;
+        s_radar_data.heart_rate_bpm = frame_result.heart_rate_bpm;
+        s_radar_data.breath_wave = frame_result.breath_wave;
+        s_radar_data.heart_wave = frame_result.heart_wave;
         s_radar_data.frame_counter = radar_frame_counter;
         export_snapshot = s_radar_data;
         taskEXIT_CRITICAL(&s_radar_data_mux);
 
+        /* 波形日志：每帧 (10Hz) */
+        ESP_LOGI(TAG, "Wave: breath=%.6f heart=%.6f frame=%" PRIu32,
+                 export_snapshot.breath_wave,
+                 export_snapshot.heart_wave,
+                 export_snapshot.frame_counter);
+
+        /* 综合日志：1Hz */
         if ((radar_distance_last_log_ms == 0U) ||
             ((time_ms - radar_distance_last_log_ms) >= RADAR_DISTANCE_LOG_INTERVAL_MS))
         {
-            if (export_snapshot.target_detected != 0U)
-            {
-                ESP_LOGI(TAG,
-                         "Distance export: detected=yes distance=%.1fcm bin=%" PRIi32
-                         " level=%.2fdB movement=%.3f frame=%" PRIu32,
-                         export_snapshot.distance_cm,
-                         export_snapshot.range_bin,
-                         export_snapshot.signal_db,
-                         export_snapshot.movement_energy,
-                         export_snapshot.frame_counter);
-            }
-            else
-            {
-                ESP_LOGI(TAG,
-                         "Distance export: detected=no candidate=%.1fcm bin=%" PRIi32
-                         " level=%.2fdB movement=%.3f frame=%" PRIu32
-                         " threshold=%.2fdB",
-                         export_snapshot.distance_cm,
-                         export_snapshot.range_bin,
-                         export_snapshot.signal_db,
-                         export_snapshot.movement_energy,
-                         export_snapshot.frame_counter,
-                         RADAR_DISTANCE_THRESHOLD_DB);
-            }
             ESP_LOGI(TAG,
-                     "Presence export: detected=%s confidence=%.2f distance=%.1fcm "
-                     "phase_exc=%.3fmm amp_cv=%.3f bin_span=%.1f flags(breath=%u phase=%u amp=%u bin=%u)",
+                     "Radar: detected=%s bin=%" PRIi32 " level=%.1fdB movement=%.3f "
+                     "confidence=%.2f distance=%.1fcm "
+                     "breath=%.1fbpm heart=%.1fbpm frame=%" PRIu32,
                      (export_snapshot.presence_detected != 0U) ? "yes" : "no",
+                     export_snapshot.range_bin,
+                     export_snapshot.signal_db,
+                     export_snapshot.movement_energy,
                      export_snapshot.presence_confidence,
                      export_snapshot.presence_distance_cm,
-                     export_snapshot.phase_excursion_mm,
-                     export_snapshot.amplitude_cv,
-                     export_snapshot.bin_span,
-                     (unsigned)export_snapshot.breath_present,
-                     (unsigned)export_snapshot.phase_present,
-                     (unsigned)export_snapshot.amplitude_present,
-                     (unsigned)export_snapshot.bin_present);
+                     export_snapshot.breath_rate_bpm,
+                     export_snapshot.heart_rate_bpm,
+                     export_snapshot.frame_counter);
             radar_distance_last_log_ms = time_ms;
         }
 
@@ -865,31 +899,6 @@ static float32_t radar_calculate_fft_level_db(const cfloat32_t *spectrum, int32_
     }
 
     return 10.0f * log10f(magnitude);
-}
-
-
-/*******************************************************************************
-* Function Name: radar_append_float_history
-********************************************************************************/
-static void radar_append_float_history(float32_t *buffer,
-                                       uint32_t *count,
-                                       uint32_t capacity,
-                                       float32_t value)
-{
-    if ((buffer == NULL) || (count == NULL) || (capacity == 0U))
-    {
-        return;
-    }
-
-    if (*count < capacity)
-    {
-        buffer[*count] = value;
-        (*count)++;
-        return;
-    }
-
-    memmove(buffer, buffer + 1, sizeof(float32_t) * (capacity - 1U));
-    buffer[capacity - 1U] = value;
 }
 
 
@@ -1399,6 +1408,376 @@ static void radar_restart_frame_generator(const char *reason)
 
 
 /*******************************************************************************
+* 生命体征 IIR 滤波器初始化
+* 呼吸 BPF: HPF@0.1Hz + LPF@0.6Hz (2 级级联)
+* 心率 BPF: HPF@0.85Hz + LPF@2.2Hz + BPF@1.525Hz (3 级级联)
+********************************************************************************/
+static void radar_vitals_init_filters(void)
+{
+    const float fs = RADAR_PRESENCE_FRAME_RATE_HZ;
+    const float q_butter = 0.7071f;  /* Butterworth Q */
+
+    /* 呼吸 BPF: 0.1–0.6 Hz */
+    dsps_biquad_gen_hpf_f32(s_presence_state.breath_bpf_coef[0],
+                            0.1f / fs, q_butter);
+    dsps_biquad_gen_lpf_f32(s_presence_state.breath_bpf_coef[1],
+                            0.6f / fs, q_butter);
+
+    /* 心率 BPF: 0.85–2.2 Hz */
+    dsps_biquad_gen_hpf_f32(s_presence_state.heart_bpf_coef[0],
+                            0.85f / fs, q_butter);
+    dsps_biquad_gen_lpf_f32(s_presence_state.heart_bpf_coef[1],
+                            2.2f / fs, q_butter);
+    dsps_biquad_gen_bpf0db_f32(s_presence_state.heart_bpf_coef[2],
+                               1.525f / fs, 1.13f);
+
+    /* 清零延迟线 */
+    memset(s_presence_state.breath_bpf_w, 0, sizeof(s_presence_state.breath_bpf_w));
+    memset(s_presence_state.heart_bpf_w, 0, sizeof(s_presence_state.heart_bpf_w));
+
+    /* 清零频率历史 */
+    memset(s_presence_state.breath_hz_history, 0, sizeof(s_presence_state.breath_hz_history));
+    memset(s_presence_state.heart_hz_history, 0, sizeof(s_presence_state.heart_hz_history));
+    s_presence_state.breath_hz_count = 0;
+    s_presence_state.heart_hz_count = 0;
+    s_presence_state.breath_rate_bpm = 0.0f;
+    s_presence_state.heart_rate_bpm = 0.0f;
+    s_presence_state.vitals_frame_counter = 0;
+
+    /* 实时波形 IIR 延迟线清零 */
+    memset(s_presence_state.rt_breath_w, 0, sizeof(s_presence_state.rt_breath_w));
+    memset(s_presence_state.rt_heart_w, 0, sizeof(s_presence_state.rt_heart_w));
+    s_presence_state.rt_breath_wave = 0.0f;
+    s_presence_state.rt_heart_wave = 0.0f;
+
+    s_presence_state.vitals_filters_inited = true;
+}
+
+
+/*******************************************************************************
+* filtfilt: 零相位 IIR 滤波（正向+反向）
+* coefs: N 组 [5] 系数, num_stages: 级联阶数
+* 注意: data 会被原地修改, temp 为等长工作缓冲区
+********************************************************************************/
+static void radar_filtfilt_biquad(float32_t *data, uint32_t len,
+                                  float coefs[][5], uint32_t num_stages,
+                                  float32_t *temp)
+{
+    if (len < 2U) { return; }
+
+    /* 正向滤波 */
+    for (uint32_t s = 0; s < num_stages; s++)
+    {
+        float w[2] = {0.0f, 0.0f};
+        dsps_biquad_f32(data, temp, (int)len, coefs[s], w);
+        memcpy(data, temp, len * sizeof(float32_t));
+    }
+
+    /* 反转 */
+    for (uint32_t i = 0; i < len / 2U; i++)
+    {
+        float32_t t = data[i];
+        data[i] = data[len - 1U - i];
+        data[len - 1U - i] = t;
+    }
+
+    /* 反向滤波 */
+    for (uint32_t s = 0; s < num_stages; s++)
+    {
+        float w[2] = {0.0f, 0.0f};
+        dsps_biquad_f32(data, temp, (int)len, coefs[s], w);
+        memcpy(data, temp, len * sizeof(float32_t));
+    }
+
+    /* 再次反转恢复原序 */
+    for (uint32_t i = 0; i < len / 2U; i++)
+    {
+        float32_t t = data[i];
+        data[i] = data[len - 1U - i];
+        data[len - 1U - i] = t;
+    }
+}
+
+
+/*******************************************************************************
+* radar_estimate_rate_hz: FFT 频谱峰值频率估算
+* Blackman 窗 → 零填充到 RADAR_VITALS_FFT_SIZE → FFT → ROI 内找峰 → 抛物线插值
+* 返回 Hz, 失败返回 0
+********************************************************************************/
+static float32_t radar_estimate_rate_hz(const float32_t *signal, uint32_t len,
+                                         float32_t fs,
+                                         float32_t freq_min, float32_t freq_max)
+{
+    if (len < 8U) { return 0.0f; }
+
+    const uint32_t fft_n = RADAR_VITALS_FFT_SIZE;
+
+    /* 清零 FFT 缓冲区 */
+    memset(vitals_fft_buf, 0, sizeof(vitals_fft_buf));
+
+    /* Blackman 窗并写入复数交错格式 (re, im=0) */
+    for (uint32_t i = 0; i < len; i++)
+    {
+        const float32_t w = 0.42f
+            - 0.50f * cosf(2.0f * RADAR_PI_F * (float32_t)i / (float32_t)(len - 1U))
+            + 0.08f * cosf(4.0f * RADAR_PI_F * (float32_t)i / (float32_t)(len - 1U));
+        vitals_fft_buf[i * 2U] = signal[i] * w;     /* real */
+        /* vitals_fft_buf[i*2+1] = 0 已由 memset 清零 */
+    }
+
+    /* FFT + bit reversal */
+    dsps_fft2r_fc32(vitals_fft_buf, (int)fft_n);
+    dsps_bit_rev_fc32(vitals_fft_buf, (int)fft_n);
+
+    /* 计算幅度谱 (只需前 N/2 个 bin) */
+    const uint32_t half_n = fft_n / 2U;
+    const float32_t bin_hz = fs / (float32_t)fft_n;
+
+    /* ROI: [freq_min, freq_max] 对应的 bin 范围 */
+    uint32_t bin_lo = (uint32_t)(freq_min / bin_hz);
+    uint32_t bin_hi = (uint32_t)(freq_max / bin_hz);
+    if (bin_lo < 1U) { bin_lo = 1U; }
+    if (bin_hi >= half_n) { bin_hi = half_n - 1U; }
+    if (bin_lo >= bin_hi) { return 0.0f; }
+
+    /* 在 ROI 内找最大幅度 bin */
+    float32_t max_mag = 0.0f;
+    uint32_t max_bin = bin_lo;
+    for (uint32_t k = bin_lo; k <= bin_hi; k++)
+    {
+        float32_t re = vitals_fft_buf[k * 2U];
+        float32_t im = vitals_fft_buf[k * 2U + 1U];
+        float32_t mag = re * re + im * im;
+        if (mag > max_mag)
+        {
+            max_mag = mag;
+            max_bin = k;
+        }
+    }
+
+    if (max_mag < 1.0e-12f) { return 0.0f; }
+
+    /* 抛物线插值精确频率 */
+    float32_t peak_bin = (float32_t)max_bin;
+    if (max_bin > bin_lo && max_bin < bin_hi)
+    {
+        float32_t re_l = vitals_fft_buf[(max_bin - 1U) * 2U];
+        float32_t im_l = vitals_fft_buf[(max_bin - 1U) * 2U + 1U];
+        float32_t re_r = vitals_fft_buf[(max_bin + 1U) * 2U];
+        float32_t im_r = vitals_fft_buf[(max_bin + 1U) * 2U + 1U];
+        float32_t alpha = sqrtf(re_l * re_l + im_l * im_l);
+        float32_t beta  = sqrtf(max_mag);
+        float32_t gamma = sqrtf(re_r * re_r + im_r * im_r);
+        float32_t denom = alpha - 2.0f * beta + gamma;
+        if (fabsf(denom) > 1.0e-10f)
+        {
+            peak_bin += 0.5f * (alpha - gamma) / denom;
+        }
+    }
+
+    return peak_bin * bin_hz;
+}
+
+
+/*******************************************************************************
+* radar_remove_breath_harmonics: 去除心率信号中的呼吸谐波
+* 对 breath_hz 的 2~8 次谐波，在心率频段 (0.85–2.2 Hz) 内施加 notch 滤波
+********************************************************************************/
+static void radar_remove_breath_harmonics(float32_t *heart_sig, uint32_t len,
+                                           float32_t breath_hz, float32_t fs)
+{
+    if (breath_hz < 0.05f || len < 4U) { return; }
+
+    const float32_t heart_lo = 0.85f;
+    const float32_t heart_hi = 2.2f;
+    float32_t temp[RADAR_PRESENCE_HISTORY_LEN];
+
+    for (uint32_t h = 2; h <= 8; h++)
+    {
+        float32_t harmonic = breath_hz * (float32_t)h;
+        if (harmonic < heart_lo || harmonic > heart_hi)
+        {
+            continue;
+        }
+
+        float notch_coef[5];
+        dsps_biquad_gen_notch_f32(notch_coef, harmonic / fs, -40.0f, 30.0f);
+
+        float w[2] = {0.0f, 0.0f};
+        dsps_biquad_f32(heart_sig, temp, (int)len, notch_coef, w);
+        memcpy(heart_sig, temp, len * sizeof(float32_t));
+    }
+}
+
+
+/*******************************************************************************
+* 循环缓冲区辅助：将最近 want 个样本线性化到 out
+********************************************************************************/
+static void radar_linearize_float(const float32_t *ring, uint32_t ring_len,
+                                   uint32_t head, uint32_t total, uint32_t want,
+                                   float32_t *out)
+{
+    if (want > total) { want = total; }
+    uint32_t start = (head + ring_len - want) % ring_len;
+    if (start + want <= ring_len)
+    {
+        memcpy(out, &ring[start], want * sizeof(float32_t));
+    }
+    else
+    {
+        uint32_t first = ring_len - start;
+        memcpy(out, &ring[start], first * sizeof(float32_t));
+        memcpy(out + first, ring, (want - first) * sizeof(float32_t));
+    }
+}
+
+
+/*******************************************************************************
+* 简单中值（小数组用，n<=5）
+********************************************************************************/
+static float32_t radar_small_median(const float32_t *arr, uint32_t n)
+{
+    float32_t sorted[5];
+    if (n == 0U) { return 0.0f; }
+    if (n > 5U) { n = 5U; }
+    memcpy(sorted, arr, n * sizeof(float32_t));
+    for (uint32_t i = 0; i < n - 1U; i++)
+    {
+        for (uint32_t j = i + 1U; j < n; j++)
+        {
+            if (sorted[j] < sorted[i])
+            {
+                float32_t t = sorted[i];
+                sorted[i] = sorted[j];
+                sorted[j] = t;
+            }
+        }
+    }
+    return sorted[n / 2U];
+}
+
+
+/*******************************************************************************
+* radar_estimate_vitals: 生命体征估算主函数
+* 每 RADAR_VITALS_INTERVAL_FRAMES 帧调用一次
+* 从相位历史提取呼吸和心率频率
+********************************************************************************/
+static void radar_estimate_vitals(radar_frame_result_t *result)
+{
+    if (!s_presence_state.vitals_filters_inited)
+    {
+        radar_vitals_init_filters();
+    }
+
+    const uint32_t total = s_presence_state.history_count;
+    if (total < RADAR_PRESENCE_HISTORY_LEN)
+    {
+        return;  /* 缓冲区未满，不进行分析 */
+    }
+
+    const float32_t fs = RADAR_PRESENCE_FRAME_RATE_HZ;
+    const uint32_t head = s_presence_state.history_head;
+    const uint32_t len = RADAR_PRESENCE_HISTORY_LEN;
+
+    /* 线性化最近 200 帧相位 */
+    float32_t phase_buf[RADAR_PRESENCE_HISTORY_LEN];
+    radar_linearize_float(s_presence_state.phase_history, len,
+                          head, total, len, phase_buf);
+
+    /* 相位预处理: 去均值 → 差分裁剪 → 平滑 */
+    float32_t processed[RADAR_PRESENCE_HISTORY_LEN];
+    radar_process_phase_signal(phase_buf, len, processed);
+
+    /* filtfilt 工作缓冲区 */
+    float32_t filt_temp[RADAR_PRESENCE_HISTORY_LEN];
+
+    /* ---- 呼吸率 ---- */
+    float32_t breath_sig[RADAR_PRESENCE_HISTORY_LEN];
+    memcpy(breath_sig, processed, len * sizeof(float32_t));
+    radar_filtfilt_biquad(breath_sig, len,
+                          s_presence_state.breath_bpf_coef, 2U,
+                          filt_temp);
+    float32_t breath_hz = radar_estimate_rate_hz(breath_sig, len,
+                                                  fs, 0.15f, 0.45f);
+
+    /* 中值平滑呼吸率 */
+    if (breath_hz > 0.0f)
+    {
+        uint32_t idx = s_presence_state.breath_hz_count % 3U;
+        s_presence_state.breath_hz_history[idx] = breath_hz;
+        if (s_presence_state.breath_hz_count < 3U)
+        {
+            s_presence_state.breath_hz_count++;
+        }
+        else
+        {
+            s_presence_state.breath_hz_count++;
+        }
+        uint32_t n = (s_presence_state.breath_hz_count < 3U)
+                     ? s_presence_state.breath_hz_count : 3U;
+        breath_hz = radar_small_median(s_presence_state.breath_hz_history, n);
+    }
+
+    /* ---- 心率 ---- */
+    float32_t heart_sig[RADAR_PRESENCE_HISTORY_LEN];
+    memcpy(heart_sig, processed, len * sizeof(float32_t));
+    radar_filtfilt_biquad(heart_sig, len,
+                          s_presence_state.heart_bpf_coef, 3U,
+                          filt_temp);
+
+    /* 去除呼吸谐波 */
+    if (breath_hz > 0.0f)
+    {
+        radar_remove_breath_harmonics(heart_sig, len, breath_hz, fs);
+    }
+
+    float32_t heart_hz = radar_estimate_rate_hz(heart_sig, len,
+                                                 fs, 0.85f, 2.2f);
+
+    /* 心率离群值拒绝 (±12 BPM) + 中值平滑 */
+    if (heart_hz > 0.0f)
+    {
+        float32_t heart_bpm_raw = heart_hz * 60.0f;
+        if (s_presence_state.heart_hz_count > 0U)
+        {
+            uint32_t n_prev = (s_presence_state.heart_hz_count < 5U)
+                              ? s_presence_state.heart_hz_count : 5U;
+            float32_t prev_median = radar_small_median(
+                s_presence_state.heart_hz_history, n_prev) * 60.0f;
+            if (fabsf(heart_bpm_raw - prev_median) > 12.0f)
+            {
+                heart_hz = 0.0f;  /* 拒绝离群值 */
+            }
+        }
+    }
+
+    if (heart_hz > 0.0f)
+    {
+        uint32_t idx = s_presence_state.heart_hz_count % 5U;
+        s_presence_state.heart_hz_history[idx] = heart_hz;
+        if (s_presence_state.heart_hz_count < 5U)
+        {
+            s_presence_state.heart_hz_count++;
+        }
+        else
+        {
+            s_presence_state.heart_hz_count++;
+        }
+        uint32_t n = (s_presence_state.heart_hz_count < 5U)
+                     ? s_presence_state.heart_hz_count : 5U;
+        heart_hz = radar_small_median(s_presence_state.heart_hz_history, n);
+    }
+
+    /* 写入结果 */
+    s_presence_state.breath_rate_bpm = breath_hz * 60.0f;
+    s_presence_state.heart_rate_bpm = heart_hz * 60.0f;
+
+    result->breath_rate_bpm = s_presence_state.breath_rate_bpm;
+    result->heart_rate_bpm = s_presence_state.heart_rate_bpm;
+}
+
+
+/*******************************************************************************
 * Function Name: radar_update_presence
 ********************************************************************************/
 static void radar_update_presence(void *result_ptr)
@@ -1409,28 +1788,17 @@ static void radar_update_presence(void *result_ptr)
         return;
     }
 
-    if (s_presence_state.history_count < RADAR_PRESENCE_HISTORY_LEN)
+    /* 循环缓冲区写入 */
     {
-        const uint32_t index = s_presence_state.history_count;
-        s_presence_state.phase_history[index] = result->phase_unwrapped;
-        s_presence_state.amplitude_history[index] = result->amplitude_metric;
-        s_presence_state.bin_history[index] = result->range_bin;
-        s_presence_state.history_count++;
-    }
-    else
-    {
-        memmove(s_presence_state.phase_history,
-                s_presence_state.phase_history + 1,
-                sizeof(float32_t) * (RADAR_PRESENCE_HISTORY_LEN - 1U));
-        memmove(s_presence_state.amplitude_history,
-                s_presence_state.amplitude_history + 1,
-                sizeof(float32_t) * (RADAR_PRESENCE_HISTORY_LEN - 1U));
-        memmove(s_presence_state.bin_history,
-                s_presence_state.bin_history + 1,
-                sizeof(int32_t) * (RADAR_PRESENCE_HISTORY_LEN - 1U));
-        s_presence_state.phase_history[RADAR_PRESENCE_HISTORY_LEN - 1U] = result->phase_unwrapped;
-        s_presence_state.amplitude_history[RADAR_PRESENCE_HISTORY_LEN - 1U] = result->amplitude_metric;
-        s_presence_state.bin_history[RADAR_PRESENCE_HISTORY_LEN - 1U] = result->range_bin;
+        const uint32_t idx = s_presence_state.history_head;
+        s_presence_state.phase_history[idx] = result->phase_unwrapped;
+        s_presence_state.amplitude_history[idx] = result->amplitude_metric;
+        s_presence_state.bin_history[idx] = result->range_bin;
+        s_presence_state.history_head = (idx + 1U) % RADAR_PRESENCE_HISTORY_LEN;
+        if (s_presence_state.history_count < RADAR_PRESENCE_HISTORY_LEN)
+        {
+            s_presence_state.history_count++;
+        }
     }
 
     const uint32_t total_count = s_presence_state.history_count;
@@ -1458,45 +1826,53 @@ static void radar_update_presence(void *result_ptr)
         return;
     }
 
-    const float32_t *phase_recent = &s_presence_state.phase_history[total_count - phase_count];
-    const float32_t *amp_recent = &s_presence_state.amplitude_history[total_count - amp_count];
-    const int32_t *bin_recent = &s_presence_state.bin_history[total_count - bin_count];
+    /* 复用的线性化临时缓冲区 */
+    float32_t hist_linear[RADAR_PRESENCE_HISTORY_LEN];
+    const uint32_t head = s_presence_state.history_head;
 
+    /* ---- 相位偏移 ---- */
+    radar_linearize_float(s_presence_state.phase_history, RADAR_PRESENCE_HISTORY_LEN,
+                          head, total_count, phase_count, hist_linear);
     result->phase_excursion_mm =
-        radar_percentile_abs_dev(phase_recent, phase_count, 90.0f) *
+        radar_percentile_abs_dev(hist_linear, phase_count, 90.0f) *
         (RADAR_WAVELENGTH_MM / (4.0f * RADAR_PI_F));
     result->phase_present = (result->phase_excursion_mm >= RADAR_PRESENCE_PHASE_EXC_MM_TH);
 
+    /* ---- 振幅变异系数 ---- */
+    radar_linearize_float(s_presence_state.amplitude_history, RADAR_PRESENCE_HISTORY_LEN,
+                          head, total_count, amp_count, hist_linear);
     float32_t amp_abs[RADAR_PRESENCE_HISTORY_LEN];
     for (uint32_t i = 0; i < amp_count; i++)
     {
-        amp_abs[i] = fabsf(amp_recent[i]);
+        amp_abs[i] = fabsf(hist_linear[i]);
     }
     const float32_t amp_median = fmaxf(radar_median_float(amp_abs, amp_count), 1.0e-6f);
-    result->amplitude_cv = radar_std_float(amp_recent, amp_count) / amp_median;
+    result->amplitude_cv = radar_std_float(hist_linear, amp_count) / amp_median;
     result->amplitude_present = (result->amplitude_cv <= RADAR_PRESENCE_AMP_CV_TH);
 
-    int32_t bin_min = bin_recent[0];
-    int32_t bin_max = bin_recent[0];
-    for (uint32_t i = 1; i < bin_count; i++)
+    /* ---- bin 跨度（直接遍历环形缓冲区，无需线性化） ---- */
     {
-        if (bin_recent[i] < bin_min)
+        uint32_t bin_start = (head + RADAR_PRESENCE_HISTORY_LEN - bin_count)
+                             % RADAR_PRESENCE_HISTORY_LEN;
+        int32_t bin_min = s_presence_state.bin_history[bin_start];
+        int32_t bin_max = bin_min;
+        for (uint32_t i = 1; i < bin_count; i++)
         {
-            bin_min = bin_recent[i];
+            uint32_t phys = (bin_start + i) % RADAR_PRESENCE_HISTORY_LEN;
+            int32_t v = s_presence_state.bin_history[phys];
+            if (v < bin_min) { bin_min = v; }
+            if (v > bin_max) { bin_max = v; }
         }
-        if (bin_recent[i] > bin_max)
-        {
-            bin_max = bin_recent[i];
-        }
+        result->bin_span = (float32_t)(bin_max - bin_min);
+        result->bin_present = (result->bin_span <= RADAR_PRESENCE_BIN_SPAN_TH);
     }
-    result->bin_span = (float32_t)(bin_max - bin_min);
-    result->bin_present = (result->bin_span <= RADAR_PRESENCE_BIN_SPAN_TH);
 
+    /* ---- 呼吸峰计数 ---- */
     float32_t breath_processed[RADAR_PRESENCE_HISTORY_LEN];
     memset(breath_processed, 0, sizeof(breath_processed));
-    radar_process_phase_signal(&s_presence_state.phase_history[total_count - breath_count],
-                               breath_count,
-                               breath_processed);
+    radar_linearize_float(s_presence_state.phase_history, RADAR_PRESENCE_HISTORY_LEN,
+                          head, total_count, breath_count, hist_linear);
+    radar_process_phase_signal(hist_linear, breath_count, breath_processed);
     const uint32_t peaks_pos = radar_count_peaks(breath_processed,
                                                  breath_count,
                                                  RADAR_PRESENCE_PEAK_HEIGHT,
@@ -1549,6 +1925,66 @@ static void radar_update_presence(void *result_ptr)
     result->presence_detected = s_presence_state.presence_latched;
     result->presence_distance_cm =
         result->presence_detected ? radar_calculate_distance_cm_from_bin(result->range_bin) : 0.0f;
+
+    /* 生命体征估算（每 RADAR_VITALS_INTERVAL_FRAMES 帧执行一次） */
+    s_presence_state.vitals_frame_counter++;
+    if (s_presence_state.vitals_frame_counter >= RADAR_VITALS_INTERVAL_FRAMES)
+    {
+        s_presence_state.vitals_frame_counter = 0;
+        if (result->presence_detected)
+        {
+            radar_estimate_vitals(result);
+        }
+        else
+        {
+            /* 无人时清零 */
+            s_presence_state.breath_rate_bpm = 0.0f;
+            s_presence_state.heart_rate_bpm = 0.0f;
+            s_presence_state.breath_hz_count = 0;
+            s_presence_state.heart_hz_count = 0;
+            result->breath_rate_bpm = 0.0f;
+            result->heart_rate_bpm = 0.0f;
+        }
+    }
+    else
+    {
+        /* 非估算帧：输出上次的结果 */
+        result->breath_rate_bpm = s_presence_state.breath_rate_bpm;
+        result->heart_rate_bpm = s_presence_state.heart_rate_bpm;
+    }
+
+    /* ---- 实时波形：每帧 IIR 滤波当前相位样本 ---- */
+    if (s_presence_state.vitals_filters_inited)
+    {
+        float32_t sample = result->phase_unwrapped;
+        float32_t filtered;
+
+        /* 呼吸波形：2 级 BPF 级联 */
+        filtered = sample;
+        for (uint32_t s = 0; s < 2U; s++)
+        {
+            float out;
+            dsps_biquad_f32(&filtered, &out, 1,
+                            s_presence_state.breath_bpf_coef[s],
+                            s_presence_state.rt_breath_w[s]);
+            filtered = out;
+        }
+        s_presence_state.rt_breath_wave = filtered;
+        result->breath_wave = filtered;
+
+        /* 心率波形：3 级 BPF 级联 */
+        filtered = sample;
+        for (uint32_t s = 0; s < 3U; s++)
+        {
+            float out;
+            dsps_biquad_f32(&filtered, &out, 1,
+                            s_presence_state.heart_bpf_coef[s],
+                            s_presence_state.rt_heart_w[s]);
+            filtered = out;
+        }
+        s_presence_state.rt_heart_wave = filtered;
+        result->heart_wave = filtered;
+    }
 }
 
 

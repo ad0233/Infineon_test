@@ -81,10 +81,10 @@ Sensor initialized OK
 Radar distance measurement started. bin_length=0.037m
 ```
 
-**健康运行（每帧两行）：**
+**健康运行：**
 ```
-Distance export: detected=yes distance=XXcm bin=XX level=XXdB movement=X.XXX frame=XXXX
-Presence export: detected=yes confidence=0.80 distance=XXcm phase_exc=X.XXXmm amp_cv=X.XXX bin_span=X.X flags(breath=1 phase=1 amp=0 bin=0)
+Wave: breath=0.001234 heart=0.000567 frame=XXX           (每帧 10Hz)
+Radar: detected=yes bin=XX level=X.XdB movement=X.XXX confidence=X.XX distance=XX.Xcm breath=XX.Xbpm heart=XX.Xbpm frame=XXX  (1Hz)
 ```
 
 **可忽略的日志：**
@@ -118,3 +118,16 @@ idf.py menuconfig
 2. 再改 `dependencies/sensor-xensiv-bgt60trxx/`（需说明封装层为何无法解决）
 3. 保持 C 风格接口和 snake_case 命名
 4. 不引入 class、继承、模板式重构
+
+## ESP32 嵌入式约束
+
+- ESP32-P4 FreeRTOS 任务栈有限，**禁止在函数内声明大数组（>512B）**，改用 static 或堆分配。
+- SPI CS 由 sensor 库软件控制，SPI 总线配置必须 `spics_io_num = -1`，CS 引脚仍需 gpio_config 初始化为输出。
+- 使用任何 SDK/库 API 前，**先读源码确认方法存在**，不要猜测方法名。
+
+## 协作纪律
+
+- 每次会话聚焦一个目标，完成验证后再切换下一个。
+- 用户有自动编译+烧录脚本，代码改完不需要提醒编译或烧录。
+- 用户说"同步"或"复制"文件时，先确认是 git 操作（merge/rebase）还是文件拷贝，不要自行假设。
+- Python 代码中的中文标签、列名、UI 字符串一律使用**简体中文**，不要用繁体。

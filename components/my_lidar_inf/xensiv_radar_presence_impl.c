@@ -144,8 +144,8 @@ int32_t xensiv_radar_presence_alloc(xensiv_radar_presence_handle_t *handle,
     ctx->absence_count = 0;
     ctx->doppler_frame_count = 0;
     
-    // Initialize FFT
-    if (dsps_fft2r_init_fc32(NULL, num_samples) != ESP_OK) {
+    // Initialize FFT — use 1024 to cover both range FFT (128) and vitals FFT (1024)
+    if (dsps_fft2r_init_fc32(NULL, 1024) != ESP_OK) {
         ESP_LOGE(TAG, "FFT initialization failed");
         xensiv_radar_presence_free((xensiv_radar_presence_handle_t)ctx);
         return XENSIV_RADAR_PRESENCE_FFT_LEN_ERROR;
