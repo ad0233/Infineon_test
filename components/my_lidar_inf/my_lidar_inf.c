@@ -1414,6 +1414,15 @@ static void radar_restart_frame_generator(const char *reason)
 ********************************************************************************/
 static void radar_vitals_init_filters(void)
 {
+    /* 强制 FFT twiddle 表扩展到 1024 点。
+     * sensor-dsp 可能先以 64/128 初始化，表太小导致 1024-FFT 越界。
+     * deinit 释放旧表，再 init 1024 → 兼容所有尺寸。 */
+    dsps_fft2r_deinit_fc32();
+    esp_err_t fft_ret = dsps_fft2r_init_fc32(NULL, RADAR_VITALS_FFT_SIZE);
+    if (fft_ret != ESP_OK) {
+        ESP_LOGE(TAG, "FFT init 1024 failed: %d", (int)fft_ret);
+    }
+
     const float fs = RADAR_PRESENCE_FRAME_RATE_HZ;
     const float q_butter = 0.7071f;  /* Butterworth Q */
 
@@ -1684,9 +1693,28 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
     radar_linearize_float(s_presence_state.phase_history, len,
                           head, total, len, phase_buf);
 
-    /* 相位预处理: 去均值 → 差分裁剪 → 平滑 */
+    /* 相位预处理: 去均值 → 差分裁剪 → 平滑（用于呼吸） */
     float32_t processed[RADAR_PRESENCE_HISTORY_LEN];
     radar_process_phase_signal(phase_buf, len, processed);
+
+    /* 差分裁剪但不平滑的版本（用于心率，保留高频分量）
+     * 复用 phase_buf 避免额外栈分配 */
+    {
+        float32_t mean = 0.0f;
+        for (uint32_t i = 0; i < len; i++) { mean += phase_buf[i]; }
+        mean /= (float32_t)len;
+        float32_t prev = phase_buf[0] - mean;
+        phase_buf[0] = 0.0f;
+        for (uint32_t i = 1; i < len; i++)
+        {
+            float32_t cur = phase_buf[i] - mean;
+            phase_buf[i] = radar_clampf(cur - prev,
+                                        -RADAR_PHASE_DIFF_CLIP,
+                                        RADAR_PHASE_DIFF_CLIP);
+            prev = cur;
+        }
+    }
+    /* phase_buf 现在是 diff-clipped 信号（无平滑），用于心率 */
 
     /* filtfilt 工作缓冲区 */
     float32_t filt_temp[RADAR_PRESENCE_HISTORY_LEN];
@@ -1698,29 +1726,22 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
                           s_presence_state.breath_bpf_coef, 2U,
                           filt_temp);
     float32_t breath_hz = radar_estimate_rate_hz(breath_sig, len,
-                                                  fs, 0.15f, 0.45f);
+                                                  fs, 0.20f, 0.50f);
 
     /* 中值平滑呼吸率 */
     if (breath_hz > 0.0f)
     {
         uint32_t idx = s_presence_state.breath_hz_count % 3U;
         s_presence_state.breath_hz_history[idx] = breath_hz;
-        if (s_presence_state.breath_hz_count < 3U)
-        {
-            s_presence_state.breath_hz_count++;
-        }
-        else
-        {
-            s_presence_state.breath_hz_count++;
-        }
+        s_presence_state.breath_hz_count++;
         uint32_t n = (s_presence_state.breath_hz_count < 3U)
                      ? s_presence_state.breath_hz_count : 3U;
         breath_hz = radar_small_median(s_presence_state.breath_hz_history, n);
     }
 
-    /* ---- 心率 ---- */
+    /* ---- 心率：使用未平滑的差分信号，保留 0.85-2.2Hz 分量 ---- */
     float32_t heart_sig[RADAR_PRESENCE_HISTORY_LEN];
-    memcpy(heart_sig, processed, len * sizeof(float32_t));
+    memcpy(heart_sig, phase_buf, len * sizeof(float32_t));
     radar_filtfilt_biquad(heart_sig, len,
                           s_presence_state.heart_bpf_coef, 3U,
                           filt_temp);
@@ -1734,20 +1755,22 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
     float32_t heart_hz = radar_estimate_rate_hz(heart_sig, len,
                                                  fs, 0.85f, 2.2f);
 
-    /* 心率离群值拒绝 (±12 BPM) + 中值平滑 */
-    if (heart_hz > 0.0f)
+    ESP_LOGI(TAG, "Vitals raw: breath_hz=%.4f heart_hz=%.4f (%.1f/%.1f BPM)",
+             breath_hz, heart_hz, breath_hz * 60.0f, heart_hz * 60.0f);
+
+    /* FIX: 心率离群值拒绝 — 前 3 次不拒绝（让初始值稳定），之后放宽到 ±25 BPM */
+    if (heart_hz > 0.0f && s_presence_state.heart_hz_count >= 3U)
     {
         float32_t heart_bpm_raw = heart_hz * 60.0f;
-        if (s_presence_state.heart_hz_count > 0U)
+        uint32_t n_prev = (s_presence_state.heart_hz_count < 5U)
+                          ? s_presence_state.heart_hz_count : 5U;
+        float32_t prev_median = radar_small_median(
+            s_presence_state.heart_hz_history, n_prev) * 60.0f;
+        if (fabsf(heart_bpm_raw - prev_median) > 25.0f)
         {
-            uint32_t n_prev = (s_presence_state.heart_hz_count < 5U)
-                              ? s_presence_state.heart_hz_count : 5U;
-            float32_t prev_median = radar_small_median(
-                s_presence_state.heart_hz_history, n_prev) * 60.0f;
-            if (fabsf(heart_bpm_raw - prev_median) > 12.0f)
-            {
-                heart_hz = 0.0f;  /* 拒绝离群值 */
-            }
+            ESP_LOGW(TAG, "Heart outlier rejected: %.1f vs median %.1f",
+                     heart_bpm_raw, prev_median);
+            heart_hz = 0.0f;
         }
     }
 
@@ -1755,14 +1778,7 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
     {
         uint32_t idx = s_presence_state.heart_hz_count % 5U;
         s_presence_state.heart_hz_history[idx] = heart_hz;
-        if (s_presence_state.heart_hz_count < 5U)
-        {
-            s_presence_state.heart_hz_count++;
-        }
-        else
-        {
-            s_presence_state.heart_hz_count++;
-        }
+        s_presence_state.heart_hz_count++;
         uint32_t n = (s_presence_state.heart_hz_count < 5U)
                      ? s_presence_state.heart_hz_count : 5U;
         heart_hz = radar_small_median(s_presence_state.heart_hz_history, n);
@@ -1774,6 +1790,9 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
 
     result->breath_rate_bpm = s_presence_state.breath_rate_bpm;
     result->heart_rate_bpm = s_presence_state.heart_rate_bpm;
+
+    ESP_LOGI(TAG, "Vitals result: breath=%.1fbpm heart=%.1fbpm",
+             result->breath_rate_bpm, result->heart_rate_bpm);
 }
 
 
