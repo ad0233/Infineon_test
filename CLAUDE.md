@@ -8,7 +8,7 @@
 - 回复简洁直接，少解释，多落地。
 - 默认直接执行任务，不先输出大段方案。
 - 除非用户明确要求，否则不要主动新增 Markdown 文档。
-- 编码风格优先遵循 `doc/coding_standard.md`。
+- 编码风格优先遵循 `doc/standards/coding_standard.md`。
 
 ## 项目定位
 
