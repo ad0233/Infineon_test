@@ -29,8 +29,21 @@ typedef struct {
     uint32_t frame_counter;
 } radar_data_t;
 
+/* Presence 校准阈值（运行时可通过 CLI 调节） */
+typedef struct {
+    float peak_height;       /* 呼吸峰高阈值, 默认 0.03 */
+    float phase_exc_mm_th;   /* 相位偏移阈值 mm, 默认 0.08 */
+    float amp_cv_th;         /* 振幅 CV 阈值, 默认 0.35 */
+    float bin_span_th;       /* bin 跨度阈值, 默认 2.0 */
+    float confidence_th;     /* 置信度门限, 默认 0.35 */
+    uint32_t miss_limit;     /* 锁存容忍帧数, 默认 3 */
+    uint8_t debug_log_enabled; /* 10Hz 子指标日志开关 */
+} radar_presence_thresholds_t;
+
 int my_lidar_inf_init(void);
 void my_lidar_inf_get_data(radar_data_t *out);
+void radar_presence_get_thresholds(radar_presence_thresholds_t *out);
+void radar_presence_set_thresholds(const radar_presence_thresholds_t *in);
 
 #ifdef __cplusplus
 }

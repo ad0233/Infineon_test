@@ -15,6 +15,7 @@
 #include "xensiv_bgt60trxx_esp.h"
 
 #include "my_lidar_inf.h"
+#include "cli_task.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "dsps_biquad.h"
@@ -64,12 +65,13 @@
 #define RADAR_AMP_WINDOW_SECONDS            (5.0f)
 #define RADAR_BIN_WINDOW_SECONDS            (5.0f)
 #define RADAR_BREATH_WINDOW_SECONDS         (10.0f)
-#define RADAR_PRESENCE_PEAK_HEIGHT          (0.03f)
-#define RADAR_PRESENCE_PHASE_EXC_MM_TH      (0.08f)
-#define RADAR_PRESENCE_AMP_CV_TH            (0.35f)
-#define RADAR_PRESENCE_BIN_SPAN_TH          (2.0f)
-#define RADAR_PRESENCE_CONFIDENCE_TH        (0.35f)
-#define RADAR_PRESENCE_MISS_LIMIT           (3U)
+/* Presence 阈值默认值（运行时通过 s_presence_thresholds 覆盖） */
+#define RADAR_PRESENCE_DEFAULT_PEAK_HEIGHT      (0.03f)
+#define RADAR_PRESENCE_DEFAULT_PHASE_EXC_MM_TH  (0.08f)
+#define RADAR_PRESENCE_DEFAULT_AMP_CV_TH        (0.35f)
+#define RADAR_PRESENCE_DEFAULT_BIN_SPAN_TH      (2.0f)
+#define RADAR_PRESENCE_DEFAULT_CONFIDENCE_TH    (0.35f)
+#define RADAR_PRESENCE_DEFAULT_MISS_LIMIT       (3U)
 #define RADAR_PHASE_DIFF_CLIP               (0.30f)
 #define RADAR_PHASE_SMOOTH_LEN              (7U)
 #define RADAR_WAVELENGTH_MM                 (5.0f)            /* c / 60GHz */
@@ -276,6 +278,17 @@ static cfloat32_t coherent_range_avg[NUM_SAMPLES_PER_CHIRP / 2U];
 /* 生命体征 FFT 工作缓冲区（1024 点复数 = 2048 float = 8KB，静态分配） */
 static float32_t vitals_fft_buf[RADAR_VITALS_FFT_SIZE * 2U];
 
+/* Presence 校准阈值（运行时可通过 CLI 调节，typedef 在 my_lidar_inf.h） */
+static radar_presence_thresholds_t s_presence_thresholds = {
+    .peak_height       = RADAR_PRESENCE_DEFAULT_PEAK_HEIGHT,
+    .phase_exc_mm_th   = RADAR_PRESENCE_DEFAULT_PHASE_EXC_MM_TH,
+    .amp_cv_th         = RADAR_PRESENCE_DEFAULT_AMP_CV_TH,
+    .bin_span_th       = RADAR_PRESENCE_DEFAULT_BIN_SPAN_TH,
+    .confidence_th     = RADAR_PRESENCE_DEFAULT_CONFIDENCE_TH,
+    .miss_limit        = RADAR_PRESENCE_DEFAULT_MISS_LIMIT,
+    .debug_log_enabled = false,
+};
+
 static TaskHandle_t radar_task_handler;
 static uint32_t radar_frame_counter = 0;
 static uint32_t radar_fifo_error_counter = 0;
@@ -296,6 +309,30 @@ void my_lidar_inf_get_data(radar_data_t *out)
     taskENTER_CRITICAL(&s_radar_data_mux);
     *out = s_radar_data;
     taskEXIT_CRITICAL(&s_radar_data_mux);
+}
+
+void radar_presence_get_thresholds(radar_presence_thresholds_t *out)
+{
+    if (out == NULL) { return; }
+    out->peak_height       = s_presence_thresholds.peak_height;
+    out->phase_exc_mm_th   = s_presence_thresholds.phase_exc_mm_th;
+    out->amp_cv_th         = s_presence_thresholds.amp_cv_th;
+    out->bin_span_th       = s_presence_thresholds.bin_span_th;
+    out->confidence_th     = s_presence_thresholds.confidence_th;
+    out->miss_limit        = s_presence_thresholds.miss_limit;
+    out->debug_log_enabled = s_presence_thresholds.debug_log_enabled;
+}
+
+void radar_presence_set_thresholds(const radar_presence_thresholds_t *in)
+{
+    if (in == NULL) { return; }
+    s_presence_thresholds.peak_height       = in->peak_height;
+    s_presence_thresholds.phase_exc_mm_th   = in->phase_exc_mm_th;
+    s_presence_thresholds.amp_cv_th         = in->amp_cv_th;
+    s_presence_thresholds.bin_span_th       = in->bin_span_th;
+    s_presence_thresholds.confidence_th     = in->confidence_th;
+    s_presence_thresholds.miss_limit        = in->miss_limit;
+    s_presence_thresholds.debug_log_enabled = in->debug_log_enabled;
 }
 
 int my_lidar_inf_init(void)
@@ -359,9 +396,9 @@ static void radar_task(void *pvParameters)
              RADAR_RANGE_TRACK_LOCAL_RADIUS_BINS,
              RADAR_RANGE_TRACK_SWITCH_RATIO,
              RADAR_RANGE_TRACK_MAX_STEP_BINS,
-             RADAR_PRESENCE_PHASE_EXC_MM_TH,
-             RADAR_PRESENCE_AMP_CV_TH,
-             RADAR_PRESENCE_BIN_SPAN_TH);
+             s_presence_thresholds.phase_exc_mm_th,
+             s_presence_thresholds.amp_cv_th,
+             s_presence_thresholds.bin_span_th);
 
     for (;;)
     {
@@ -474,11 +511,11 @@ static void radar_task(void *pvParameters)
         export_snapshot = s_radar_data;
         taskEXIT_CRITICAL(&s_radar_data_mux);
 
-        /* 波形日志：每帧 (10Hz) */
-        ESP_LOGI(TAG, "Wave: breath=%.6f heart=%.6f frame=%" PRIu32,
+        /* 波形日志：关闭（校准 presence 时不需要，需要时取消注释） */
+        /* ESP_LOGI(TAG, "Wave: breath=%.6f heart=%.6f frame=%" PRIu32,
                  export_snapshot.breath_wave,
                  export_snapshot.heart_wave,
-                 export_snapshot.frame_counter);
+                 export_snapshot.frame_counter); */
 
         /* 综合日志：1Hz */
         if ((radar_distance_last_log_ms == 0U) ||
@@ -487,7 +524,8 @@ static void radar_task(void *pvParameters)
             ESP_LOGI(TAG,
                      "Radar: detected=%s bin=%" PRIi32 " level=%.1fdB movement=%.3f "
                      "confidence=%.2f distance=%.1fcm "
-                     "breath=%.1fbpm heart=%.1fbpm frame=%" PRIu32,
+                     "breath=%.1fbpm heart=%.1fbpm frame=%" PRIu32
+                     " phExc=%.3fmm(%s) ampCV=%.3f(%s) binSpan=%.1f(%s) breathPk=%s",
                      (export_snapshot.presence_detected != 0U) ? "yes" : "no",
                      export_snapshot.range_bin,
                      export_snapshot.signal_db,
@@ -496,7 +534,14 @@ static void radar_task(void *pvParameters)
                      export_snapshot.presence_distance_cm,
                      export_snapshot.breath_rate_bpm,
                      export_snapshot.heart_rate_bpm,
-                     export_snapshot.frame_counter);
+                     export_snapshot.frame_counter,
+                     export_snapshot.phase_excursion_mm,
+                     export_snapshot.phase_present ? "Y" : "N",
+                     export_snapshot.amplitude_cv,
+                     export_snapshot.amplitude_present ? "Y" : "N",
+                     export_snapshot.bin_span,
+                     export_snapshot.bin_present ? "Y" : "N",
+                     export_snapshot.breath_present ? "Y" : "N");
             radar_distance_last_log_ms = time_ms;
         }
 
@@ -1855,7 +1900,7 @@ static void radar_update_presence(void *result_ptr)
     result->phase_excursion_mm =
         radar_percentile_abs_dev(hist_linear, phase_count, 90.0f) *
         (RADAR_WAVELENGTH_MM / (4.0f * RADAR_PI_F));
-    result->phase_present = (result->phase_excursion_mm >= RADAR_PRESENCE_PHASE_EXC_MM_TH);
+    result->phase_present = (result->phase_excursion_mm >= s_presence_thresholds.phase_exc_mm_th);
 
     /* ---- 振幅变异系数 ---- */
     radar_linearize_float(s_presence_state.amplitude_history, RADAR_PRESENCE_HISTORY_LEN,
@@ -1867,7 +1912,7 @@ static void radar_update_presence(void *result_ptr)
     }
     const float32_t amp_median = fmaxf(radar_median_float(amp_abs, amp_count), 1.0e-6f);
     result->amplitude_cv = radar_std_float(hist_linear, amp_count) / amp_median;
-    result->amplitude_present = (result->amplitude_cv <= RADAR_PRESENCE_AMP_CV_TH);
+    result->amplitude_present = (result->amplitude_cv <= s_presence_thresholds.amp_cv_th);
 
     /* ---- bin 跨度（直接遍历环形缓冲区，无需线性化） ---- */
     {
@@ -1883,7 +1928,7 @@ static void radar_update_presence(void *result_ptr)
             if (v > bin_max) { bin_max = v; }
         }
         result->bin_span = (float32_t)(bin_max - bin_min);
-        result->bin_present = (result->bin_span <= RADAR_PRESENCE_BIN_SPAN_TH);
+        result->bin_present = (result->bin_span <= s_presence_thresholds.bin_span_th);
     }
 
     /* ---- 呼吸峰计数 ---- */
@@ -1894,11 +1939,11 @@ static void radar_update_presence(void *result_ptr)
     radar_process_phase_signal(hist_linear, breath_count, breath_processed);
     const uint32_t peaks_pos = radar_count_peaks(breath_processed,
                                                  breath_count,
-                                                 RADAR_PRESENCE_PEAK_HEIGHT,
+                                                 s_presence_thresholds.peak_height,
                                                  true);
     const uint32_t peaks_neg = radar_count_peaks(breath_processed,
                                                  breath_count,
-                                                 RADAR_PRESENCE_PEAK_HEIGHT,
+                                                 s_presence_thresholds.peak_height,
                                                  false);
     result->breath_present = ((peaks_pos >= 2U) || (peaks_neg >= 2U));
 
@@ -1921,8 +1966,21 @@ static void radar_update_presence(void *result_ptr)
     }
     result->presence_confidence = confidence;
 
+    /* 10Hz 子指标详细日志（CLI 开关控制） */
+    if (s_presence_thresholds.debug_log_enabled)
+    {
+        ESP_LOGI(TAG,
+                 "PRES_DBG: phExc=%.4fmm ampCV=%.4f binSpan=%.1f "
+                 "peaks+=%"PRIu32" peaks-=%"PRIu32" conf=%.2f",
+                 result->phase_excursion_mm,
+                 result->amplitude_cv,
+                 result->bin_span,
+                 peaks_pos, peaks_neg,
+                 confidence);
+    }
+
     const bool raw_present =
-        (confidence >= RADAR_PRESENCE_CONFIDENCE_TH) ||
+        (confidence >= s_presence_thresholds.confidence_th) ||
         result->breath_present ||
         (result->phase_present && result->bin_present);
 
@@ -1932,7 +1990,7 @@ static void radar_update_presence(void *result_ptr)
         s_presence_state.presence_misses = 0U;
     }
     else if (s_presence_state.presence_latched &&
-             (s_presence_state.presence_misses < RADAR_PRESENCE_MISS_LIMIT))
+             (s_presence_state.presence_misses < s_presence_thresholds.miss_limit))
     {
         s_presence_state.presence_misses++;
     }

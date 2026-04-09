@@ -26,6 +26,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
@@ -35,15 +36,16 @@
 #include "cli_task.h"
 
 #include "xensiv_radar_presence.h"
+#include "my_lidar_inf.h"
 
 /*******************************************************************************
  * Macros
  ********************************************************************************/
-#define NUMBER_OF_COMMANDS (6)
+#define NUMBER_OF_COMMANDS (14)
 
 /* Strings length */
 #define MAX_INPUT_LENGTH  (50)
-#define MAX_OUTPUT_LENGTH (100)
+#define MAX_OUTPUT_LENGTH (350)
 
 /* Strings for enable and disable */
 #define ENABLE_STRING  ("enable")
@@ -87,6 +89,22 @@ static BaseType_t turn_decimation_filter(char *pcWriteBuffer,
         size_t xWriteBufferLen, const char *pcCommandString);
 static BaseType_t set_presence_mode(char *pcWriteBuffer, size_t xWriteBufferLen,
         const char *pcCommandString);
+static BaseType_t cli_set_peak_height(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString);
+static BaseType_t cli_set_phase_th(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString);
+static BaseType_t cli_set_ampcv_th(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString);
+static BaseType_t cli_set_binspan_th(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString);
+static BaseType_t cli_set_confidence_th(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString);
+static BaseType_t cli_set_miss_limit(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString);
+static BaseType_t cli_presence_debug(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString);
+static BaseType_t cli_show_presence(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString);
 static inline bool check_bool_validation(const char *value, const char *enable,
         const char *disable);
 static inline bool check_float_validation(float32_t value, float32_t min,
@@ -132,7 +150,47 @@ static const CLI_Command_Definition_t command_list[NUMBER_OF_COMMANDS] =
                         .pcHelpString =
                                 "set_mode <macro_only|micro_only|micro_if_macro|micro_and_macro> - Chooses work mode\n",
                         .pxCommandInterpreter = set_presence_mode,
-                        .cExpectedNumberOfParameters = 1 } };
+                        .cExpectedNumberOfParameters = 1 },
+                { .pcCommand = "set_peak_height",
+                        .pcHelpString =
+                                "set_peak_height <value> - Breath peak height threshold. Range <0.005-0.50>\n",
+                        .pxCommandInterpreter = cli_set_peak_height,
+                        .cExpectedNumberOfParameters = 1 },
+                { .pcCommand = "set_phase_th",
+                        .pcHelpString =
+                                "set_phase_th <value> - Phase excursion threshold in mm. Range <0.01-1.0>\n",
+                        .pxCommandInterpreter = cli_set_phase_th,
+                        .cExpectedNumberOfParameters = 1 },
+                { .pcCommand = "set_ampcv_th",
+                        .pcHelpString =
+                                "set_ampcv_th <value> - Amplitude CV threshold. Range <0.05-2.0>\n",
+                        .pxCommandInterpreter = cli_set_ampcv_th,
+                        .cExpectedNumberOfParameters = 1 },
+                { .pcCommand = "set_binspan_th",
+                        .pcHelpString =
+                                "set_binspan_th <value> - Bin span threshold. Range <0.5-10.0>\n",
+                        .pxCommandInterpreter = cli_set_binspan_th,
+                        .cExpectedNumberOfParameters = 1 },
+                { .pcCommand = "set_confidence_th",
+                        .pcHelpString =
+                                "set_confidence_th <value> - Confidence threshold. Range <0.10-0.95>\n",
+                        .pxCommandInterpreter = cli_set_confidence_th,
+                        .cExpectedNumberOfParameters = 1 },
+                { .pcCommand = "set_miss_limit",
+                        .pcHelpString =
+                                "set_miss_limit <value> - Latch miss frame limit. Range <0-20>\n",
+                        .pxCommandInterpreter = cli_set_miss_limit,
+                        .cExpectedNumberOfParameters = 1 },
+                { .pcCommand = "presence_debug",
+                        .pcHelpString =
+                                "presence_debug <enable|disable> - Toggle 10Hz sub-indicator debug log\n",
+                        .pxCommandInterpreter = cli_presence_debug,
+                        .cExpectedNumberOfParameters = 1 },
+                { .pcCommand = "show_presence",
+                        .pcHelpString =
+                                "show_presence - Show all presence threshold values\n",
+                        .pxCommandInterpreter = cli_show_presence,
+                        .cExpectedNumberOfParameters = 0 } };
 
 static xensiv_radar_presence_handle_t handle;
 
@@ -166,10 +224,7 @@ void console_task(void *pvParameters) {
     bool setting_mode = false;
 
     handle = (xensiv_radar_presence_handle_t) pvParameters;
-    if (handle == NULL) 
-    {
-        ESP_ERROR_CHECK(ESP_FAIL);
-    }
+    /* handle 可以为 NULL — 旧 xensiv 命令不可用，新 presence 校准命令仍可工作 */
 
     setvbuf(stdin, NULL, _IONBF, 0);
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -200,8 +255,10 @@ void console_task(void *pvParameters) {
                 cInputIndex = 0;
                 memset(pcInputString, 0x00, MAX_INPUT_LENGTH);
                 setting_mode = true;
-                xensiv_radar_presence_set_callback(handle, NULL, NULL);
-                printf("\r\nEnter setting mode and stop processing\r\n"
+                if (handle != NULL) {
+                    xensiv_radar_presence_set_callback(handle, NULL, NULL);
+                }
+                printf("\r\nEnter setting mode\r\n"
                         "> ");
             }
         } else {
@@ -212,8 +269,10 @@ void console_task(void *pvParameters) {
                 setting_mode = false;
                 printf(
                         "\r\nQuit from settings menu and back to processing\r\n\n");
-                xensiv_radar_presence_set_callback(handle,
-                        presence_detection_cb, NULL);
+                if (handle != NULL) {
+                    xensiv_radar_presence_set_callback(handle,
+                            presence_detection_cb, NULL);
+                }
             } else if (c == ENTER_KEY) // confirm entered text
             {
                 putchar('\r');
@@ -285,6 +344,16 @@ void console_task(void *pvParameters) {
  * Return:
  *   pdFALSE indicating that the function ends it's processing
  *******************************************************************************/
+/* 旧 xensiv 命令需要 handle 有效 */
+#define CLI_REQUIRE_HANDLE(buf)                                               \
+    do {                                                                       \
+        if (handle == NULL) {                                                  \
+            snprintf((buf), xWriteBufferLen,                                   \
+                     "Error: xensiv handle not available\r\n\n");              \
+            return pdFALSE;                                                    \
+        }                                                                      \
+    } while (0)
+
 static BaseType_t set_max_range(char *pcWriteBuffer, size_t xWriteBufferLen,
         const char *pcCommandString) {
     int32_t result = XENSIV_RADAR_PRESENCE_OK;
@@ -294,6 +363,7 @@ static BaseType_t set_max_range(char *pcWriteBuffer, size_t xWriteBufferLen,
     BaseType_t lParameterStringLength;
 
     configASSERT(pcWriteBuffer);
+    CLI_REQUIRE_HANDLE(pcWriteBuffer);
 
     /* Obtain the parameter string. */
     pcParameter = FreeRTOS_CLIGetParameter(pcCommandString, /* The command string itself. */
@@ -355,6 +425,7 @@ static BaseType_t set_macro_threshold(char *pcWriteBuffer,
     BaseType_t lParameterStringLength;
 
     configASSERT(pcWriteBuffer);
+    CLI_REQUIRE_HANDLE(pcWriteBuffer);
 
     /* Obtain the parameter string. */
     pcParameter = FreeRTOS_CLIGetParameter(pcCommandString, /* The command string itself. */
@@ -414,6 +485,7 @@ static BaseType_t set_micro_threshold(char *pcWriteBuffer,
     BaseType_t lParameterStringLength;
 
     configASSERT(pcWriteBuffer);
+    CLI_REQUIRE_HANDLE(pcWriteBuffer);
 
     /* Obtain the parameter string. */
     pcParameter = FreeRTOS_CLIGetParameter(pcCommandString, /* The command string itself. */
@@ -472,6 +544,7 @@ static BaseType_t turn_bandpass_filter(char *pcWriteBuffer,
     BaseType_t lParameterStringLength;
 
     configASSERT(pcWriteBuffer);
+    CLI_REQUIRE_HANDLE(pcWriteBuffer);
 
     /* Obtain the parameter string. */
     pcParameter = FreeRTOS_CLIGetParameter(pcCommandString, /* The command string itself. */
@@ -528,6 +601,7 @@ static BaseType_t turn_decimation_filter(char *pcWriteBuffer,
     BaseType_t lParameterStringLength;
 
     configASSERT(pcWriteBuffer);
+    CLI_REQUIRE_HANDLE(pcWriteBuffer);
 
     /* Obtain the parameter string. */
     pcParameter = FreeRTOS_CLIGetParameter(pcCommandString, /* The command string itself. */
@@ -584,6 +658,7 @@ static BaseType_t set_presence_mode(char *pcWriteBuffer, size_t xWriteBufferLen,
     BaseType_t lParameterStringLength;
 
     configASSERT(pcWriteBuffer);
+    CLI_REQUIRE_HANDLE(pcWriteBuffer);
 
     /* Obtain the parameter string. */
     pcParameter = FreeRTOS_CLIGetParameter(pcCommandString, /* The command string itself. */
@@ -754,4 +829,134 @@ static inline xensiv_radar_presence_mode_t string_to_mode(const char *mode) {
     }
 
     return result;
+}
+
+
+/*******************************************************************************
+ * Presence 校准 CLI 命令 — 通用 float 阈值设置辅助宏
+ ********************************************************************************/
+#define CLI_SET_PRESENCE_FLOAT(field, vmin, vmax)                              \
+    do {                                                                       \
+        const char *p;                                                         \
+        BaseType_t plen;                                                       \
+        configASSERT(pcWriteBuffer);                                           \
+        p = FreeRTOS_CLIGetParameter(pcCommandString, 1, &plen);               \
+        configASSERT(p);                                                       \
+        float32_t v = strtof(p, NULL);                                         \
+        if (check_float_validation(v, (vmin), (vmax))) {                       \
+            radar_presence_thresholds_t th;                                    \
+            radar_presence_get_thresholds(&th);                                \
+            th.field = v;                                                      \
+            vTaskSuspendAll();                                                 \
+            radar_presence_set_thresholds(&th);                                \
+            xTaskResumeAll();                                                  \
+            snprintf(pcWriteBuffer, xWriteBufferLen,                           \
+                     "ok (" #field "=%.4f)\n", (double)v);                     \
+        } else {                                                               \
+            snprintf(pcWriteBuffer, xWriteBufferLen,                           \
+                     "Invalid value. Range: %.3f - %.3f\r\n\n",               \
+                     (double)(vmin), (double)(vmax));                          \
+        }                                                                      \
+    } while (0)
+
+static BaseType_t cli_set_peak_height(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString) {
+    CLI_SET_PRESENCE_FLOAT(peak_height, 0.005f, 0.50f);
+    return pdFALSE;
+}
+
+static BaseType_t cli_set_phase_th(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString) {
+    CLI_SET_PRESENCE_FLOAT(phase_exc_mm_th, 0.01f, 1.0f);
+    return pdFALSE;
+}
+
+static BaseType_t cli_set_ampcv_th(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString) {
+    CLI_SET_PRESENCE_FLOAT(amp_cv_th, 0.05f, 2.0f);
+    return pdFALSE;
+}
+
+static BaseType_t cli_set_binspan_th(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString) {
+    CLI_SET_PRESENCE_FLOAT(bin_span_th, 0.5f, 10.0f);
+    return pdFALSE;
+}
+
+static BaseType_t cli_set_confidence_th(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString) {
+    CLI_SET_PRESENCE_FLOAT(confidence_th, 0.10f, 0.95f);
+    return pdFALSE;
+}
+
+static BaseType_t cli_set_miss_limit(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString) {
+    const char *p;
+    BaseType_t plen;
+    configASSERT(pcWriteBuffer);
+    p = FreeRTOS_CLIGetParameter(pcCommandString, 1, &plen);
+    configASSERT(p);
+    int32_t v = (int32_t)strtol(p, NULL, 10);
+    if (v >= 0 && v <= 20) {
+        radar_presence_thresholds_t th;
+        radar_presence_get_thresholds(&th);
+        th.miss_limit = (uint32_t)v;
+        vTaskSuspendAll();
+        radar_presence_set_thresholds(&th);
+        xTaskResumeAll();
+        snprintf(pcWriteBuffer, xWriteBufferLen,
+                 "ok (miss_limit=%" PRIi32 ")\n", v);
+    } else {
+        snprintf(pcWriteBuffer, xWriteBufferLen,
+                 "Invalid value. Range: 0 - 20\r\n\n");
+    }
+    return pdFALSE;
+}
+
+static BaseType_t cli_presence_debug(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString) {
+    const char *p;
+    BaseType_t plen;
+    configASSERT(pcWriteBuffer);
+    p = FreeRTOS_CLIGetParameter(pcCommandString, 1, &plen);
+    configASSERT(p);
+    if (check_bool_validation(p, ENABLE_STRING, DISABLE_STRING)) {
+        radar_presence_thresholds_t th;
+        radar_presence_get_thresholds(&th);
+        th.debug_log_enabled = string_to_bool(p, ENABLE_STRING, DISABLE_STRING);
+        vTaskSuspendAll();
+        radar_presence_set_thresholds(&th);
+        xTaskResumeAll();
+        snprintf(pcWriteBuffer, xWriteBufferLen,
+                 "ok (presence_debug=%s)\n",
+                 th.debug_log_enabled ? "enabled" : "disabled");
+    } else {
+        snprintf(pcWriteBuffer, xWriteBufferLen, "Invalid value.\r\n\n");
+    }
+    return pdFALSE;
+}
+
+static BaseType_t cli_show_presence(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString) {
+    (void)pcCommandString;
+    configASSERT(pcWriteBuffer);
+    radar_presence_thresholds_t th;
+    radar_presence_get_thresholds(&th);
+    snprintf(pcWriteBuffer, xWriteBufferLen,
+             "Presence thresholds:\r\n"
+             "  peak_height    = %.4f\r\n"
+             "  phase_exc_th   = %.4f mm\r\n"
+             "  amp_cv_th      = %.4f\r\n"
+             "  bin_span_th    = %.1f\r\n"
+             "  confidence_th  = %.2f\r\n"
+             "  miss_limit     = %" PRIu32 "\r\n"
+             "  debug_log      = %s\r\n",
+             (double)th.peak_height,
+             (double)th.phase_exc_mm_th,
+             (double)th.amp_cv_th,
+             (double)th.bin_span_th,
+             (double)th.confidence_th,
+             th.miss_limit,
+             th.debug_log_enabled ? "enabled" : "disabled");
+    return pdFALSE;
 }
