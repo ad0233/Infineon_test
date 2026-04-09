@@ -1,0 +1,5 @@
+wing: by001_esp32_feat_lidar_inf
+rooms:
+  - name: bgt60tr13c-datasheet
+    description: BGT60TR13C radar chip datasheet and hardware reference
+    keywords: [datasheet, bgt60, register, timing, spi, fifo, adc, chirp, 寄存器, 数据手册, page]

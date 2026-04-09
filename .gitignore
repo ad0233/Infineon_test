@@ -6,3 +6,13 @@ sdkconfig.old
 managed_components/
 tools/__pycache__/
 dependencies.lock
+
+# Local Claude Code settings
+.claude/settings.json
+.claude/settings.local.json
+
+# mempalace runtime artifacts
+entities.json
+
+# Large binary reference files
+reference/**/*.pdf

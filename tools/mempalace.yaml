@@ -1,0 +1,5 @@
+wing: by001_esp32_feat_lidar_inf
+rooms:
+  - name: tools
+    description: Development scripts
+    keywords: [wave_plot, flash, cert, python, script, monitor, serial]

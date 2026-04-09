@@ -1,0 +1,39 @@
+wing: by001_esp32_feat_lidar_inf
+
+exclude:
+  - dependencies/
+  - managed_components/
+  - build/
+  - .git/
+  - .vscode/
+  - .claude/
+  - .codex/
+  - spiffs/
+
+rooms:
+  - name: bgt60tr13c-datasheet
+    description: BGT60TR13C radar chip datasheet and hardware reference
+    keywords: [datasheet, bgt60, bgt60tr13c, register, timing, spi, fifo, adc, chirp, antenna, rx, tx, page, 寄存器, 数据手册]
+
+  - name: source-radar
+    description: Radar pipeline source code in components/my_lidar_inf/
+    keywords: [my_lidar_inf, radar, lidar, spi, fifo, presence, distance, vitals, cli, resource_map]
+
+  - name: source-main
+    description: Application entry point in main/
+    keywords: [main, app_main, lunawake, init, task]
+
+  - name: documentation
+    description: Project documentation under doc/
+    keywords: [coding, standard, flash, cert, design, fsm, vitals_status, doc]
+
+  - name: config
+    description: Build configuration and CMake files
+    keywords: [cmake, sdkconfig, kconfig, partition, component, idf]
+
+  - name: tools
+    description: Development scripts under tools/
+    keywords: [wave_plot, flash, cert, python, script, monitor]
+
+  - name: general
+    description: Other project files
