@@ -99,12 +99,41 @@ Heart outlier rejected: XX.X vs median XX.X                      (警告, 触发
 ### FFT twiddle 表注意事项
 `dsps_fft2r_init_fc32()` 是全局一次性初始化。`sensor-dsp` 库可能先以 64/128 初始化，导致 1024 点 FFT 越界。`radar_vitals_init_filters()` 中通过 `dsps_fft2r_deinit_fc32()` + `dsps_fft2r_init_fc32(NULL, 1024)` 强制重新分配。
 
+### Presence 检测参数（已校准）
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `FIRST_VALID_BIN` | 10 (37.5cm) | 排除近场杂波 |
+| `SWITCH_RATIO` | 1.25 | bin 跟踪切换比 |
+| `MAX_STEP_BINS` | 2 | 每帧最大 bin 步进 |
+| `CONFIDENCE_TH` | 0.80 | 置信度门限（需 phExc + 其他指标） |
+| `BREATH_WINDOW` | 6s | 呼吸峰检测窗口 |
+| `MISS_LIMIT` | 3 帧 | 锁存容忍帧数 |
+| 判定逻辑 | `conf≥0.80 OR (breath AND phase) OR (phase AND bin)` | breathPk 不再单独触发 |
+
+### 体动检测 (RBM) — Phase 1 已实现
+基于自适应基线的前向能量差分:
+```
+每帧: cur_spectrum[64] = |FFT(chirp平均)|
+      diff = Σ|cur[b] - baseline[b]| / N  (目标 bin ±5 范围)
+      baseline: 静止时 α=0.50 快速跟随, 运动时 α=0.01 近冻结
+      noise_floor: 跟踪 raw 的滑动最小值
+      bodyMov: 10帧平滑后, < noise×2.5 → 输出 0 (死区)
+      rbm_ratio: 200帧窗口内体动帧占比, >15% → 跳过 vitals 估算
+```
+
+校准期: 前 30 帧 (3s) 强制学习基线和噪声底, bodyMov=0
+
+日志: `rbm=Y/N(ratio%) bodyMov=X.XXXX raw=X.XXXX noise=X.XXXX`
+
+Phase 2 (待实现): 启用 3RX 天线相位差, 检测侧向运动
+
 ### 已知限制与待优化
-1. **体动 (RBM) 无检测**: 翻身污染 20s 窗口, 无 SQI 评估 → 需加运动伪影检测
+1. **侧向运动检测弱**: 仅用 RX1, 需启用 3RX 相位差 (Phase 2)
 2. **心率下限 51 BPM**: 深睡/运动员可能 40-50 BPM → 计划降到 42 BPM
 3. **固定 Notch 谐波消除**: Q=30 对呼吸频率波动敏感 → 未来考虑 LMS 自适应
 4. **单 Bin 提取**: 未做多 Bin 相干融合 (MRC) → SNR 有提升空间
 5. **无 HRV**: 10Hz 帧率时间精度不足 (±50ms) → 当前硬件不可行
+6. **SPI 20MHz**: CLAUDE.md 要求 25MHz, 当前用 XTAL 限制 20MHz, 可能是偶发 FIFO 崩溃原因
 
 ### 常见问题排查
 - **BPM 不变**: 检查 `Vitals raw:` 日志是否出现; FFT twiddle 表是否正确初始化为 1024
@@ -112,3 +141,6 @@ Heart outlier rejected: XX.X vs median XX.X                      (警告, 触发
 - **波形全零**: `vitals_filters_inited` 为 false, 或 `presence_detected` 一直为 false
 - **栈溢出**: vitals 函数有大量局部数组, 确保 `RADAR_TASK_STACK_SIZE` ≥ `configMINIMAL_STACK_SIZE * 16`
 - **心率被离群拒绝**: 查看 `Heart outlier rejected` 日志, 初始锁定值不准导致后续全拒绝 → 前 3 次不拒绝已修复
+- **启动时 FIFO 崩溃**: 断电 3 秒冷启动恢复, 非代码问题 (SPI 电平转换器 TXS0108 + 20MHz 临界)
+- **bodyMov 全零**: 检查 noise 是否过高 (校准期有运动), 重启保持静止 3 秒
+- **bin 跟踪卡在远处**: 全局能量 >2× 局部时直接跳转, 无步进限制

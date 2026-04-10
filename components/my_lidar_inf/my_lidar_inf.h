@@ -26,6 +26,10 @@ typedef struct {
     float heart_rate_bpm;       /* 0 = 未检测到 */
     float breath_wave;          /* 实时呼吸波形（IIR 滤波后） */
     float heart_wave;           /* 实时心率波形（IIR 滤波后） */
+    uint8_t rbm_detected;       /* 当前帧体动标记 */
+    float rbm_ratio;            /* 窗口内体动帧占比 (0.0-1.0) */
+    float rbm_phase_jump;       /* 当前帧相位跳变量 rad */
+    float body_movement_mm;     /* 1s 滑窗体动强度 mm */
     uint32_t frame_counter;
 } radar_data_t;
 

@@ -27,6 +27,7 @@
 | `components/my_lidar_inf/cli_task.c` | CLI 控制入口，presence 参数调节 |
 | `components/my_lidar_inf/resource_map.h` | 雷达引脚定义 |
 | `dependencies/sensor-xensiv-bgt60trxx/` | Infineon 低层驱动 |
+| `doc/netlist_BY-SA-V001.tel` | 主板原理图网表（Telia 格式，纯文本，含所有元器件和网络连接） |
 
 ## 雷达硬件配置（当前已验证）
 
