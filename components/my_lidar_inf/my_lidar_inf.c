@@ -2034,7 +2034,7 @@ static void radar_update_presence(void *result_ptr)
         }
 
         /* 判定：1s_ampCV > 0.45 或 1s_binSpan ≥ 4 */
-        const bool rbm_by_amp = (rbm_amp_cv > 0.45f);
+        const bool rbm_by_amp = (rbm_amp_cv > 0.38f);   /* 校准值：静坐max=0.353, 运动min=0.413 */
         const bool rbm_by_bin = (rbm_bin_span >= 4.0f);
         const uint8_t rbm_flag = (rbm_by_amp || rbm_by_bin) ? 1U : 0U;
 
@@ -2053,7 +2053,7 @@ static void radar_update_presence(void *result_ptr)
 
         /* bodyMov 输出：1s ampCV 减去静坐基线 */
         result->body_movement_mm = rbm_flag
-            ? fmaxf(rbm_amp_cv - 0.35f, 0.0f)
+            ? fmaxf(rbm_amp_cv - 0.25f, 0.0f)  /* 减去静坐均值基线 */
             : 0.0f;
 
         /* 日志用：覆盖 amplitude_cv 和 bin_span 为 1s 值（不影响 presence 判定，presence 已算完） */
