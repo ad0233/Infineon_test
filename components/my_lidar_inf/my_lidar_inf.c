@@ -76,6 +76,7 @@
 #define RADAR_RBM_PHASE_JUMP_TH            (2.0f)            /* 帧间相位跳变 > 2.0 rad 判定为体动（呼吸约 0.3-1.5 rad） */
 #define RADAR_RBM_WINDOW_FRAMES            (200U)            /* RBM 统计窗口 = vitals 窗口 */
 #define RADAR_RBM_RATIO_TH                 (0.15f)           /* 窗口内 >15% 帧为体动 → 跳过 vitals */
+#define RADAR_BODY_MOVE_THRESHOLD          (0.38f)           /* 体动固定阈值（静坐<0.35，运动>0.40） */
 #define RADAR_PHASE_SMOOTH_LEN              (7U)
 #define RADAR_WAVELENGTH_MM                 (5.0f)            /* c / 60GHz */
 #define RADAR_VITALS_FFT_SIZE               (1024U)           /* 200 samples × 4 零填充 → 对齐 1024 */
@@ -268,11 +269,12 @@ typedef struct
     float32_t baseline[NUM_SAMPLES_PER_CHIRP / 2U]; /* 背景频谱基线 */
     bool baseline_inited;               /* 基线是否已初始化 */
     float32_t body_move_raw;            /* 当前帧前向体动原始值 */
-    float32_t body_move_smooth;         /* 10帧平滑后的体动值 */
-    float32_t body_move_buf[10];        /* 10 帧体动原始值环形缓冲 */
-    uint32_t body_move_idx;
-    uint32_t body_move_count;
-    float32_t noise_floor;              /* 静止时的噪声底（自动学习） */
+
+    /* ---- 体动专用 1s 滑窗（独立于 presence 的 5s 窗口） ---- */
+    float32_t rbm_amp_buf[10];          /* 最近 10 帧振幅 */
+    int32_t rbm_bin_buf[10];            /* 最近 10 帧 bin */
+    uint32_t rbm_buf_idx;
+    uint32_t rbm_buf_count;
 } radar_presence_state_t;
 
 
@@ -551,7 +553,7 @@ static void radar_task(void *pvParameters)
                      "confidence=%.2f distance=%.1fcm "
                      "breath=%.1fbpm heart=%.1fbpm frame=%" PRIu32
                      " phExc=%.3fmm(%s) ampCV=%.3f(%s) binSpan=%.1f(%s) breathPk=%s"
-                     " rbm=%s(%.0f%%) bodyMov=%.4f raw=%.4f noise=%.4f",
+                     " rbm=%s bodyMov=%.3f ampCV1s=%.3f",
                      (export_snapshot.presence_detected != 0U) ? "yes" : "no",
                      export_snapshot.range_bin,
                      export_snapshot.signal_db,
@@ -569,10 +571,8 @@ static void radar_task(void *pvParameters)
                      export_snapshot.bin_present ? "Y" : "N",
                      export_snapshot.breath_present ? "Y" : "N",
                      export_snapshot.rbm_detected ? "Y" : "N",
-                     export_snapshot.rbm_ratio * 100.0f,
                      export_snapshot.body_movement_mm,
-                     export_snapshot.rbm_phase_jump,
-                     s_presence_state.noise_floor);
+                     export_snapshot.rbm_phase_jump);
             radar_distance_last_log_ms = time_ms;
         }
 
@@ -1898,20 +1898,7 @@ static void radar_update_presence(void *result_ptr)
         s_presence_state.amplitude_history[idx] = result->amplitude_metric;
         s_presence_state.bin_history[idx] = result->range_bin;
 
-        /* ---- RBM 标记：基于自适应基线体动值（在 radar_analyze_frame 中已计算） ---- */
-        uint8_t rbm_flag = (result->body_movement_mm > 0.0f) ? 1U : 0U;
-
-        /* 更新 RBM 环形缓冲：减去旧值，加入新值 */
-        s_presence_state.rbm_sum -= s_presence_state.rbm_flags[idx];
-        s_presence_state.rbm_flags[idx] = rbm_flag;
-        s_presence_state.rbm_sum += rbm_flag;
-        result->rbm_detected = (rbm_flag != 0U);
-
-        const uint32_t rbm_window = (s_presence_state.history_count < RADAR_RBM_WINDOW_FRAMES)
-                                    ? s_presence_state.history_count : RADAR_RBM_WINDOW_FRAMES;
-        result->rbm_ratio = (rbm_window > 0U)
-                            ? (float32_t)s_presence_state.rbm_sum / (float32_t)rbm_window
-                            : 0.0f;
+        /* RBM 标记在下方 ampCV/binSpan 计算完后更新 */
 
         s_presence_state.history_head = (idx + 1U) % RADAR_PRESENCE_HISTORY_LEN;
         if (s_presence_state.history_count < RADAR_PRESENCE_HISTORY_LEN)
@@ -2001,6 +1988,77 @@ static void radar_update_presence(void *result_ptr)
                                                  s_presence_thresholds.peak_height,
                                                  false);
     result->breath_present = ((peaks_pos >= 2U) || (peaks_neg >= 2U));
+
+    /* ---- RBM 体动判定：独立 1s (10帧) 窗口，不共用 presence 的 5s 窗口 ---- */
+    {
+        /* 写入当前帧的振幅和 bin 到 1s 环形缓冲 */
+        const uint32_t ri = s_presence_state.rbm_buf_idx;
+        s_presence_state.rbm_amp_buf[ri] = result->amplitude_metric;
+        s_presence_state.rbm_bin_buf[ri] = result->range_bin;
+        s_presence_state.rbm_buf_idx = (ri + 1U) % 10U;
+        if (s_presence_state.rbm_buf_count < 10U)
+        {
+            s_presence_state.rbm_buf_count++;
+        }
+        const uint32_t rn = s_presence_state.rbm_buf_count;
+
+        /* 1s ampCV: std / mean */
+        float32_t rbm_amp_cv = 0.0f;
+        if (rn >= 3U)
+        {
+            float32_t a_sum = 0.0f;
+            for (uint32_t i = 0; i < rn; i++) { a_sum += s_presence_state.rbm_amp_buf[i]; }
+            float32_t a_mean = a_sum / (float32_t)rn;
+            float32_t a_sq = 0.0f;
+            for (uint32_t i = 0; i < rn; i++)
+            {
+                float32_t d = s_presence_state.rbm_amp_buf[i] - a_mean;
+                a_sq += d * d;
+            }
+            rbm_amp_cv = (a_mean > 1.0e-6f)
+                ? sqrtf(a_sq / (float32_t)rn) / a_mean : 0.0f;
+        }
+
+        /* 1s binSpan: max - min */
+        float32_t rbm_bin_span = 0.0f;
+        if (rn >= 2U)
+        {
+            int32_t b_min = s_presence_state.rbm_bin_buf[0];
+            int32_t b_max = b_min;
+            for (uint32_t i = 1; i < rn; i++)
+            {
+                if (s_presence_state.rbm_bin_buf[i] < b_min) { b_min = s_presence_state.rbm_bin_buf[i]; }
+                if (s_presence_state.rbm_bin_buf[i] > b_max) { b_max = s_presence_state.rbm_bin_buf[i]; }
+            }
+            rbm_bin_span = (float32_t)(b_max - b_min);
+        }
+
+        /* 判定：1s_ampCV > 0.45 或 1s_binSpan ≥ 4 */
+        const bool rbm_by_amp = (rbm_amp_cv > 0.45f);
+        const bool rbm_by_bin = (rbm_bin_span >= 4.0f);
+        const uint8_t rbm_flag = (rbm_by_amp || rbm_by_bin) ? 1U : 0U;
+
+        const uint32_t idx_rbm = (s_presence_state.history_head + RADAR_PRESENCE_HISTORY_LEN - 1U)
+                                 % RADAR_PRESENCE_HISTORY_LEN;
+        s_presence_state.rbm_sum -= s_presence_state.rbm_flags[idx_rbm];
+        s_presence_state.rbm_flags[idx_rbm] = rbm_flag;
+        s_presence_state.rbm_sum += rbm_flag;
+        result->rbm_detected = (rbm_flag != 0U);
+
+        const uint32_t rbm_window = (s_presence_state.history_count < RADAR_RBM_WINDOW_FRAMES)
+                                    ? s_presence_state.history_count : RADAR_RBM_WINDOW_FRAMES;
+        result->rbm_ratio = (rbm_window > 0U)
+                            ? (float32_t)s_presence_state.rbm_sum / (float32_t)rbm_window
+                            : 0.0f;
+
+        /* bodyMov 输出：1s ampCV 减去静坐基线 */
+        result->body_movement_mm = rbm_flag
+            ? fmaxf(rbm_amp_cv - 0.35f, 0.0f)
+            : 0.0f;
+
+        /* 日志用：覆盖 amplitude_cv 和 bin_span 为 1s 值（不影响 presence 判定，presence 已算完） */
+        result->rbm_phase_jump = rbm_amp_cv;    /* 复用字段：1s ampCV */
+    }
 
     float32_t confidence = 0.0f;
     if (result->breath_present)
@@ -2246,9 +2304,7 @@ static bool radar_analyze_frame(void *result_ptr)
                 s_presence_state.baseline[b] = cur_spectrum[b];
             }
             s_presence_state.baseline_inited = true;
-            s_presence_state.noise_floor = 0.0f;
             s_presence_state.body_move_raw = 0.0f;
-            s_presence_state.body_move_smooth = 0.0f;
         }
 
         /* 前向能量差分：目标 bin ±5 附近的频谱与基线的差异 */
@@ -2266,85 +2322,17 @@ static bool radar_analyze_frame(void *result_ptr)
         }
         float32_t move_raw = diff_sum / (float32_t)(roi_hi - roi_lo);
 
-        /* 校准阶段：前 30 帧 (3s) */
-        const bool calibrating = (s_presence_state.body_move_count < 30U);
-
-        /* 运动判定：raw 超过 noise 的 1.8 倍 */
-        const float32_t move_gate = fmaxf(s_presence_state.noise_floor * 1.8f, 0.02f);
-        const bool is_moving = !calibrating && (move_raw > move_gate);
-
-        /* 自适应基线更新
-         * α 控制隐式高通截止: f_cut ≈ α × fs / 2π
-         * α=0.5 → f_cut ≈ 0.8Hz → 呼吸(0.3Hz)被基线吸收，体动(突发)产生差值 */
-        float32_t alpha;
-        if (calibrating)
-        {
-            alpha = 0.30f;   /* 校准期：快速收敛 */
-        }
-        else if (is_moving)
-        {
-            alpha = 0.01f;   /* 运动中：极慢更新，保持运动前的基线 */
-        }
-        else
-        {
-            alpha = 0.50f;   /* 静止：紧密跟随，吸收呼吸波动 */
-        }
+        /* 基线保持更新（用于将来 Phase 2） */
+        const float32_t alpha = s_presence_state.baseline_inited ? 0.05f : 1.0f;
         for (int32_t b = roi_lo; b < roi_hi; b++)
         {
             s_presence_state.baseline[b] =
                 alpha * cur_spectrum[b] + (1.0f - alpha) * s_presence_state.baseline[b];
         }
 
-        /* 噪声底学习：跟踪静坐时 raw 的均值水平
-         * 静止时 IIR 跟踪 raw → noise 代表"正常静坐的 raw 水平"
-         * 运动时冻结 noise → 死区不被运动拉高 */
-        if (calibrating)
-        {
-            s_presence_state.noise_floor =
-                0.15f * move_raw + 0.85f * s_presence_state.noise_floor;
-        }
-        else if (!is_moving)
-        {
-            /* 静止时：中等速度跟踪 raw 均值 */
-            s_presence_state.noise_floor =
-                0.05f * move_raw + 0.95f * s_presence_state.noise_floor;
-        }
-        /* 运动时不更新 noise → 保持静坐水平 */
-
-        /* 帧计数（用于校准阶段判定） */
-        s_presence_state.body_move_count++;
-
-        /* 10 帧滑窗平滑 */
-        {
-            const uint32_t mi = s_presence_state.body_move_idx;
-            s_presence_state.body_move_buf[mi] = move_raw;
-            s_presence_state.body_move_idx = (mi + 1U) % 10U;
-
-            const uint32_t n = (s_presence_state.body_move_count < 10U)
-                               ? s_presence_state.body_move_count : 10U;
-            float32_t smooth_sum = 0.0f;
-            for (uint32_t i = 0; i < n; i++)
-            {
-                smooth_sum += s_presence_state.body_move_buf[i];
-            }
-            s_presence_state.body_move_smooth = smooth_sum / (float32_t)n;
-        }
-
-        /* 死区：校准期 或 低于噪声底 × 1.8 → 输出 0
-         * noise 现在跟踪静坐均值 (~0.15-0.25), ×1.8 ≈ 0.27-0.45 */
+        /* 体动检测暂存 raw（日志用），实际判定在 radar_update_presence 中完成 */
         s_presence_state.body_move_raw = move_raw;
-        float32_t final_move = 0.0f;
-        if (!calibrating)
-        {
-            final_move = s_presence_state.body_move_smooth;
-            if (final_move < s_presence_state.noise_floor * 1.8f)
-            {
-                final_move = 0.0f;
-            }
-        }
-
-        result->body_movement_mm = final_move;   /* 体动强度（归一化能量差） */
-        result->rbm_phase_jump = move_raw;        /* 当前帧原始差分值 */
+        result->rbm_phase_jump = move_raw;
     }
 
     radar_update_presence(result);
