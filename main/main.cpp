@@ -78,6 +78,7 @@
 #include "btn.h"
 
 #include "my_lidar_inf.h"
+#include "my_rgb.h"
 
 #include "my_aht20.h"
 #include "my_light.h"
@@ -311,6 +312,28 @@ extern "C" void app_main()
     // xTaskCreate(mic_debug_task, "mic_debug", 4096, NULL, 5, NULL);
 
     my_lidar_inf_init();
+
+    /* WS2812 灯光：有人白色常亮，无人灭灯 */
+    my_rgb_init();
+    xTaskCreate([](void *) {
+        radar_result_t rd;
+        bool was_present = false;
+
+        while (1) {
+            my_lidar_inf_get_result(&rd);
+            bool present = (rd.detected != 0);
+
+            if (present && !was_present) {
+                my_rgb_set(255, 255, 255, 100);
+            } else if (!present && was_present) {
+                my_rgb_set(0, 0, 0, 0);
+            }
+
+            was_present = present;
+            vTaskDelay(pdMS_TO_TICKS(200));
+        }
+    }, "rgb_ctrl", 2048, NULL, 2, NULL);
+
     print_mem_info();
     return;
 }

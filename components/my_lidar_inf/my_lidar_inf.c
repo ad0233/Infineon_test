@@ -61,10 +61,10 @@
 #define RADAR_PRESENCE_HISTORY_LEN          (200U)            /* 10Hz * 20s, 足够心率分析 */
 #define RADAR_PRESENCE_FRAME_RATE_HZ        (10.0f)
 #define RADAR_PRESENCE_ENERGY_RADIUS_BINS   (2)
-#define RADAR_PHASE_WINDOW_SECONDS          (6.0f)
+#define RADAR_PHASE_WINDOW_SECONDS          (3.0f)
 #define RADAR_AMP_WINDOW_SECONDS            (5.0f)
 #define RADAR_BIN_WINDOW_SECONDS            (5.0f)
-#define RADAR_BREATH_WINDOW_SECONDS         (6.0f)
+#define RADAR_BREATH_WINDOW_SECONDS         (3.0f)
 /* Presence 阈值默认值（运行时通过 s_presence_thresholds 覆盖） */
 #define RADAR_PRESENCE_DEFAULT_PEAK_HEIGHT      (0.03f)
 #define RADAR_PRESENCE_DEFAULT_PHASE_EXC_MM_TH  (0.08f)
@@ -321,16 +321,25 @@ static uint32_t radar_distance_last_log_ms = 0;
 
 
 /* ---- 导出数据（受临界区保护） ---- */
-static radar_data_t s_radar_data;
+static radar_result_t s_radar_result;
+static radar_debug_t s_radar_debug;
 static portMUX_TYPE s_radar_data_mux = portMUX_INITIALIZER_UNLOCKED;
 static radar_presence_state_t s_presence_state;
 
 
-void my_lidar_inf_get_data(radar_data_t *out)
+void my_lidar_inf_get_result(radar_result_t *out)
 {
     if (out == NULL) return;
     taskENTER_CRITICAL(&s_radar_data_mux);
-    *out = s_radar_data;
+    *out = s_radar_result;
+    taskEXIT_CRITICAL(&s_radar_data_mux);
+}
+
+void my_lidar_inf_get_debug(radar_debug_t *out)
+{
+    if (out == NULL) return;
+    taskENTER_CRITICAL(&s_radar_data_mux);
+    *out = s_radar_debug;
     taskEXIT_CRITICAL(&s_radar_data_mux);
 }
 
@@ -509,70 +518,65 @@ static void radar_task(void *pvParameters)
         gpio_set_level(PIN_LED_RED, frame_result.target_detected ? 1 : 0);
         gpio_set_level(PIN_LED_GREEN, frame_result.target_detected ? 0 : 1);
 
-        radar_data_t export_snapshot;
         taskENTER_CRITICAL(&s_radar_data_mux);
-        s_radar_data.target_detected = frame_result.target_detected ? 1U : 0U;
-        s_radar_data.distance_cm = frame_result.distance_cm;
-        s_radar_data.signal_db = frame_result.signal_db;
-        s_radar_data.range_bin = frame_result.range_bin;
-        s_radar_data.movement_energy = frame_result.movement_energy;
-        s_radar_data.presence_detected = frame_result.presence_detected ? 1U : 0U;
-        s_radar_data.presence_confidence = frame_result.presence_confidence;
-        s_radar_data.presence_distance_cm = frame_result.presence_distance_cm;
-        s_radar_data.phase_excursion_mm = frame_result.phase_excursion_mm;
-        s_radar_data.amplitude_cv = frame_result.amplitude_cv;
-        s_radar_data.bin_span = frame_result.bin_span;
-        s_radar_data.breath_present = frame_result.breath_present ? 1U : 0U;
-        s_radar_data.phase_present = frame_result.phase_present ? 1U : 0U;
-        s_radar_data.amplitude_present = frame_result.amplitude_present ? 1U : 0U;
-        s_radar_data.bin_present = frame_result.bin_present ? 1U : 0U;
-        s_radar_data.breath_rate_bpm = frame_result.breath_rate_bpm;
-        s_radar_data.heart_rate_bpm = frame_result.heart_rate_bpm;
-        s_radar_data.breath_wave = frame_result.breath_wave;
-        s_radar_data.heart_wave = frame_result.heart_wave;
-        s_radar_data.rbm_detected = frame_result.rbm_detected ? 1U : 0U;
-        s_radar_data.rbm_ratio = frame_result.rbm_ratio;
-        s_radar_data.rbm_phase_jump = frame_result.rbm_phase_jump;
-        s_radar_data.body_movement_mm = frame_result.body_movement_mm;
-        s_radar_data.frame_counter = radar_frame_counter;
-        export_snapshot = s_radar_data;
-        taskEXIT_CRITICAL(&s_radar_data_mux);
+        s_radar_result.detected    = frame_result.presence_detected ? 1U : 0U;
+        s_radar_result.confidence  = frame_result.presence_confidence;
+        s_radar_result.distance_cm = frame_result.presence_distance_cm;
+        s_radar_result.breath_bpm  = frame_result.breath_rate_bpm;
+        s_radar_result.heart_bpm   = frame_result.heart_rate_bpm;
+        s_radar_result.rbm         = frame_result.rbm_detected ? 1U : 0U;
+        s_radar_result.body_move   = frame_result.body_movement_mm;
+        s_radar_result.frame       = radar_frame_counter;
 
-        /* 波形日志：关闭（校准 presence 时不需要，需要时取消注释） */
-        /* ESP_LOGI(TAG, "Wave: breath=%.6f heart=%.6f frame=%" PRIu32,
-                 export_snapshot.breath_wave,
-                 export_snapshot.heart_wave,
-                 export_snapshot.frame_counter); */
+        s_radar_debug.target_detected    = frame_result.target_detected ? 1U : 0U;
+        s_radar_debug.signal_db          = frame_result.signal_db;
+        s_radar_debug.range_bin          = frame_result.range_bin;
+        s_radar_debug.movement_energy    = frame_result.movement_energy;
+        s_radar_debug.phase_excursion_mm = frame_result.phase_excursion_mm;
+        s_radar_debug.amplitude_cv       = frame_result.amplitude_cv;
+        s_radar_debug.bin_span           = frame_result.bin_span;
+        s_radar_debug.breath_present     = frame_result.breath_present ? 1U : 0U;
+        s_radar_debug.phase_present      = frame_result.phase_present ? 1U : 0U;
+        s_radar_debug.amplitude_present  = frame_result.amplitude_present ? 1U : 0U;
+        s_radar_debug.bin_present        = frame_result.bin_present ? 1U : 0U;
+        s_radar_debug.breath_wave        = frame_result.breath_wave;
+        s_radar_debug.heart_wave         = frame_result.heart_wave;
+        s_radar_debug.rbm_ratio          = frame_result.rbm_ratio;
+        s_radar_debug.rbm_amp_cv_1s      = frame_result.rbm_phase_jump;
+        s_radar_debug.rbm_phase_jump     = frame_result.rbm_phase_jump;
+        taskEXIT_CRITICAL(&s_radar_data_mux);
 
         /* 综合日志：1Hz */
         if ((radar_distance_last_log_ms == 0U) ||
             ((time_ms - radar_distance_last_log_ms) >= RADAR_DISTANCE_LOG_INTERVAL_MS))
         {
+            /* 业务数据 */
             ESP_LOGI(TAG,
-                     "Radar: detected=%s bin=%" PRIi32 " level=%.1fdB movement=%.3f "
-                     "confidence=%.2f distance=%.1fcm "
-                     "breath=%.1fbpm heart=%.1fbpm frame=%" PRIu32
-                     " phExc=%.3fmm(%s) ampCV=%.3f(%s) binSpan=%.1f(%s) breathPk=%s"
-                     " rbm=%s bodyMov=%.0f%% ampCV1s=%.3f",
-                     (export_snapshot.presence_detected != 0U) ? "yes" : "no",
-                     export_snapshot.range_bin,
-                     export_snapshot.signal_db,
-                     export_snapshot.movement_energy,
-                     export_snapshot.presence_confidence,
-                     export_snapshot.presence_distance_cm,
-                     export_snapshot.breath_rate_bpm,
-                     export_snapshot.heart_rate_bpm,
-                     export_snapshot.frame_counter,
-                     export_snapshot.phase_excursion_mm,
-                     export_snapshot.phase_present ? "Y" : "N",
-                     export_snapshot.amplitude_cv,
-                     export_snapshot.amplitude_present ? "Y" : "N",
-                     export_snapshot.bin_span,
-                     export_snapshot.bin_present ? "Y" : "N",
-                     export_snapshot.breath_present ? "Y" : "N",
-                     export_snapshot.rbm_detected ? "Y" : "N",
-                     export_snapshot.body_movement_mm,
-                     export_snapshot.rbm_phase_jump);
+                     "Radar: detected=%s confidence=%.2f distance=%.1fcm "
+                     "breath=%.1fbpm heart=%.1fbpm "
+                     "rbm=%s bodyMov=%.0f%%",
+                     frame_result.presence_detected ? "yes" : "no",
+                     frame_result.presence_confidence,
+                     frame_result.presence_distance_cm,
+                     frame_result.breath_rate_bpm,
+                     frame_result.heart_rate_bpm,
+                     frame_result.rbm_detected ? "Y" : "N",
+                     frame_result.body_movement_mm);
+            /* 调试数据 */
+            ESP_LOGD(TAG,
+                     "Debug: bin=%" PRIi32 " level=%.1fdB frame=%" PRIu32
+                     " phExc=%.3fmm(%s) ampCV=%.3f(%s) binSpan=%.1f(%s) breathPk=%s ampCV1s=%.3f",
+                     frame_result.range_bin,
+                     frame_result.signal_db,
+                     radar_frame_counter,
+                     frame_result.phase_excursion_mm,
+                     frame_result.phase_present ? "Y" : "N",
+                     frame_result.amplitude_cv,
+                     frame_result.amplitude_present ? "Y" : "N",
+                     frame_result.bin_span,
+                     frame_result.bin_present ? "Y" : "N",
+                     frame_result.breath_present ? "Y" : "N",
+                     frame_result.rbm_phase_jump);
             radar_distance_last_log_ms = time_ms;
         }
 

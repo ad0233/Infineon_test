@@ -6,48 +6,66 @@
 extern "C" {
 #endif
 
+/* ---- 对外输出数据 ---- */
 typedef struct {
-    uint8_t target_detected;
-    float distance_cm;
-    float signal_db;
-    int32_t range_bin;
-    float movement_energy;
-    uint8_t presence_detected;
-    float presence_confidence;
-    float presence_distance_cm;
-    float phase_excursion_mm;
-    float amplitude_cv;
-    float bin_span;
-    uint8_t breath_present;
-    uint8_t phase_present;
-    uint8_t amplitude_present;
-    uint8_t bin_present;
-    float breath_rate_bpm;      /* 0 = 未检测到 */
-    float heart_rate_bpm;       /* 0 = 未检测到 */
-    float breath_wave;          /* 实时呼吸波形（IIR 滤波后） */
-    float heart_wave;           /* 实时心率波形（IIR 滤波后） */
-    uint8_t rbm_detected;       /* 当前帧体动标记 */
-    float rbm_ratio;            /* 窗口内体动帧占比 (0.0-1.0) */
-    float rbm_phase_jump;       /* 当前帧相位跳变量 rad */
-    float body_movement_mm;     /* 1s 滑窗体动强度 mm */
-    uint32_t frame_counter;
-} radar_data_t;
+    /* 人存检测 */
+    uint8_t  detected;          /* 1=有人, 0=无人 */
+    float    confidence;        /* 置信度 0.0-1.0 */
+    float    distance_cm;       /* 目标距离 cm (无人时=0) */
 
-/* Presence 校准阈值（运行时可通过 CLI 调节） */
+    /* 生命体征 */
+    float    breath_bpm;        /* 呼吸率 BPM (0=未检测) */
+    float    heart_bpm;         /* 心率 BPM (0=未检测) */
+
+    /* 体动 */
+    uint8_t  rbm;               /* 1=正在体动, 0=静止 */
+    float    body_move;         /* 体动强度 0-100% */
+
+    /* 帧信息 */
+    uint32_t frame;             /* 帧计数 */
+} radar_result_t;
+
+/* ---- 内部调试数据（日志/CLI 用，外部一般不需要） ---- */
 typedef struct {
-    float peak_height;       /* 呼吸峰高阈值, 默认 0.03 */
-    float phase_exc_mm_th;   /* 相位偏移阈值 mm, 默认 0.08 */
-    float amp_cv_th;         /* 振幅 CV 阈值, 默认 0.35 */
-    float bin_span_th;       /* bin 跨度阈值, 默认 2.0 */
-    float confidence_th;     /* 置信度门限, 默认 0.35 */
-    uint32_t miss_limit;     /* 锁存容忍帧数, 默认 3 */
-    uint8_t debug_log_enabled; /* 10Hz 子指标日志开关 */
+    uint8_t  target_detected;
+    float    signal_db;
+    int32_t  range_bin;
+    float    movement_energy;
+    float    phase_excursion_mm;
+    float    amplitude_cv;
+    float    bin_span;
+    uint8_t  breath_present;
+    uint8_t  phase_present;
+    uint8_t  amplitude_present;
+    uint8_t  bin_present;
+    float    breath_wave;
+    float    heart_wave;
+    float    rbm_ratio;
+    float    rbm_amp_cv_1s;
+    float    rbm_phase_jump;
+} radar_debug_t;
+
+/* ---- Presence 校准阈值（CLI 运行时调节） ---- */
+typedef struct {
+    float    peak_height;
+    float    phase_exc_mm_th;
+    float    amp_cv_th;
+    float    bin_span_th;
+    float    confidence_th;
+    uint32_t miss_limit;
+    uint8_t  debug_log_enabled;
 } radar_presence_thresholds_t;
 
-int my_lidar_inf_init(void);
-void my_lidar_inf_get_data(radar_data_t *out);
+/* ---- API ---- */
+int  my_lidar_inf_init(void);
+void my_lidar_inf_get_result(radar_result_t *out);
+void my_lidar_inf_get_debug(radar_debug_t *out);
 void radar_presence_get_thresholds(radar_presence_thresholds_t *out);
 void radar_presence_set_thresholds(const radar_presence_thresholds_t *in);
+
+/* 兼容旧接口 */
+typedef radar_result_t radar_data_t;
+#define my_lidar_inf_get_data(out) my_lidar_inf_get_result(out)
 
 #ifdef __cplusplus
 }
