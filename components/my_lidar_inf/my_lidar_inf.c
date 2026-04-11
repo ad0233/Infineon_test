@@ -553,7 +553,7 @@ static void radar_task(void *pvParameters)
                      "confidence=%.2f distance=%.1fcm "
                      "breath=%.1fbpm heart=%.1fbpm frame=%" PRIu32
                      " phExc=%.3fmm(%s) ampCV=%.3f(%s) binSpan=%.1f(%s) breathPk=%s"
-                     " rbm=%s bodyMov=%.3f ampCV1s=%.3f",
+                     " rbm=%s bodyMov=%.0f%% ampCV1s=%.3f",
                      (export_snapshot.presence_detected != 0U) ? "yes" : "no",
                      export_snapshot.range_bin,
                      export_snapshot.signal_db,
@@ -1309,8 +1309,11 @@ static int32_t radar_select_tracked_range_bin(const float32_t *range_energy,
     {
         if (global_energy > fmaxf(local_energy, 1.0e-9f) * RADAR_RANGE_TRACK_SWITCH_RATIO)
         {
-            /* 全局能量 >2× 局部：直接跳（新目标出现/旧目标消失） */
-            if (global_energy > fmaxf(local_energy, 1.0e-9f) * 2.0f)
+            /* 全局能量 >2× 局部 且距离 ≤10 bin：直接跳
+             * 距离 >10 bin 时仍受步进限制（防止跳到远处杂波） */
+            const int32_t jump_dist = abs(global_bin - tracked_bin);
+            if (global_energy > fmaxf(local_energy, 1.0e-9f) * 2.0f
+                && jump_dist <= 10)
             {
                 candidate_bin = global_bin;
             }
@@ -2051,10 +2054,21 @@ static void radar_update_presence(void *result_ptr)
                             ? (float32_t)s_presence_state.rbm_sum / (float32_t)rbm_window
                             : 0.0f;
 
-        /* bodyMov 输出：1s ampCV 减去静坐基线 */
-        result->body_movement_mm = rbm_flag
-            ? fmaxf(rbm_amp_cv - 0.25f, 0.0f)  /* 减去静坐均值基线 */
-            : 0.0f;
+        /* bodyMov 输出：0-100% 体动强度
+         * 0% = 静坐 (ampCV1s ≤ 0.38)
+         * 100% = 大摆动 (ampCV1s ≥ 0.92)
+         * 线性映射，clamp 到 0-100 */
+        if (rbm_flag)
+        {
+            float32_t pct = (rbm_amp_cv - 0.38f) / (0.92f - 0.38f) * 100.0f;
+            if (pct < 0.0f) { pct = 0.0f; }
+            if (pct > 100.0f) { pct = 100.0f; }
+            result->body_movement_mm = pct;
+        }
+        else
+        {
+            result->body_movement_mm = 0.0f;
+        }
 
         /* 日志用：覆盖 amplitude_cv 和 bin_span 为 1s 值（不影响 presence 判定，presence 已算完） */
         result->rbm_phase_jump = rbm_amp_cv;    /* 复用字段：1s ampCV */
@@ -2099,6 +2113,11 @@ static void radar_update_presence(void *result_ptr)
 
     if (raw_present)
     {
+        /* presence 从 no→yes：清空 bin history，让 tracker 重新锁定 */
+        if (!s_presence_state.presence_latched)
+        {
+            s_presence_state.search_bin_count = 0;
+        }
         s_presence_state.presence_latched = true;
         s_presence_state.presence_misses = 0U;
     }
@@ -2145,7 +2164,14 @@ static void radar_update_presence(void *result_ptr)
     }
     else
     {
-        /* 非估算帧：输出上次的结果 */
+        /* 非估算帧：无人立即清零，有人输出上次结果 */
+        if (!result->presence_detected)
+        {
+            s_presence_state.breath_rate_bpm = 0.0f;
+            s_presence_state.heart_rate_bpm = 0.0f;
+            s_presence_state.breath_hz_count = 0;
+            s_presence_state.heart_hz_count = 0;
+        }
         result->breath_rate_bpm = s_presence_state.breath_rate_bpm;
         result->heart_rate_bpm = s_presence_state.heart_rate_bpm;
     }
@@ -2240,6 +2266,7 @@ static bool radar_analyze_frame(void *result_ptr)
         (s_presence_state.search_bin_count > 0U) ?
         radar_median_int(s_presence_state.search_bin_history, s_presence_state.search_bin_count) :
         -1;
+
     const int32_t search_bin =
         radar_select_tracked_range_bin(range_energy_accum,
                                        (int32_t)RADAR_DISTANCE_FIRST_VALID_BIN,
