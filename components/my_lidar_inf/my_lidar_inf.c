@@ -2269,8 +2269,8 @@ static bool radar_analyze_frame(void *result_ptr)
         /* 校准阶段：前 30 帧 (3s) */
         const bool calibrating = (s_presence_state.body_move_count < 30U);
 
-        /* 运动判定：raw 超过 noise 的 2.5 倍 */
-        const float32_t move_gate = fmaxf(s_presence_state.noise_floor * 2.5f, 0.02f);
+        /* 运动判定：raw 超过 noise 的 1.8 倍 */
+        const float32_t move_gate = fmaxf(s_presence_state.noise_floor * 1.8f, 0.02f);
         const bool is_moving = !calibrating && (move_raw > move_gate);
 
         /* 自适应基线更新
@@ -2295,31 +2295,21 @@ static bool radar_analyze_frame(void *result_ptr)
                 alpha * cur_spectrum[b] + (1.0f - alpha) * s_presence_state.baseline[b];
         }
 
-        /* 噪声底学习：跟踪 move_raw 的滑动最小值
-         * 只有当 raw < 当前 noise 时才拉低，否则极慢上升（防止永远卡在 0） */
+        /* 噪声底学习：跟踪静坐时 raw 的均值水平
+         * 静止时 IIR 跟踪 raw → noise 代表"正常静坐的 raw 水平"
+         * 运动时冻结 noise → 死区不被运动拉高 */
         if (calibrating)
         {
-            /* 校准期：用最小值初始化 */
-            if (s_presence_state.noise_floor < 1.0e-6f || move_raw < s_presence_state.noise_floor)
-            {
-                s_presence_state.noise_floor = move_raw;
-            }
+            s_presence_state.noise_floor =
+                0.15f * move_raw + 0.85f * s_presence_state.noise_floor;
         }
         else if (!is_moving)
         {
-            if (move_raw < s_presence_state.noise_floor)
-            {
-                /* raw 比 noise 低 → 快速拉低 */
-                s_presence_state.noise_floor =
-                    0.20f * move_raw + 0.80f * s_presence_state.noise_floor;
-            }
-            else
-            {
-                /* raw 比 noise 高但未判定为运动 → 极慢上升 */
-                s_presence_state.noise_floor =
-                    0.01f * move_raw + 0.99f * s_presence_state.noise_floor;
-            }
+            /* 静止时：中等速度跟踪 raw 均值 */
+            s_presence_state.noise_floor =
+                0.05f * move_raw + 0.95f * s_presence_state.noise_floor;
         }
+        /* 运动时不更新 noise → 保持静坐水平 */
 
         /* 帧计数（用于校准阶段判定） */
         s_presence_state.body_move_count++;
@@ -2340,13 +2330,14 @@ static bool radar_analyze_frame(void *result_ptr)
             s_presence_state.body_move_smooth = smooth_sum / (float32_t)n;
         }
 
-        /* 死区：校准期 或 低于噪声底 × 2.5 → 输出 0 */
+        /* 死区：校准期 或 低于噪声底 × 1.8 → 输出 0
+         * noise 现在跟踪静坐均值 (~0.15-0.25), ×1.8 ≈ 0.27-0.45 */
         s_presence_state.body_move_raw = move_raw;
         float32_t final_move = 0.0f;
         if (!calibrating)
         {
             final_move = s_presence_state.body_move_smooth;
-            if (final_move < s_presence_state.noise_floor * 2.5f)
+            if (final_move < s_presence_state.noise_floor * 1.8f)
             {
                 final_move = 0.0f;
             }

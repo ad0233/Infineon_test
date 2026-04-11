@@ -126,6 +126,26 @@ idf.py menuconfig
 - SPI CS 由 sensor 库软件控制，SPI 总线配置必须 `spics_io_num = -1`，CS 引脚仍需 gpio_config 初始化为输出。
 - 使用任何 SDK/库 API 前，**先读源码确认方法存在**，不要猜测方法名。
 
+## MemPalace 调用规则
+
+MemPalace（MCP）是跨会话持久记忆，wing 为 `BY001-ESP32`。以下场景**必须主动调用**：
+
+### 自动查询（mempalace_search）
+- 涉及**硬件引脚、原理图、电源域**问题时 → 查 `room: hardware`
+- 涉及**雷达参数调优、BPM 异常、滤波器配置**时 → 查 `room: radar-vitals`
+- 用户提到"之前"、"上次"、"历史记录"时 → 全局搜索
+- 修改 `resource_map.h` 或 SPI 配置前 → 查硬件引脚映射确认正确性
+
+### 自动存入（mempalace_add_drawer）
+- 硬件审计发现新问题或确认结论时 → 存入 `room: hardware`
+- 调参实验结论**经用户确认有效**后 → 存入 `room: radar-vitals`
+- 发现并修复了非显而易见的 bug 时 → 存入 `room: decisions`
+
+### 不要存入的内容
+- 临时调试数据、未确认的实验结果
+- 代码中可直接读取的参数值（看代码即可）
+- 每次会话的过程记录
+
 ## 协作纪律
 
 - 每次会话聚焦一个目标，完成验证后再切换下一个。
