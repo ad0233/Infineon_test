@@ -580,6 +580,10 @@ static void radar_task(void *pvParameters)
             radar_distance_last_log_ms = time_ms;
         }
 
+        /* 波形日志：每帧 10Hz，供 GUI 画图 */
+        ESP_LOGI(TAG, "Wave: breath=%.4f heart=%.4f",
+                 frame_result.breath_wave, frame_result.heart_wave);
+
         vTaskDelay(pdMS_TO_TICKS(RADAR_MEASUREMENT_REARM_DELAY_MS));
         radar_rearm_next_measurement();
     }

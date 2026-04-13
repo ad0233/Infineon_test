@@ -18,5 +18,6 @@ idf_component_register(
     REQUIRES
         main
         sensor-xensiv-bgt60trxx
+        my_rgb
         ${PRESENCE_REQUIRES}
 )

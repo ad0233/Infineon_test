@@ -267,7 +267,7 @@ extern "C" void app_main()
     // ESP_ERROR_CHECK(esp_ldo_acquire_channel(&ldo_config, &ldo_handle));
     // printf("VDD_IO4 已配置为 3.3V\n");
 
-    // bsp_audio_bus_init();       //i2c  i2s 初始化
+    bsp_audio_bus_init();       //i2c  i2s 初始化（AHT20/VEML7700 需要）
     // // init_pdm_mic();          //pdm麦克风初始化
     // bsp_audio_codec_init();    //es8311 
     // bsp_gpio46_set_level(1); //功放的使能，拉高
@@ -289,32 +289,25 @@ extern "C" void app_main()
     
    
 
-    // my_aht20_init(&aht20, bsp_i2c_get_bus_handle());
-    // if (aht20 != NULL) {
-    //     xTaskCreate(aht20_task, "aht20", 4096, NULL, 5, NULL);
-    // }
+    /* AHT20 温湿度 */
+    my_aht20_init(&aht20, bsp_i2c_get_bus_handle());
+    if (aht20 != NULL) {
+        xTaskCreate(aht20_task, "aht20", 4096, NULL, 5, NULL);
+    }
 
-    // my_light_init(&light, bsp_i2c_get_bus_handle());
-    // if (light != NULL) {     
-    //     xTaskCreate(light_task, "light", 4096, NULL, 5, NULL);
-    // }
-
-    // my_bmp580_init(&bmp580, bsp_i2c_get_bus_handle());
-    // if (bmp580 != NULL) {
-    //     xTaskCreate(bmp580_task, "bmp580", 4096, NULL, 5, NULL);
-    // }
-
-    // my_veml7700_init(&veml7700, bsp_i2c_get_bus_handle());
-    // if (veml7700 != NULL) {
-    //     xTaskCreate(veml7700_task, "veml7700", 4096, NULL, 5, NULL);
-    // }
+    /* VEML7700 环境光 */
+    my_veml7700_init(&veml7700, bsp_i2c_get_bus_handle());
+    if (veml7700 != NULL) {
+        xTaskCreate(veml7700_task, "veml7700", 4096, NULL, 5, NULL);
+    }
 
     // xTaskCreate(mic_debug_task, "mic_debug", 4096, NULL, 5, NULL);
 
     my_lidar_inf_init();
 
-    /* WS2812 灯光：有人白色常亮，无人灭灯 */
+    /* WS2812 灯光：有人亮（颜色可 CLI 实时调），无人灭 */
     my_rgb_init();
+    my_rgb_set_color(255, 255, 255, 100);  /* 默认白色 100% */
     xTaskCreate([](void *) {
         radar_result_t rd;
         bool was_present = false;
@@ -323,10 +316,8 @@ extern "C" void app_main()
             my_lidar_inf_get_result(&rd);
             bool present = (rd.detected != 0);
 
-            if (present && !was_present) {
-                my_rgb_set(255, 255, 255, 100);
-            } else if (!present && was_present) {
-                my_rgb_set(0, 0, 0, 0);
+            if (present != was_present) {
+                my_rgb_enable(present);
             }
 
             was_present = present;

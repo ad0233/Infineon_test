@@ -89,6 +89,16 @@ dependencies:
       path: E:\Radar_Infilin\BY001-ESP32-feat_lidar_inf\dependencies\espressif__jsmn
       type: local
     version: 1.1.0
+  espressif/led_strip:
+    component_hash: 28621486f77229aaf81c71f5e15d6fbf36c2949cf11094e07090593e659e7639
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 3.0.3
   espressif/nghttp:
     dependencies: []
     source:
@@ -134,10 +144,11 @@ direct_dependencies:
 - espressif/esp_websocket_client
 - espressif/esp_wifi_remote
 - espressif/jsmn
+- espressif/led_strip
 - espressif/nghttp
 - espressif/zlib
 - idf
 - lvgl/lvgl
-manifest_hash: 9de96d92d2d4c136738464cf52fea9e9a63607e0c4a4b8b1a66313faa5951df6
+manifest_hash: 0998c49a59bc971b4e64f9d3af827e0f1b75837320ee74ed7d94abe22341a165
 target: esp32p4
 version: 2.0.0

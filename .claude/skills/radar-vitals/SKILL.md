@@ -105,27 +105,61 @@ Heart outlier rejected: XX.X vs median XX.X                      (警告, 触发
 | `FIRST_VALID_BIN` | 10 (37.5cm) | 排除近场杂波 |
 | `SWITCH_RATIO` | 1.25 | bin 跟踪切换比 |
 | `MAX_STEP_BINS` | 2 | 每帧最大 bin 步进 |
-| `CONFIDENCE_TH` | 0.80 | 置信度门限（需 phExc + 其他指标） |
-| `BREATH_WINDOW` | 6s | 呼吸峰检测窗口 |
+| 直接跳转 | 能量>2× 且距离≤10 bin | 防止跳到远处杂波 |
+| `CONFIDENCE_TH` | 0.80 | 置信度门限 |
+| `PHASE_WINDOW` | 3s | phExc 窗口（缩短离开检测延迟） |
+| `BREATH_WINDOW` | 3s | 呼吸峰检测窗口 |
 | `MISS_LIMIT` | 3 帧 | 锁存容忍帧数 |
-| 判定逻辑 | `conf≥0.80 OR (breath AND phase) OR (phase AND bin)` | breathPk 不再单独触发 |
+| 判定逻辑 | `conf≥0.80 OR (breath AND phase) OR (phase AND bin)` | — |
+| 无人行为 | 立即清零 BPM，bin 冻结 | presence→no 即生效 |
+| 人回来 | 清空 bin history，重新锁定 | presence no→yes |
 
-### 体动检测 (RBM) — Phase 1 已实现
-基于自适应基线的前向能量差分:
+### 体动检测 (RBM) — 独立 1s 滑窗
+基于振幅 CV 和 bin 跨度（不共用 presence 的 5s 窗口）:
 ```
-每帧: cur_spectrum[64] = |FFT(chirp平均)|
-      diff = Σ|cur[b] - baseline[b]| / N  (目标 bin ±5 范围)
-      baseline: 静止时 α=0.50 快速跟随, 运动时 α=0.01 近冻结
-      noise_floor: 跟踪 raw 的滑动最小值
-      bodyMov: 10帧平滑后, < noise×2.5 → 输出 0 (死区)
-      rbm_ratio: 200帧窗口内体动帧占比, >15% → 跳过 vitals 估算
+每帧: 推入 amp 和 bin 到 10 帧环形缓冲
+      ampCV1s = std(amp)/mean(amp) 在 10 帧内
+      binSpan1s = max - min bin 在 10 帧内
+
+判定: rbm_flag = (ampCV1s > 0.38) OR (binSpan1s >= 4)
+
+bodyMov (0-100%):
+  rbm_flag=1 时 = clamp((ampCV1s - 0.38) / (0.92 - 0.38) × 100, 0, 100)
+  rbm_flag=0 时 = 0
+
+rbm_ratio = 200帧窗口体动占比, >15% → 跳过 vitals 估算
 ```
 
-校准期: 前 30 帧 (3s) 强制学习基线和噪声底, bodyMov=0
+校准值（2026-04-12）:
+- 静坐 ampCV1s 最大: 0.353
+- 运动 ampCV1s 最小: 0.413
+- 阈值 0.38 (中点 + 0.027 余量)
+- 检测延迟 ~0.5s, 恢复延迟 ~1s
 
-日志: `rbm=Y/N(ratio%) bodyMov=X.XXXX raw=X.XXXX noise=X.XXXX`
+日志: `rbm=Y/N bodyMov=XX% ampCV1s=X.XXX`
 
 Phase 2 (待实现): 启用 3RX 天线相位差, 检测侧向运动
+
+### WS2812 RGB 控制 (my_rgb 组件)
+- GPIO20, 1 颗灯珠, RMT 驱动
+- API: `my_rgb_set_color(r, g, b, brightness)` / `my_rgb_enable(on)`
+- 串口命令: `rgb R G B BRIGHTNESS\n`（UART0, 独立任务监听）
+- 主控逻辑: presence=yes → enable，人走 → disable；颜色由串口命令实时控制
+
+### Python GUI (tools/radar_panel.py)
+- 综合面板: 呼吸/心率波形 + RGB 调光 + 串口日志
+- 状态栏: 有人/无人 + 距离 + BPM + 体动 + 温湿度 + 光照
+- RGB 滑动条 10Hz 节流发送到 ESP32
+- 解析 `Wave:` (10Hz 波形), `Radar:` (1Hz 综合), `温湿度:`, `VEML7700:` 日志
+
+### 日志格式
+```
+Radar: detected=yes confidence=1.00 distance=45.0cm breath=16.9bpm heart=87.2bpm rbm=N bodyMov=0%
+Wave: breath=0.1234 heart=-0.0567
+温湿度 T=25.5℃ RH=50.0%
+VEML7700 环境光 94.0 lx
+my_rgb: rgb_cmd_task started
+```
 
 ### 已知限制与待优化
 1. **侧向运动检测弱**: 仅用 RX1, 需启用 3RX 相位差 (Phase 2)
@@ -137,10 +171,9 @@ Phase 2 (待实现): 启用 3RX 天线相位差, 检测侧向运动
 
 ### 常见问题排查
 - **BPM 不变**: 检查 `Vitals raw:` 日志是否出现; FFT twiddle 表是否正确初始化为 1024
-- **BPM 偏低卡死**: FFT ROI 下限过低会锁在噪声峰; 检查 ROI 范围
 - **波形全零**: `vitals_filters_inited` 为 false, 或 `presence_detected` 一直为 false
 - **栈溢出**: vitals 函数有大量局部数组, 确保 `RADAR_TASK_STACK_SIZE` ≥ `configMINIMAL_STACK_SIZE * 16`
-- **心率被离群拒绝**: 查看 `Heart outlier rejected` 日志, 初始锁定值不准导致后续全拒绝 → 前 3 次不拒绝已修复
-- **启动时 FIFO 崩溃**: 断电 3 秒冷启动恢复, 非代码问题 (SPI 电平转换器 TXS0108 + 20MHz 临界)
-- **bodyMov 全零**: 检查 noise 是否过高 (校准期有运动), 重启保持静止 3 秒
-- **bin 跟踪卡在远处**: 全局能量 >2× 局部时直接跳转, 无步进限制
+- **启动时 FIFO 崩溃**: 断电 3 秒冷启动恢复, 非代码问题
+- **bin 跟踪卡在远处**: 人走后跳到远处静态反射 → 已加距离限制（最多 10 bin）
+- **人走后 BPM 没清零**: 旧版 bug (等 20s 周期)，现已立即清零
+- **RGB 命令无响应**: 检查 COM 口是否被 monitor 占用；确认 rgb_cmd_task 已启动

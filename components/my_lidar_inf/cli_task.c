@@ -37,11 +37,12 @@
 
 #include "xensiv_radar_presence.h"
 #include "my_lidar_inf.h"
+#include "my_rgb.h"
 
 /*******************************************************************************
  * Macros
  ********************************************************************************/
-#define NUMBER_OF_COMMANDS (14)
+#define NUMBER_OF_COMMANDS (15)
 
 /* Strings length */
 #define MAX_INPUT_LENGTH  (50)
@@ -104,6 +105,8 @@ static BaseType_t cli_set_miss_limit(char *pcWriteBuffer,
 static BaseType_t cli_presence_debug(char *pcWriteBuffer,
         size_t xWriteBufferLen, const char *pcCommandString);
 static BaseType_t cli_show_presence(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString);
+static BaseType_t cli_rgb(char *pcWriteBuffer,
         size_t xWriteBufferLen, const char *pcCommandString);
 static inline bool check_bool_validation(const char *value, const char *enable,
         const char *disable);
@@ -190,7 +193,12 @@ static const CLI_Command_Definition_t command_list[NUMBER_OF_COMMANDS] =
                         .pcHelpString =
                                 "show_presence - Show all presence threshold values\n",
                         .pxCommandInterpreter = cli_show_presence,
-                        .cExpectedNumberOfParameters = 0 } };
+                        .cExpectedNumberOfParameters = 0 },
+                { .pcCommand = "rgb",
+                        .pcHelpString =
+                                "rgb <R> <G> <B> <BRIGHTNESS> - Set LED color (0-255) and brightness (0-100)\n",
+                        .pxCommandInterpreter = cli_rgb,
+                        .cExpectedNumberOfParameters = 4 } };
 
 static xensiv_radar_presence_handle_t handle;
 
@@ -230,14 +238,13 @@ void console_task(void *pvParameters) {
     setvbuf(stdout, NULL, _IONBF, 0);
 
     for (int32_t i = 0; i < NUMBER_OF_COMMANDS; ++i) {
-        FreeRTOS_CLIRegisterCommand(&command_list[i]); 
+        FreeRTOS_CLIRegisterCommand(&command_list[i]);
     }
 
     for (;;) {
-        /* Wait for a sign */
         int32_t c = getchar();
-        
-        if (c == EOF) 
+
+        if (c == EOF)
         {
             vTaskDelay(pdMS_TO_TICKS(1));
             continue;
@@ -958,5 +965,40 @@ static BaseType_t cli_show_presence(char *pcWriteBuffer,
              (double)th.confidence_th,
              th.miss_limit,
              th.debug_log_enabled ? "enabled" : "disabled");
+    return pdFALSE;
+}
+
+/* rgb R G B BRIGHTNESS */
+static BaseType_t cli_rgb(char *pcWriteBuffer,
+        size_t xWriteBufferLen, const char *pcCommandString)
+{
+    const char *p;
+    BaseType_t plen;
+    configASSERT(pcWriteBuffer);
+
+    p = FreeRTOS_CLIGetParameter(pcCommandString, 1, &plen);
+    if (!p) { snprintf(pcWriteBuffer, xWriteBufferLen, "Err\n"); return pdFALSE; }
+    int32_t r = (int32_t)strtol(p, NULL, 10);
+
+    p = FreeRTOS_CLIGetParameter(pcCommandString, 2, &plen);
+    if (!p) { snprintf(pcWriteBuffer, xWriteBufferLen, "Err\n"); return pdFALSE; }
+    int32_t g = (int32_t)strtol(p, NULL, 10);
+
+    p = FreeRTOS_CLIGetParameter(pcCommandString, 3, &plen);
+    if (!p) { snprintf(pcWriteBuffer, xWriteBufferLen, "Err\n"); return pdFALSE; }
+    int32_t b = (int32_t)strtol(p, NULL, 10);
+
+    p = FreeRTOS_CLIGetParameter(pcCommandString, 4, &plen);
+    if (!p) { snprintf(pcWriteBuffer, xWriteBufferLen, "Err\n"); return pdFALSE; }
+    int32_t br = (int32_t)strtol(p, NULL, 10);
+
+    if (r < 0) r = 0; else if (r > 255) r = 255;
+    if (g < 0) g = 0; else if (g > 255) g = 255;
+    if (b < 0) b = 0; else if (b > 255) b = 255;
+    if (br < 0) br = 0; else if (br > 100) br = 100;
+
+    my_rgb_set_color((uint8_t)r, (uint8_t)g, (uint8_t)b, (uint8_t)br);
+    snprintf(pcWriteBuffer, xWriteBufferLen, "ok rgb=%" PRIi32 ",%" PRIi32 ",%" PRIi32 " br=%" PRIi32 "\n",
+             r, g, b, br);
     return pdFALSE;
 }
