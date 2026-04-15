@@ -53,11 +53,12 @@
 #define RADAR_IRQ_WAIT_LOW_TIMEOUT_MS       (20U)
 #define RADAR_MEASUREMENT_REARM_DELAY_MS    (100U)
 #define RADAR_DISTANCE_FIRST_VALID_BIN      (10U)             /* bin10=37.5cm, 排除近场杂波 */
+#define RADAR_DISTANCE_LAST_VALID_BIN       (53U)             /* bin53≈198.75cm, 过滤 2m 外 */
 #define RADAR_MAIN_RX_IDX                   (1U)              /* 参考脚本 MAIN_RX_IDX=1 */
 #define RADAR_RANGE_TRACK_HISTORY_LEN       (5U)
 #define RADAR_RANGE_TRACK_LOCAL_RADIUS_BINS (3)
-#define RADAR_RANGE_TRACK_SWITCH_RATIO      (1.25f)
-#define RADAR_RANGE_TRACK_MAX_STEP_BINS     (2)
+#define RADAR_RANGE_TRACK_SWITCH_RATIO      (2.5f)   /* 远端功率需 ≥2.5× 本地才允许步进，抗瞬态 */
+#define RADAR_RANGE_TRACK_MAX_STEP_BINS     (1)     /* 每帧最多步进 1 bin（10Hz 下 1s 最多 10 bin），防止快速漂移 */
 #define RADAR_PRESENCE_HISTORY_LEN          (200U)            /* 10Hz * 20s, 足够心率分析 */
 #define RADAR_PRESENCE_FRAME_RATE_HZ        (10.0f)
 #define RADAR_PRESENCE_ENERGY_RADIUS_BINS   (2)
@@ -275,6 +276,19 @@ typedef struct
     int32_t rbm_bin_buf[10];            /* 最近 10 帧 bin */
     uint32_t rbm_buf_idx;
     uint32_t rbm_buf_count;
+
+    /* ---- 逐 bin 呼吸带通功率（tracker 选 bin 依据）---- */
+    float     bpf_w_bin[NUM_SAMPLES_PER_CHIRP / 2U][2][2];  /* 64 bin × 2 级 × 2 延迟线 */
+    float32_t bin_breath_power[NUM_SAMPLES_PER_CHIRP / 2U]; /* 每 bin 带通功率 EMA */
+    uint32_t  bin_bpf_warmup_frames;                        /* 启动期帧计数 */
+    cfloat32_t bin_prev_coherent[NUM_SAMPLES_PER_CHIRP / 2U]; /* MTI: 上一帧的相干 FFT，用于算帧差 */
+
+    /* ---- 胸腔多特征打分状态 ---- */
+    float32_t bin_static_ema[NUM_SAMPLES_PER_CHIRP / 2U];   /* 长窗静态能量 EMA（α=0.01，τ=10s） */
+    float32_t bin_power_slow[NUM_SAMPLES_PER_CHIRP / 2U];   /* 带通功率慢 EMA（α=0.02，τ=5s） */
+    float32_t bin_chest_score[NUM_SAMPLES_PER_CHIRP / 2U];  /* 最终综合打分，tracker 输入 */
+    int32_t   anchor_bin;                                   /* 位置锚点：tracker 稳定位置 */
+    uint32_t  anchor_age_frames;                            /* 锚点年龄（连续稳定帧数） */
 } radar_presence_state_t;
 
 
@@ -309,7 +323,7 @@ static radar_presence_thresholds_t s_presence_thresholds = {
     .bin_span_th       = RADAR_PRESENCE_DEFAULT_BIN_SPAN_TH,
     .confidence_th     = 0.80f,
     .miss_limit        = RADAR_PRESENCE_DEFAULT_MISS_LIMIT,
-    .debug_log_enabled = false,
+    .debug_log_enabled = true,   /* 默认开启 10Hz PRES_DBG 日志，便于校准；CLI 可关 */
 };
 
 static TaskHandle_t radar_task_handler;
@@ -509,11 +523,19 @@ static void radar_task(void *pvParameters)
         uint32_t time_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
 
         radar_frame_result_t frame_result = {0};
+        const int64_t t_analyze_start = esp_timer_get_time();
         if (!radar_analyze_frame(&frame_result))
         {
             radar_restart_frame_generator("Frame analysis failed");
             continue;
         }
+        const int64_t analyze_us = esp_timer_get_time() - t_analyze_start;
+        static int64_t s_analyze_us_sum = 0;
+        static uint32_t s_analyze_us_count = 0;
+        static int64_t s_analyze_us_peak = 0;
+        s_analyze_us_sum += analyze_us;
+        s_analyze_us_count++;
+        if (analyze_us > s_analyze_us_peak) s_analyze_us_peak = analyze_us;
 
         gpio_set_level(PIN_LED_RED, frame_result.target_detected ? 1 : 0);
         gpio_set_level(PIN_LED_GREEN, frame_result.target_detected ? 0 : 1);
@@ -562,8 +584,8 @@ static void radar_task(void *pvParameters)
                      frame_result.heart_rate_bpm,
                      frame_result.rbm_detected ? "Y" : "N",
                      frame_result.body_movement_mm);
-            /* 调试数据 */
-            ESP_LOGD(TAG,
+            /* 调试数据（校准期间升为 INFO，便于观察 tracker 锁定的 bin 与子指标）*/
+            ESP_LOGI(TAG,
                      "Debug: bin=%" PRIi32 " level=%.1fdB frame=%" PRIu32
                      " phExc=%.3fmm(%s) ampCV=%.3f(%s) binSpan=%.1f(%s) breathPk=%s ampCV1s=%.3f",
                      frame_result.range_bin,
@@ -577,6 +599,62 @@ static void radar_task(void *pvParameters)
                      frame_result.bin_present ? "Y" : "N",
                      frame_result.breath_present ? "Y" : "N",
                      frame_result.rbm_phase_jump);
+            /* Score 诊断：打印 chest_score 前 3 名 bin，看 tracker 为什么选 */
+            {
+                int32_t  top3_bin[3]   = {-1, -1, -1};
+                float32_t top3_score[3] = {0.0f, 0.0f, 0.0f};
+                const int32_t bin_lo_l = (int32_t)RADAR_DISTANCE_FIRST_VALID_BIN;
+                const int32_t bin_hi_l = (int32_t)RADAR_DISTANCE_LAST_VALID_BIN + 1;
+                for (int32_t b = bin_lo_l; b < bin_hi_l; b++) {
+                    float32_t s = s_presence_state.bin_chest_score[b];
+                    if (s > top3_score[0]) {
+                        top3_score[2] = top3_score[1]; top3_bin[2] = top3_bin[1];
+                        top3_score[1] = top3_score[0]; top3_bin[1] = top3_bin[0];
+                        top3_score[0] = s;             top3_bin[0] = b;
+                    } else if (s > top3_score[1]) {
+                        top3_score[2] = top3_score[1]; top3_bin[2] = top3_bin[1];
+                        top3_score[1] = s;             top3_bin[1] = b;
+                    } else if (s > top3_score[2]) {
+                        top3_score[2] = s;             top3_bin[2] = b;
+                    }
+                }
+                /* 直接取 tracker 当前 bin 的 bin_breath_power，验证 BPF 是否在产生非零 */
+                const int32_t trk = frame_result.range_bin;
+                const float32_t bp_trk = (trk >= 0 && trk < (int32_t)(NUM_SAMPLES_PER_CHIRP / 2U))
+                                         ? s_presence_state.bin_breath_power[trk] : -1.0f;
+                const float32_t se_trk = (trk >= 0 && trk < (int32_t)(NUM_SAMPLES_PER_CHIRP / 2U))
+                                         ? s_presence_state.bin_static_ema[trk] : -1.0f;
+                const float32_t sc_trk = (trk >= 0 && trk < (int32_t)(NUM_SAMPLES_PER_CHIRP / 2U))
+                                         ? s_presence_state.bin_chest_score[trk] : -1.0f;
+                ESP_LOGI(TAG,
+                         "Score: top1=[%" PRIi32 ":%.4g] top2=[%" PRIi32 ":%.4g] top3=[%" PRIi32 ":%.4g] anchor=%" PRIi32 " age=%" PRIu32
+                         " | trkBin=%" PRIi32 " P=%.4g static=%.4g score=%.4g warmup=%" PRIu32,
+                         top3_bin[0], top3_score[0],
+                         top3_bin[1], top3_score[1],
+                         top3_bin[2], top3_score[2],
+                         s_presence_state.anchor_bin,
+                         s_presence_state.anchor_age_frames,
+                         trk, (double)bp_trk, (double)se_trk, (double)sc_trk,
+                         s_presence_state.bin_bpf_warmup_frames);
+
+                /* Perf: 帧处理耗时 + 堆 + 栈水位。CPU% 以 100ms 帧预算为基准 */
+                const int64_t avg_us = (s_analyze_us_count > 0)
+                                        ? (s_analyze_us_sum / (int64_t)s_analyze_us_count) : 0;
+                const int32_t cpu_avg_pct  = (int32_t)((avg_us * 100) / 100000);
+                const int32_t cpu_peak_pct = (int32_t)((s_analyze_us_peak * 100) / 100000);
+                const UBaseType_t stack_min = uxTaskGetStackHighWaterMark(NULL);
+                const size_t heap_int  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+                const size_t heap_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+                ESP_LOGI(TAG,
+                         "Perf: frame avg=%" PRId64 "us peak=%" PRId64 "us cpu_avg=%" PRId32 "%% cpu_peak=%" PRId32 "%%"
+                         " | stack_min=%u words heap_int=%u heap_psram=%u",
+                         avg_us, s_analyze_us_peak, cpu_avg_pct, cpu_peak_pct,
+                         (unsigned)stack_min, (unsigned)heap_int, (unsigned)heap_psram);
+                /* 重置统计窗口 */
+                s_analyze_us_sum = 0;
+                s_analyze_us_count = 0;
+                s_analyze_us_peak = 0;
+            }
             radar_distance_last_log_ms = time_ms;
         }
 
@@ -1317,11 +1395,12 @@ static int32_t radar_select_tracked_range_bin(const float32_t *range_energy,
     {
         if (global_energy > fmaxf(local_energy, 1.0e-9f) * RADAR_RANGE_TRACK_SWITCH_RATIO)
         {
-            /* 全局能量 >2× 局部 且距离 ≤10 bin：直接跳
-             * 距离 >10 bin 时仍受步进限制（防止跳到远处杂波） */
+            /* 全局能量 >2× 局部 且距离 ≤2 bin：直接跳（小位移快速响应）
+             * 距离 >2 bin 一律步进（每帧最多 MAX_STEP_BINS），避免瞬态
+             * （举手、翻身等 <1s 的短暂强信号）把 tracker 拽走 */
             const int32_t jump_dist = abs(global_bin - tracked_bin);
             if (global_energy > fmaxf(local_energy, 1.0e-9f) * 2.0f
-                && jump_dist <= 10)
+                && jump_dist <= 2)
             {
                 candidate_bin = global_bin;
             }
@@ -1539,6 +1618,19 @@ static void radar_vitals_init_filters(void)
     memset(s_presence_state.breath_bpf_w, 0, sizeof(s_presence_state.breath_bpf_w));
     memset(s_presence_state.heart_bpf_w, 0, sizeof(s_presence_state.heart_bpf_w));
 
+    /* 清零逐 bin 呼吸带通状态 */
+    memset(s_presence_state.bpf_w_bin, 0, sizeof(s_presence_state.bpf_w_bin));
+    memset(s_presence_state.bin_breath_power, 0, sizeof(s_presence_state.bin_breath_power));
+    memset(s_presence_state.bin_prev_coherent, 0, sizeof(s_presence_state.bin_prev_coherent));
+    s_presence_state.bin_bpf_warmup_frames = 0U;
+
+    /* 清零胸腔多特征打分状态 */
+    memset(s_presence_state.bin_static_ema, 0, sizeof(s_presence_state.bin_static_ema));
+    memset(s_presence_state.bin_power_slow, 0, sizeof(s_presence_state.bin_power_slow));
+    memset(s_presence_state.bin_chest_score, 0, sizeof(s_presence_state.bin_chest_score));
+    s_presence_state.anchor_bin = -1;
+    s_presence_state.anchor_age_frames = 0U;
+
     /* 清零频率历史 */
     memset(s_presence_state.breath_hz_history, 0, sizeof(s_presence_state.breath_hz_history));
     memset(s_presence_state.heart_hz_history, 0, sizeof(s_presence_state.heart_hz_history));
@@ -1696,7 +1788,7 @@ static void radar_remove_breath_harmonics(float32_t *heart_sig, uint32_t len,
     const float32_t heart_hi = 2.2f;
     float32_t temp[RADAR_PRESENCE_HISTORY_LEN];
 
-    for (uint32_t h = 2; h <= 8; h++)
+    for (uint32_t h = 2; h <= 12; h++)   /* 扩到 12 次：0.2Hz 呼吸 × 10 = 2.0Hz 落入心率带 */
     {
         float32_t harmonic = breath_hz * (float32_t)h;
         if (harmonic < heart_lo || harmonic > heart_hi)
@@ -1861,7 +1953,7 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
                           ? s_presence_state.heart_hz_count : 5U;
         float32_t prev_median = radar_small_median(
             s_presence_state.heart_hz_history, n_prev) * 60.0f;
-        if (fabsf(heart_bpm_raw - prev_median) > 25.0f)
+        if (fabsf(heart_bpm_raw - prev_median) > 15.0f)   /* 从 ±25 收紧到 ±15 BPM，过滤谐波误检 */
         {
             ESP_LOGW(TAG, "Heart outlier rejected: %.1f vs median %.1f",
                      heart_bpm_raw, prev_median);
@@ -2270,15 +2362,103 @@ static bool radar_analyze_frame(void *result_ptr)
         coherent_range_avg[bin] = coherent_range_accum[bin] / (float32_t)NUM_CHIRPS_PER_FRAME;
     }
 
+    /* 逐 bin 呼吸带通功率更新：只认 0.1–0.6Hz 呼吸频带，过滤静态墙/被子和随机抖动 */
+    {
+        const int32_t bin_lo = (int32_t)RADAR_DISTANCE_FIRST_VALID_BIN;
+        const int32_t bin_hi = (int32_t)RADAR_DISTANCE_LAST_VALID_BIN + 1;
+        for (int32_t bin = bin_lo; bin < bin_hi; bin++)
+        {
+            /* MTI: 复数帧差模值平方 = 帧间"运动功率"
+             * - 相位旋转（呼吸）→ diff_mag ≠ 0
+             * - 幅度变化（走动）→ diff_mag ≠ 0
+             * - 静态反射（墙）→ diff_mag ≈ 0
+             * MTI 本身去 DC，不需要再加 BPF */
+            const float32_t dre = CREAL_F32(coherent_range_avg[bin])
+                                - CREAL_F32(s_presence_state.bin_prev_coherent[bin]);
+            const float32_t dim = CIMAG_F32(coherent_range_avg[bin])
+                                - CIMAG_F32(s_presence_state.bin_prev_coherent[bin]);
+            const float32_t diff_mag_sq = dre * dre + dim * dim;
+            s_presence_state.bin_prev_coherent[bin] = coherent_range_avg[bin];
+
+            /* 短窗功率 EMA，α=0.1，时间常数约 1 秒 */
+            s_presence_state.bin_breath_power[bin] =
+                0.9f * s_presence_state.bin_breath_power[bin] + 0.1f * diff_mag_sq;
+        }
+        s_presence_state.bin_bpf_warmup_frames++;
+        /* 暖机刚结束：清空 tracker 历史，强制基于带通功率重新做一次全局 argmax，
+         * 避免暖机期静态能量选出的错误 bin（通常是近场强反射）粘住 */
+        if (s_presence_state.bin_bpf_warmup_frames == 40U)
+        {
+            s_presence_state.search_bin_count = 0U;
+        }
+    }
+
+    /* === 胸腔多特征打分（MVP：5 特征加权）=== */
+    {
+        const int32_t bin_lo = (int32_t)RADAR_DISTANCE_FIRST_VALID_BIN;
+        const int32_t bin_hi = (int32_t)RADAR_DISTANCE_LAST_VALID_BIN + 1;
+        const int32_t anchor = s_presence_state.anchor_bin;
+        const bool    anchor_active = (anchor >= bin_lo) && (s_presence_state.anchor_age_frames >= 30U);
+        const float32_t anchor_sigma2_inv = 1.0f / (2.0f * 5.0f * 5.0f);   /* σ=5 bin，更宽容 */
+        const float32_t anchor_bonus_k    = 0.3f;                          /* 最多 +30% 奖励，不惩罚远处 */
+
+        for (int32_t bin = bin_lo; bin < bin_hi; bin++)
+        {
+            /* 慢 EMA 更新：静态基线 + 带通功率慢基线 */
+            s_presence_state.bin_static_ema[bin] =
+                0.99f * s_presence_state.bin_static_ema[bin] + 0.01f * range_energy_accum[bin];
+            s_presence_state.bin_power_slow[bin] =
+                0.98f * s_presence_state.bin_power_slow[bin] + 0.02f * s_presence_state.bin_breath_power[bin];
+
+            /* 特征 1：带通功率（基础信号） */
+            const float32_t P = s_presence_state.bin_breath_power[bin];
+
+            /* 特征 2：空间窄瘦度（孤峰→1，宽展→0.33） */
+            float32_t P_prev = (bin > bin_lo) ? s_presence_state.bin_breath_power[bin - 1] : 0.0f;
+            float32_t P_next = (bin < bin_hi - 1) ? s_presence_state.bin_breath_power[bin + 1] : 0.0f;
+            float32_t narrowness = P / (P + P_prev + P_next + 1e-9f);
+
+            /* 特征 3：位置稳定加权（锚点激活后才生效） */
+            float32_t pos_weight = 1.0f;
+            if (anchor_active) {
+                float32_t d = (float32_t)(bin - anchor);
+                pos_weight = 1.0f + anchor_bonus_k * expf(-(d * d) * anchor_sigma2_inv);
+            }
+
+            /* 特征 4：静态占比门控（墙/家具动/静比低 → 扣分） */
+            float32_t static_ratio = P / (s_presence_state.bin_static_ema[bin] * 0.01f + 1e-9f);
+            float32_t static_gate = fminf(static_ratio, 1.0f);
+
+            /* 特征 5：突发门控（当前 >> 5s 慢基线 → 瞬态扣分）
+             * 初期 slow 未稳定时禁用（warmup 后 10 秒内不启用），避免把合法信号误判为瞬态 */
+            float32_t burst_gate;
+            if (s_presence_state.bin_bpf_warmup_frames < 140U) {
+                burst_gate = 1.0f;  /* 暖机后 10s 内不启用突发惩罚 */
+            } else {
+                float32_t burst_ratio = P / (s_presence_state.bin_power_slow[bin] * 3.0f + 1e-9f);
+                burst_gate = fminf(1.0f / (burst_ratio + 0.5f), 1.0f);
+            }
+
+            /* 综合打分 */
+            s_presence_state.bin_chest_score[bin] = P * narrowness * pos_weight * static_gate * burst_gate;
+        }
+    }
+
     const int32_t tracked_seed =
         (s_presence_state.search_bin_count > 0U) ?
         radar_median_int(s_presence_state.search_bin_history, s_presence_state.search_bin_count) :
         -1;
 
+    /* 暖机期（< 4 秒）用静态能量兜底，之后用胸腔多特征综合打分选 bin */
+    const float32_t *tracker_input =
+        (s_presence_state.bin_bpf_warmup_frames >= 40U)
+            ? s_presence_state.bin_chest_score
+            : range_energy_accum;
+
     const int32_t search_bin =
-        radar_select_tracked_range_bin(range_energy_accum,
+        radar_select_tracked_range_bin(tracker_input,
                                        (int32_t)RADAR_DISTANCE_FIRST_VALID_BIN,
-                                       (int32_t)(NUM_SAMPLES_PER_CHIRP / 2U),
+                                       (int32_t)RADAR_DISTANCE_LAST_VALID_BIN + 1,
                                        tracked_seed);
     radar_append_int_history(s_presence_state.search_bin_history,
                              &s_presence_state.search_bin_count,
@@ -2290,6 +2470,31 @@ static bool radar_analyze_frame(void *result_ptr)
     result->distance_cm = radar_calculate_distance_cm_from_bin(result->range_bin);
     result->signal_db = radar_calculate_fft_level_db(coherent_range_avg, result->range_bin);
     result->target_detected = (result->signal_db > RADAR_DISTANCE_THRESHOLD_DB);
+
+    /* === 锚点维护：tracker 稳定位置追踪（仅暖机后启用，避免被静态能量误锚）=== */
+    if (s_presence_state.bin_bpf_warmup_frames >= 40U)
+    {
+        const int32_t cur_bin = result->range_bin;
+        if (s_presence_state.anchor_bin < 0) {
+            s_presence_state.anchor_bin = cur_bin;
+            s_presence_state.anchor_age_frames = 1U;
+        } else if (abs(cur_bin - s_presence_state.anchor_bin) <= 2) {
+            /* 当前 bin 在锚点 ±2 → 延长年龄 */
+            s_presence_state.anchor_age_frames++;
+            if (s_presence_state.anchor_age_frames > 1000U) {
+                s_presence_state.anchor_age_frames = 1000U;
+            }
+        } else {
+            /* 偏离锚点 → 年龄衰减；归零后重置锚点到新位置 */
+            if (s_presence_state.anchor_age_frames > 0U) {
+                s_presence_state.anchor_age_frames--;
+            }
+            if (s_presence_state.anchor_age_frames == 0U) {
+                s_presence_state.anchor_bin = cur_bin;
+                s_presence_state.anchor_age_frames = 1U;
+            }
+        }
+    }
 
     const int32_t bin_start = (int32_t)RADAR_DISTANCE_FIRST_VALID_BIN;
     const int32_t bin_end = (int32_t)(NUM_SAMPLES_PER_CHIRP / 2U);

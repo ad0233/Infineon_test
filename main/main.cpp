@@ -146,7 +146,7 @@ static void veml7700_task(void *arg)
     vTaskDelay(pdMS_TO_TICKS(400));
     while (1) {
         if (veml7700 != NULL && my_veml7700_read_block(veml7700, &lux, 300) == 0) {
-            ESP_LOGI(TAG, "VEML7700 环境光 %.1f lx", lux);
+            ESP_LOGD(TAG, "VEML7700 环境光 %.1f lx", lux);
         }
         vTaskDelay(pdMS_TO_TICKS(interval_ms));
     }
@@ -172,7 +172,7 @@ static void light_task(void *arg)
     vTaskDelay(pdMS_TO_TICKS(300));  /* 等 BH1750 就绪，避免首次 one-shot 259 */
     while (1) {
         if (light != NULL && my_light_read_block(light, &lux, 200) == 0) {
-            ESP_LOGI(TAG, "环境光 %.1f lx", lux);
+            ESP_LOGD(TAG, "环境光 %.1f lx", lux);
         }
         vTaskDelay(pdMS_TO_TICKS(interval_ms));
     }
@@ -184,7 +184,7 @@ static void aht20_task(void *arg)
     float temp = 0.f, rh = 0.f;
     while (1) {
         if (aht20 != NULL && my_aht20_read_block(aht20, &temp, &rh, 300) == 0) {
-            ESP_LOGI(TAG, "温湿度 T=%.1f℃ RH=%.1f%%", temp, rh);
+            ESP_LOGD(TAG, "温湿度 T=%.1f℃ RH=%.1f%%", temp, rh);
         }
         vTaskDelay(pdMS_TO_TICKS(interval_ms));
     }
