@@ -16,3 +16,5 @@ entities.json
 
 # Large binary reference files
 reference/**/*.pdf
+# Radar calibration recording artifacts
+tools/records/

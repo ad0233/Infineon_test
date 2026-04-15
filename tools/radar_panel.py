@@ -5,9 +5,12 @@
 """
 import sys
 import re
+import csv
+import os
 import time
+import datetime
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 from collections import deque
 
 try:
@@ -63,6 +66,9 @@ class RadarPanel:
         self.wave_x = deque(maxlen=WAVE_WINDOW)
         self.wave_breath = deque(maxlen=WAVE_WINDOW)
         self.wave_heart = deque(maxlen=WAVE_WINDOW)
+        # 体动曲线：1Hz 采样，保留最近 300 秒（5 分钟）
+        self.body_t = deque(maxlen=300)
+        self.body_v = deque(maxlen=300)
 
         # RGB 状态
         self.r = tk.IntVar(value=255)
@@ -75,6 +81,12 @@ class RadarPanel:
         self.ser = None
         self.send_pending = False
         self.last_sent_time = 0
+
+        # CSV 录制
+        self.csv_file = None
+        self.csv_writer = None
+        self.csv_path = None
+        self.csv_row_count = 0
 
         # ---- 布局 ----
         self._build_status_bar()
@@ -102,6 +114,17 @@ class RadarPanel:
                                      foreground="#F44336", font=("Arial", 10, "bold"))
         self.conn_label.pack(side="left", padx=(0, 8))
         ttk.Button(top, text="连接", width=6, command=self._connect).pack(side="left")
+
+        # 录制按钮
+        self.rec_btn = tk.Button(top, text="● 开始录制", width=10,
+                                  bg="#F44336", fg="white", relief="flat",
+                                  activebackground="#D32F2F",
+                                  command=self._toggle_recording)
+        self.rec_btn.pack(side="left", padx=(12, 4))
+        self.rec_info = ttk.Label(top, text="未录制", font=("Consolas", 9),
+                                   foreground="#666")
+        self.rec_info.pack(side="left")
+
         self.status_var = tk.StringVar(value="等待数据...")
         ttk.Label(top, textvariable=self.status_var, font=("Arial", 10),
                   foreground="#333"
@@ -112,21 +135,29 @@ class RadarPanel:
         frame = ttk.LabelFrame(parent, text="波形", padding=4)
         frame.grid(row=0, column=0, sticky="nsew", padx=(0, 4))
 
-        self.fig = Figure(figsize=(8, 6), dpi=90)
-        self.fig.subplots_adjust(hspace=0.35, top=0.95, bottom=0.08,
+        self.fig = Figure(figsize=(8, 7), dpi=90)
+        self.fig.subplots_adjust(hspace=0.45, top=0.95, bottom=0.06,
                                   left=0.08, right=0.96)
-        self.ax_breath = self.fig.add_subplot(2, 1, 1)
+        self.ax_breath = self.fig.add_subplot(3, 1, 1)
         self.line_breath, = self.ax_breath.plot([], [], "#2196F3", linewidth=1.5)
         self.ax_breath.set_title("呼吸波形", fontsize=11, loc="left")
         self.ax_breath.set_ylabel("相位")
         self.ax_breath.grid(True, alpha=0.2)
 
-        self.ax_heart = self.fig.add_subplot(2, 1, 2)
+        self.ax_heart = self.fig.add_subplot(3, 1, 2)
         self.line_heart, = self.ax_heart.plot([], [], "#F44336", linewidth=1.5)
         self.ax_heart.set_title("心率波形", fontsize=11, loc="left")
         self.ax_heart.set_ylabel("相位")
-        self.ax_heart.set_xlabel("时间 (秒)")
         self.ax_heart.grid(True, alpha=0.2)
+
+        self.ax_body = self.fig.add_subplot(3, 1, 3)
+        self.line_body, = self.ax_body.plot([], [], "#FF9800", linewidth=1.5)
+        self.ax_body.fill_between([], [], 0, color="#FF9800", alpha=0.25)
+        self.ax_body.set_title("体动强度", fontsize=11, loc="left")
+        self.ax_body.set_ylabel("%")
+        self.ax_body.set_xlabel("时间 (秒)")
+        self.ax_body.set_ylim(0, 110)
+        self.ax_body.grid(True, alpha=0.2)
 
         canvas = FigureCanvasTkAgg(self.fig, master=frame)
         canvas.draw()
@@ -307,6 +338,95 @@ class RadarPanel:
                 pass
         self.root.after(50, self._rx_poll)
 
+    # ---------- CSV 录制 ----------
+    def _toggle_recording(self):
+        if self.csv_file is None:
+            self._start_recording()
+        else:
+            self._stop_recording()
+
+    def _start_recording(self):
+        # 默认路径: tools/records/radar_YYYYMMDD_HHMMSS.csv
+        default_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    "records")
+        os.makedirs(default_dir, exist_ok=True)
+        default_name = "radar_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + ".csv"
+        path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV 文件", "*.csv"), ("所有文件", "*.*")],
+            initialdir=default_dir,
+            initialfile=default_name,
+            title="选择录制保存位置"
+        )
+        if not path:
+            return
+        try:
+            self.csv_file = open(path, "w", newline="", encoding="utf-8-sig")
+            self.csv_writer = csv.writer(self.csv_file)
+            self.csv_writer.writerow([
+                "时间", "帧号",
+                "有人", "置信度", "距离_cm",
+                "呼吸_BPM", "心率_BPM",
+                "体动", "体动强度_%",
+                "温度_℃", "湿度_%", "环境光_lux"
+            ])
+            self.csv_file.flush()
+            self.csv_path = path
+            self.csv_row_count = 0
+            self.rec_btn.configure(text="■ 停止录制", bg="#4CAF50",
+                                    activebackground="#388E3C")
+            self.rec_info.configure(text=f"录制中: {os.path.basename(path)}",
+                                     foreground="#4CAF50")
+            self._log(f"开始录制: {path}", "sys")
+        except Exception as e:
+            self._log(f"录制失败: {e}", "sys")
+            self.csv_file = None
+
+    def _stop_recording(self):
+        if self.csv_file:
+            try:
+                self.csv_file.close()
+            except Exception:
+                pass
+            path = self.csv_path
+            rows = self.csv_row_count
+            self.csv_file = None
+            self.csv_writer = None
+            self.csv_path = None
+            self.rec_btn.configure(text="● 开始录制", bg="#F44336",
+                                    activebackground="#D32F2F")
+            self.rec_info.configure(text=f"已保存 {rows} 行", foreground="#666")
+            self._log(f"停止录制，共 {rows} 行 → {path}", "sys")
+
+    def _record_row(self, frame_num):
+        if not self.csv_writer:
+            return
+        try:
+            s = self.state
+            self.csv_writer.writerow([
+                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                frame_num,
+                1 if s["detected"] == "yes" else 0,
+                f"{s['confidence']:.2f}",
+                f"{s['distance_cm']:.1f}",
+                f"{s['breath_bpm']:.1f}",
+                f"{s['heart_bpm']:.1f}",
+                1 if s["rbm"] == "Y" else 0,
+                s["body_move"],
+                f"{s['temp']:.1f}",
+                f"{s['rh']:.1f}",
+                f"{s['lux']:.1f}",
+            ])
+            self.csv_file.flush()
+            self.csv_row_count += 1
+            # 每 60 行更新一次显示（避免频繁刷新）
+            if self.csv_row_count % 60 == 0:
+                self.rec_info.configure(
+                    text=f"录制中: {self.csv_row_count} 行"
+                )
+        except Exception as e:
+            self._log(f"写入失败: {e}", "sys")
+
     def _parse_line(self, line):
         m = wave_re.search(line)
         if m:
@@ -325,7 +445,12 @@ class RadarPanel:
             self.state["heart_bpm"]   = float(m.group(5))
             self.state["rbm"]         = m.group(6)
             self.state["body_move"]   = int(m.group(7))
+            # 推入体动曲线（1Hz）
+            self.body_t.append(self._now_t())
+            self.body_v.append(self.state["body_move"])
             self._update_status()
+            # 每次 Radar 行（1Hz）写一条 CSV
+            self._record_row(self.wave_idx)
             if not self.filter_rgb.get():
                 self._log(f"RX: {line[:100]}", "rx")
             return
@@ -365,6 +490,7 @@ class RadarPanel:
         )
 
     def _chart_refresh(self):
+        redraw = False
         if len(self.wave_x) >= 2:
             xs = list(self.wave_x)
             bs = list(self.wave_breath)
@@ -390,7 +516,24 @@ class RadarPanel:
             self.ax_heart.set_title(
                 f"心率波形  {self.state['heart_bpm']:.1f} BPM",
                 fontsize=11, loc="left")
+            redraw = True
 
+        if len(self.body_t) >= 2:
+            bt = list(self.body_t)
+            bv = list(self.body_v)
+            self.line_body.set_data(bt, bv)
+            # 清除旧填充后重绘
+            self.ax_body.collections.clear()
+            self.ax_body.fill_between(bt, bv, 0, color="#FF9800", alpha=0.25)
+            # 窗口: 最近 300 秒
+            xlim_body = (max(0, bt[-1] - 300), bt[-1] + 1)
+            self.ax_body.set_xlim(*xlim_body)
+            self.ax_body.set_title(
+                f"体动强度  当前 {self.state['body_move']}%",
+                fontsize=11, loc="left")
+            redraw = True
+
+        if redraw:
             self.canvas.draw_idle()
         self.root.after(200, self._chart_refresh)
 
@@ -403,5 +546,14 @@ if __name__ == "__main__":
         default.configure(family="Microsoft YaHei", size=9)
     except Exception:
         pass
-    RadarPanel(root)
+    panel = RadarPanel(root)
+
+    def on_close():
+        try:
+            panel._stop_recording()
+        except Exception:
+            pass
+        root.destroy()
+
+    root.protocol("WM_DELETE_WINDOW", on_close)
     root.mainloop()
