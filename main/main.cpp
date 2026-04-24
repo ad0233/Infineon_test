@@ -139,6 +139,13 @@ static my_light_handle_t light = NULL;   //环境光传感器句柄
 static my_bmp580_handle_t bmp580 = NULL; //气压传感器句柄
 static my_veml7700_handle_t veml7700 = NULL; //VEML7700 环境光句柄
 
+/* 暴露给雷达任务的最新环境读数（C 链接，便于 my_lidar_inf.c extern 引用） */
+extern "C" {
+    volatile float g_env_temp_c = 0.0f;
+    volatile float g_env_rh_pct = 0.0f;
+    volatile float g_env_lux    = 0.0f;
+}
+
 static void veml7700_task(void *arg)
 {
     const uint32_t interval_ms = 1500;
@@ -146,6 +153,7 @@ static void veml7700_task(void *arg)
     vTaskDelay(pdMS_TO_TICKS(400));
     while (1) {
         if (veml7700 != NULL && my_veml7700_read_block(veml7700, &lux, 300) == 0) {
+            g_env_lux = lux;
             ESP_LOGD(TAG, "VEML7700 环境光 %.1f lx", lux);
         }
         vTaskDelay(pdMS_TO_TICKS(interval_ms));
@@ -184,6 +192,8 @@ static void aht20_task(void *arg)
     float temp = 0.f, rh = 0.f;
     while (1) {
         if (aht20 != NULL && my_aht20_read_block(aht20, &temp, &rh, 300) == 0) {
+            g_env_temp_c = temp;
+            g_env_rh_pct = rh;
             ESP_LOGD(TAG, "温湿度 T=%.1f℃ RH=%.1f%%", temp, rh);
         }
         vTaskDelay(pdMS_TO_TICKS(interval_ms));
@@ -310,17 +320,13 @@ extern "C" void app_main()
     my_rgb_set_color(255, 255, 255, 100);  /* 默认白色 100% */
     xTaskCreate([](void *) {
         radar_result_t rd;
-        bool was_present = false;
 
         while (1) {
             my_lidar_inf_get_result(&rd);
             bool present = (rd.detected != 0);
-
-            if (present != was_present) {
-                my_rgb_enable(present);
-            }
-
-            was_present = present;
+            /* 每帧都无条件刷新 LED 状态，避免 WS2812 硬件状态丢失后
+             * 边沿触发逻辑无法恢复（检测稳定 yes 时不会重发 enable） */
+            my_rgb_enable(present);
             vTaskDelay(pdMS_TO_TICKS(200));
         }
     }, "rgb_ctrl", 2048, NULL, 2, NULL);

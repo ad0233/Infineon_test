@@ -53,7 +53,7 @@
 #define RADAR_IRQ_WAIT_LOW_TIMEOUT_MS       (20U)
 #define RADAR_MEASUREMENT_REARM_DELAY_MS    (100U)
 #define RADAR_DISTANCE_FIRST_VALID_BIN      (10U)             /* bin10=37.5cm, 排除近场杂波 */
-#define RADAR_DISTANCE_LAST_VALID_BIN       (53U)             /* bin53≈198.75cm, 过滤 2m 外 */
+#define RADAR_DISTANCE_LAST_VALID_BIN       (53U)             /* bin53≈198.75cm (≈2m) */
 #define RADAR_MAIN_RX_IDX                   (1U)              /* 参考脚本 MAIN_RX_IDX=1 */
 #define RADAR_RANGE_TRACK_HISTORY_LEN       (5U)
 #define RADAR_RANGE_TRACK_LOCAL_RADIUS_BINS (3)
@@ -74,6 +74,7 @@
 #define RADAR_PRESENCE_DEFAULT_CONFIDENCE_TH    (0.80f)
 #define RADAR_PRESENCE_DEFAULT_MISS_LIMIT       (3U)
 #define RADAR_PHASE_DIFF_CLIP               (0.30f)
+#define RADAR_PHASE_DIFF_CLIP_HEART         (1.0f)            /* 心率高频信号需要更大裕度，避免削顶产生谐波 */
 #define RADAR_RBM_PHASE_JUMP_TH            (2.0f)            /* 帧间相位跳变 > 2.0 rad 判定为体动（呼吸约 0.3-1.5 rad） */
 #define RADAR_RBM_WINDOW_FRAMES            (200U)            /* RBM 统计窗口 = vitals 窗口 */
 #define RADAR_RBM_RATIO_TH                 (0.15f)           /* 窗口内 >15% 帧为体动 → 跳过 vitals */
@@ -81,7 +82,16 @@
 #define RADAR_PHASE_SMOOTH_LEN              (7U)
 #define RADAR_WAVELENGTH_MM                 (5.0f)            /* c / 60GHz */
 #define RADAR_VITALS_FFT_SIZE               (1024U)           /* 200 samples × 4 零填充 → 对齐 1024 */
-#define RADAR_VITALS_INTERVAL_FRAMES        (200U)            /* 每 200 帧 (20s) 做一次 vitals 估算 */
+
+/* 临时调试日志：躺卧丢人问题定位用。置 1 启用，0 关闭。不影响算法行为。
+ * 启用后每 1 秒打印：
+ *   ScoreDbg anchor=... P=... statG=... score=...   （score 各分量）
+ *   LockDbg  top_score=... threshold=... latched=... （锁定判决）
+ * 历史：
+ *   2026-04 批次 1+2 调试期间打开过；F1/F2/F3/F4/F5/F6 全部验证通过后关闭。
+ *   现场再现问题需要重新打开 → 改成 1 → 重新烧录。 */
+#define RADAR_DEBUG_SCORE_LOG               (0)
+#define RADAR_VITALS_INTERVAL_FRAMES        (20U)             /* 每 20 帧 (2s) 做一次 vitals 估算（滑窗：仍用最近 20s 数据）*/
 #define RADAR_PI_F                          (3.14159265358979323846f)
 
 /* FIFO 分片读取：BGT60TR13C FIFO 上限 8192 样本，24576 总样本需分 6 片
@@ -245,8 +255,8 @@ typedef struct
     float heart_bpf_w[3][2];            /* 延迟线 */
 
     /* 频率估算结果中值平滑历史 */
-    float breath_hz_history[3];
-    float heart_hz_history[5];
+    float breath_hz_history[5];     /* 滑窗每 2s 更新，5 个样本中值 ≈ 10s 平滑 */
+    float heart_hz_history[7];      /* 滑窗每 2s 更新，7 个样本中值 ≈ 14s 平滑 */
     uint32_t breath_hz_count;
     uint32_t heart_hz_count;
 
@@ -282,6 +292,8 @@ typedef struct
     float32_t bin_breath_power[NUM_SAMPLES_PER_CHIRP / 2U]; /* 每 bin 带通功率 EMA */
     uint32_t  bin_bpf_warmup_frames;                        /* 启动期帧计数 */
     cfloat32_t bin_prev_coherent[NUM_SAMPLES_PER_CHIRP / 2U]; /* MTI: 上一帧的相干 FFT，用于算帧差 */
+    float32_t bin_diff_fast[NUM_SAMPLES_PER_CHIRP / 2U];    /* 双 EMA 带通：快窗 α=0.12 (≈0.6Hz LPF) */
+    float32_t bin_diff_slow[NUM_SAMPLES_PER_CHIRP / 2U];    /* 双 EMA 带通：慢窗 α=0.02 (≈0.1Hz LPF) */
 
     /* ---- 胸腔多特征打分状态 ---- */
     float32_t bin_static_ema[NUM_SAMPLES_PER_CHIRP / 2U];   /* 长窗静态能量 EMA（α=0.01，τ=10s） */
@@ -289,6 +301,9 @@ typedef struct
     float32_t bin_chest_score[NUM_SAMPLES_PER_CHIRP / 2U];  /* 最终综合打分，tracker 输入 */
     int32_t   anchor_bin;                                   /* 位置锚点：tracker 稳定位置 */
     uint32_t  anchor_age_frames;                            /* 锚点年龄（连续稳定帧数） */
+    uint32_t  score_low_frames;                             /* 锁定后 score 持续低于 maintain_th 的帧数 */
+    float32_t current_top_score;                            /* 当前帧 top_score 缓存：供 confidence-gate 参考 */
+    uint32_t  score_hi_streak;                              /* score 持续高于 ACQUIRE_BY_SCORE_TH 的帧数（score-only re-acquire 用） */
 } radar_presence_state_t;
 
 
@@ -323,7 +338,7 @@ static radar_presence_thresholds_t s_presence_thresholds = {
     .bin_span_th       = RADAR_PRESENCE_DEFAULT_BIN_SPAN_TH,
     .confidence_th     = 0.80f,
     .miss_limit        = RADAR_PRESENCE_DEFAULT_MISS_LIMIT,
-    .debug_log_enabled = true,   /* 默认开启 10Hz PRES_DBG 日志，便于校准；CLI 可关 */
+    .debug_log_enabled = false,  /* 默认关闭 10Hz PRES_DBG 日志；CLI presence_debug enable 可开 */
 };
 
 static TaskHandle_t radar_task_handler;
@@ -418,6 +433,10 @@ static void radar_task(void *pvParameters)
         vTaskDelete(NULL);
         return;
     }
+
+    /* 启动即初始化 vitals BPF 滤波器系数和延迟线，让每帧的实时波形 BPF
+     * 从 detected=yes 第一帧就能跑（不再依赖 radar_estimate_vitals 的 lazy init） */
+    radar_vitals_init_filters();
 
     ifx_window_hann_f32(distance_window, NUM_SAMPLES_PER_CHIRP);
 
@@ -517,7 +536,7 @@ static void radar_task(void *pvParameters)
         radar_frame_counter++;
         if ((radar_frame_counter % 32U) == 0U)
         {
-            ESP_LOGI(TAG, "Radar frames processed: %" PRIu32, radar_frame_counter);
+            ESP_LOGD(TAG, "Radar frames processed: %" PRIu32, radar_frame_counter);
         }
 
         uint32_t time_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
@@ -572,20 +591,25 @@ static void radar_task(void *pvParameters)
         if ((radar_distance_last_log_ms == 0U) ||
             ((time_ms - radar_distance_last_log_ms) >= RADAR_DISTANCE_LOG_INTERVAL_MS))
         {
-            /* 业务数据 */
+            /* 业务数据（含环境读数：T/RH/lux 由 main.cpp 的 sensor task 写入全局）*/
+            extern volatile float g_env_temp_c;
+            extern volatile float g_env_rh_pct;
+            extern volatile float g_env_lux;
             ESP_LOGI(TAG,
                      "Radar: detected=%s confidence=%.2f distance=%.1fcm "
                      "breath=%.1fbpm heart=%.1fbpm "
-                     "rbm=%s bodyMov=%.0f%%",
+                     "rbm=%s bodyMov=%.0f%% "
+                     "T=%.1f RH=%.1f lux=%.1f",
                      frame_result.presence_detected ? "yes" : "no",
                      frame_result.presence_confidence,
                      frame_result.presence_distance_cm,
                      frame_result.breath_rate_bpm,
                      frame_result.heart_rate_bpm,
                      frame_result.rbm_detected ? "Y" : "N",
-                     frame_result.body_movement_mm);
-            /* 调试数据（校准期间升为 INFO，便于观察 tracker 锁定的 bin 与子指标）*/
-            ESP_LOGI(TAG,
+                     frame_result.body_movement_mm,
+                     g_env_temp_c, g_env_rh_pct, g_env_lux);
+            /* 调试数据（默认隐藏；esp_log_level_set("radar_task", ESP_LOG_DEBUG) 启用）*/
+            ESP_LOGD(TAG,
                      "Debug: bin=%" PRIi32 " level=%.1fdB frame=%" PRIu32
                      " phExc=%.3fmm(%s) ampCV=%.3f(%s) binSpan=%.1f(%s) breathPk=%s ampCV1s=%.3f",
                      frame_result.range_bin,
@@ -626,7 +650,7 @@ static void radar_task(void *pvParameters)
                                          ? s_presence_state.bin_static_ema[trk] : -1.0f;
                 const float32_t sc_trk = (trk >= 0 && trk < (int32_t)(NUM_SAMPLES_PER_CHIRP / 2U))
                                          ? s_presence_state.bin_chest_score[trk] : -1.0f;
-                ESP_LOGI(TAG,
+                ESP_LOGD(TAG,
                          "Score: top1=[%" PRIi32 ":%.4g] top2=[%" PRIi32 ":%.4g] top3=[%" PRIi32 ":%.4g] anchor=%" PRIi32 " age=%" PRIu32
                          " | trkBin=%" PRIi32 " P=%.4g static=%.4g score=%.4g warmup=%" PRIu32,
                          top3_bin[0], top3_score[0],
@@ -645,7 +669,7 @@ static void radar_task(void *pvParameters)
                 const UBaseType_t stack_min = uxTaskGetStackHighWaterMark(NULL);
                 const size_t heap_int  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
                 const size_t heap_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-                ESP_LOGI(TAG,
+                ESP_LOGD(TAG,
                          "Perf: frame avg=%" PRId64 "us peak=%" PRId64 "us cpu_avg=%" PRId32 "%% cpu_peak=%" PRId32 "%%"
                          " | stack_min=%u words heap_int=%u heap_psram=%u",
                          avg_us, s_analyze_us_peak, cpu_avg_pct, cpu_peak_pct,
@@ -1622,6 +1646,8 @@ static void radar_vitals_init_filters(void)
     memset(s_presence_state.bpf_w_bin, 0, sizeof(s_presence_state.bpf_w_bin));
     memset(s_presence_state.bin_breath_power, 0, sizeof(s_presence_state.bin_breath_power));
     memset(s_presence_state.bin_prev_coherent, 0, sizeof(s_presence_state.bin_prev_coherent));
+    memset(s_presence_state.bin_diff_fast, 0, sizeof(s_presence_state.bin_diff_fast));
+    memset(s_presence_state.bin_diff_slow, 0, sizeof(s_presence_state.bin_diff_slow));
     s_presence_state.bin_bpf_warmup_frames = 0U;
 
     /* 清零胸腔多特征打分状态 */
@@ -1630,6 +1656,9 @@ static void radar_vitals_init_filters(void)
     memset(s_presence_state.bin_chest_score, 0, sizeof(s_presence_state.bin_chest_score));
     s_presence_state.anchor_bin = -1;
     s_presence_state.anchor_age_frames = 0U;
+    s_presence_state.score_low_frames = 0U;
+    s_presence_state.current_top_score = 0.0f;
+    s_presence_state.score_hi_streak = 0U;
 
     /* 清零频率历史 */
     memset(s_presence_state.breath_hz_history, 0, sizeof(s_presence_state.breath_hz_history));
@@ -1788,7 +1817,7 @@ static void radar_remove_breath_harmonics(float32_t *heart_sig, uint32_t len,
     const float32_t heart_hi = 2.2f;
     float32_t temp[RADAR_PRESENCE_HISTORY_LEN];
 
-    for (uint32_t h = 2; h <= 12; h++)   /* 扩到 12 次：0.2Hz 呼吸 × 10 = 2.0Hz 落入心率带 */
+    for (uint32_t h = 2; h <= 6; h++)    /* 限到 6 次：避免在心率带打太多 notch 误杀真实心率峰 */
     {
         float32_t harmonic = breath_hz * (float32_t)h;
         if (harmonic < heart_lo || harmonic > heart_hi)
@@ -1797,7 +1826,7 @@ static void radar_remove_breath_harmonics(float32_t *heart_sig, uint32_t len,
         }
 
         float notch_coef[5];
-        dsps_biquad_gen_notch_f32(notch_coef, harmonic / fs, -40.0f, 30.0f);
+        dsps_biquad_gen_notch_f32(notch_coef, harmonic / fs, -40.0f, 10.0f);  /* Q 30→10：notch 更窄，少误伤旁边的真心率峰 */
 
         float w[2] = {0.0f, 0.0f};
         dsps_biquad_f32(heart_sig, temp, (int)len, notch_coef, w);
@@ -1896,12 +1925,12 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
         {
             float32_t cur = phase_buf[i] - mean;
             phase_buf[i] = radar_clampf(cur - prev,
-                                        -RADAR_PHASE_DIFF_CLIP,
-                                        RADAR_PHASE_DIFF_CLIP);
+                                        -RADAR_PHASE_DIFF_CLIP_HEART,
+                                        RADAR_PHASE_DIFF_CLIP_HEART);
             prev = cur;
         }
     }
-    /* phase_buf 现在是 diff-clipped 信号（无平滑），用于心率 */
+    /* phase_buf 现在是 diff-clipped 信号（无平滑，用更宽 HEART clip 保留高频），用于心率 */
 
     /* filtfilt 工作缓冲区 */
     float32_t filt_temp[RADAR_PRESENCE_HISTORY_LEN];
@@ -1915,14 +1944,14 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
     float32_t breath_hz = radar_estimate_rate_hz(breath_sig, len,
                                                   fs, 0.20f, 0.50f);
 
-    /* 中值平滑呼吸率 */
+    /* 中值平滑呼吸率（5 样本中值 ≈ 10s 平滑）*/
     if (breath_hz > 0.0f)
     {
-        uint32_t idx = s_presence_state.breath_hz_count % 3U;
+        uint32_t idx = s_presence_state.breath_hz_count % 5U;
         s_presence_state.breath_hz_history[idx] = breath_hz;
         s_presence_state.breath_hz_count++;
-        uint32_t n = (s_presence_state.breath_hz_count < 3U)
-                     ? s_presence_state.breath_hz_count : 3U;
+        uint32_t n = (s_presence_state.breath_hz_count < 5U)
+                     ? s_presence_state.breath_hz_count : 5U;
         breath_hz = radar_small_median(s_presence_state.breath_hz_history, n);
     }
 
@@ -1942,43 +1971,59 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
     float32_t heart_hz = radar_estimate_rate_hz(heart_sig, len,
                                                  fs, 0.85f, 2.2f);
 
-    ESP_LOGI(TAG, "Vitals raw: breath_hz=%.4f heart_hz=%.4f (%.1f/%.1f BPM)",
+    ESP_LOGD(TAG, "Vitals raw: breath_hz=%.4f heart_hz=%.4f (%.1f/%.1f BPM)",
              breath_hz, heart_hz, breath_hz * 60.0f, heart_hz * 60.0f);
 
-    /* FIX: 心率离群值拒绝 — 前 3 次不拒绝（让初始值稳定），之后放宽到 ±25 BPM */
+    /* 心率离群值拒绝 — 前 3 次不拒绝（让初始值稳定）；±20 BPM 容忍；
+     * 2026-04 修正：streak 阈值 5 → 2。
+     *   原来要连续 10 秒（5 × 2s）才接受新值 → 真实心率变化时卡 0 太久。
+     *   新逻辑：连续 2 次拒绝即接受（4 秒内自适应），让 median 跟上心率漂移。*/
+    static uint32_t heart_reject_streak = 0;
     if (heart_hz > 0.0f && s_presence_state.heart_hz_count >= 3U)
     {
         float32_t heart_bpm_raw = heart_hz * 60.0f;
-        uint32_t n_prev = (s_presence_state.heart_hz_count < 5U)
-                          ? s_presence_state.heart_hz_count : 5U;
+        uint32_t n_prev = (s_presence_state.heart_hz_count < 7U)
+                          ? s_presence_state.heart_hz_count : 7U;
         float32_t prev_median = radar_small_median(
             s_presence_state.heart_hz_history, n_prev) * 60.0f;
-        if (fabsf(heart_bpm_raw - prev_median) > 15.0f)   /* 从 ±25 收紧到 ±15 BPM，过滤谐波误检 */
+        if (fabsf(heart_bpm_raw - prev_median) > 20.0f && heart_reject_streak < 2U)
         {
-            ESP_LOGW(TAG, "Heart outlier rejected: %.1f vs median %.1f",
-                     heart_bpm_raw, prev_median);
+            ESP_LOGW(TAG, "Heart outlier rejected (streak=%u): %.1f vs median %.1f",
+                     (unsigned)heart_reject_streak, heart_bpm_raw, prev_median);
             heart_hz = 0.0f;
+            heart_reject_streak++;
+        }
+        else
+        {
+            heart_reject_streak = 0;  /* 接受，重置连续拒绝计数 */
         }
     }
 
     if (heart_hz > 0.0f)
     {
-        uint32_t idx = s_presence_state.heart_hz_count % 5U;
+        uint32_t idx = s_presence_state.heart_hz_count % 7U;
         s_presence_state.heart_hz_history[idx] = heart_hz;
         s_presence_state.heart_hz_count++;
-        uint32_t n = (s_presence_state.heart_hz_count < 5U)
-                     ? s_presence_state.heart_hz_count : 5U;
+        uint32_t n = (s_presence_state.heart_hz_count < 7U)
+                     ? s_presence_state.heart_hz_count : 7U;
         heart_hz = radar_small_median(s_presence_state.heart_hz_history, n);
     }
 
-    /* 写入结果 */
-    s_presence_state.breath_rate_bpm = breath_hz * 60.0f;
-    s_presence_state.heart_rate_bpm = heart_hz * 60.0f;
+    /* 写入结果
+     * 2026-04 修正：若本次估计无效（heart_hz=0 outlier 被拒 / breath_hz=0 FFT 无峰），
+     *   保持 s_presence_state.*_rate_bpm 为上次有效值，不归零。
+     *   真正离开/解锁 由 score-gate 的 release 路径显式清零（那里会设 result->*=0）。*/
+    if (breath_hz > 0.0f) {
+        s_presence_state.breath_rate_bpm = breath_hz * 60.0f;
+    }
+    if (heart_hz > 0.0f) {
+        s_presence_state.heart_rate_bpm = heart_hz * 60.0f;
+    }
 
     result->breath_rate_bpm = s_presence_state.breath_rate_bpm;
     result->heart_rate_bpm = s_presence_state.heart_rate_bpm;
 
-    ESP_LOGI(TAG, "Vitals result: breath=%.1fbpm heart=%.1fbpm",
+    ESP_LOGD(TAG, "Vitals result: breath=%.1fbpm heart=%.1fbpm",
              result->breath_rate_bpm, result->heart_rate_bpm);
 }
 
@@ -2211,31 +2256,113 @@ static void radar_update_presence(void *result_ptr)
         (result->breath_present && result->phase_present) ||
         (result->phase_present && result->bin_present);
 
-    if (raw_present)
+    /* ===== F6: warmup 期间（< 4s）禁止任何 latch，避免冷启动静态杂波误检 ===== */
+    if (s_presence_state.bin_bpf_warmup_frames < 40U)
     {
-        /* presence 从 no→yes：清空 bin history，让 tracker 重新锁定 */
-        if (!s_presence_state.presence_latched)
-        {
-            s_presence_state.search_bin_count = 0;
-        }
-        s_presence_state.presence_latched = true;
-        s_presence_state.presence_misses = 0U;
-    }
-    else if (s_presence_state.presence_latched &&
-             (s_presence_state.presence_misses < s_presence_thresholds.miss_limit))
-    {
-        s_presence_state.presence_misses++;
+        s_presence_state.presence_latched = false;
+        s_presence_state.presence_misses  = 0U;
+        s_presence_state.score_hi_streak  = 0U;
+        result->presence_detected = false;
+        result->presence_distance_cm = 0.0f;
     }
     else
     {
-        s_presence_state.presence_latched = false;
+        /* ===== F1/F2: 引入 score-aware 锁定逻辑 =====
+         * F1（释放保护）：已锁定 + score 健康 → 忽略 raw_present 的 miss 累计
+         * F2（re-acquire）：未锁定但 score 持续强 → score-only 重新 latch
+         */
+        const float32_t SCORE_HEALTHY_TH     = 1e-6f;   /* 高 score 保持锁定的门槛（2026-04 再调：1e-5→1e-6，避免贴在典型信号下限导致偶发小波谷击穿 F1） */
+        const float32_t ACQUIRE_BY_SCORE_TH  = 1e-3f;   /* score-only re-acquire 门槛 */
+        const uint32_t  SCORE_ACQUIRE_FRAMES = 10U;     /* 持续 1s（10Hz） */
+
+        const float32_t top_score       = s_presence_state.current_top_score;
+        const bool      score_is_healthy = (top_score >= SCORE_HEALTHY_TH);
+        const bool      score_is_strong  = (top_score >= ACQUIRE_BY_SCORE_TH);
+
+        /* score 高分持续计数器（F2 用） */
+        if (score_is_strong)
+        {
+            if (s_presence_state.score_hi_streak < 1000U)
+            {
+                s_presence_state.score_hi_streak++;
+            }
+        }
+        else
+        {
+            s_presence_state.score_hi_streak = 0U;
+        }
+
+        const bool score_only_acquire =
+            (!s_presence_state.presence_latched) &&
+            (s_presence_state.score_hi_streak >= SCORE_ACQUIRE_FRAMES);
+
+        if (raw_present || score_only_acquire)
+        {
+            /* 入锁：从 no→yes 清空 tracker bin history */
+            if (!s_presence_state.presence_latched)
+            {
+                s_presence_state.search_bin_count = 0;
+            }
+            s_presence_state.presence_latched = true;
+            s_presence_state.presence_misses = 0U;
+        }
+        else if (s_presence_state.presence_latched && score_is_healthy)
+        {
+            /* F1: 已锁定且 score 强健 → 清 miss，防止位置微动触发误释放 */
+            s_presence_state.presence_misses = 0U;
+        }
+        else if (s_presence_state.presence_latched)
+        {
+            /* 已锁定但 score 不健康：累 miss 但【不】释放。
+             * 2026-04 架构修正：confidence-gate 只做"从无到有"的 acquire 路径。
+             * Release 完全交给 score-gate（maintain_th=1e-7 + 30 帧 grace），
+             * 消除两 gate grace 不对称（3 帧 vs 30 帧）造成的 [1e-7, 1e-6] 盲区。 */
+            if (s_presence_state.presence_misses < s_presence_thresholds.miss_limit)
+            {
+                s_presence_state.presence_misses++;
+            }
+        }
+        /* 未锁定 + 未触发 acquire → no-op，保持 not-latched */
+
+        result->presence_detected = s_presence_state.presence_latched;
+        result->presence_distance_cm =
+            result->presence_detected ? radar_calculate_distance_cm_from_bin(result->range_bin) : 0.0f;
     }
 
-    result->presence_detected = s_presence_state.presence_latched;
-    result->presence_distance_cm =
-        result->presence_detected ? radar_calculate_distance_cm_from_bin(result->range_bin) : 0.0f;
+    /* ---- 实时波形 BPF：每帧都跑，detected=yes 时立即出 Wave 数据 ---- */
+    if (s_presence_state.vitals_filters_inited && result->presence_detected)
+    {
+        float32_t sample = result->phase_unwrapped;
+        float32_t filtered;
 
-    /* 生命体征估算（每 RADAR_VITALS_INTERVAL_FRAMES 帧执行一次） */
+        /* 呼吸 BPF：2 级 biquad 级联 */
+        filtered = sample;
+        for (uint32_t s = 0; s < 2U; s++)
+        {
+            float out;
+            dsps_biquad_f32(&filtered, &out, 1,
+                            s_presence_state.breath_bpf_coef[s],
+                            s_presence_state.rt_breath_w[s]);
+            filtered = out;
+        }
+        s_presence_state.rt_breath_wave = filtered;
+        result->breath_wave = filtered;
+
+        /* 心率 BPF：3 级 biquad 级联 */
+        filtered = sample;
+        for (uint32_t s = 0; s < 3U; s++)
+        {
+            float out;
+            dsps_biquad_f32(&filtered, &out, 1,
+                            s_presence_state.heart_bpf_coef[s],
+                            s_presence_state.rt_heart_w[s]);
+            filtered = out;
+        }
+        s_presence_state.rt_heart_wave = filtered;
+        result->heart_wave = filtered;
+    }
+
+    /* 生命体征 BPM 估算（每 RADAR_VITALS_INTERVAL_FRAMES 帧 FFT 一次） */
     s_presence_state.vitals_frame_counter++;
     if (s_presence_state.vitals_frame_counter >= RADAR_VITALS_INTERVAL_FRAMES)
     {
@@ -2276,38 +2403,7 @@ static void radar_update_presence(void *result_ptr)
         result->heart_rate_bpm = s_presence_state.heart_rate_bpm;
     }
 
-    /* ---- 实时波形：每帧 IIR 滤波当前相位样本 ---- */
-    if (s_presence_state.vitals_filters_inited)
-    {
-        float32_t sample = result->phase_unwrapped;
-        float32_t filtered;
-
-        /* 呼吸波形：2 级 BPF 级联 */
-        filtered = sample;
-        for (uint32_t s = 0; s < 2U; s++)
-        {
-            float out;
-            dsps_biquad_f32(&filtered, &out, 1,
-                            s_presence_state.breath_bpf_coef[s],
-                            s_presence_state.rt_breath_w[s]);
-            filtered = out;
-        }
-        s_presence_state.rt_breath_wave = filtered;
-        result->breath_wave = filtered;
-
-        /* 心率波形：3 级 BPF 级联 */
-        filtered = sample;
-        for (uint32_t s = 0; s < 3U; s++)
-        {
-            float out;
-            dsps_biquad_f32(&filtered, &out, 1,
-                            s_presence_state.heart_bpf_coef[s],
-                            s_presence_state.rt_heart_w[s]);
-            filtered = out;
-        }
-        s_presence_state.rt_heart_wave = filtered;
-        result->heart_wave = filtered;
-    }
+    /* 实时波形 BPF 已搬到 radar_update_presence 的每帧路径，这里不重复计算 */
 }
 
 
@@ -2368,21 +2464,30 @@ static bool radar_analyze_frame(void *result_ptr)
         const int32_t bin_hi = (int32_t)RADAR_DISTANCE_LAST_VALID_BIN + 1;
         for (int32_t bin = bin_lo; bin < bin_hi; bin++)
         {
-            /* MTI: 复数帧差模值平方 = 帧间"运动功率"
-             * - 相位旋转（呼吸）→ diff_mag ≠ 0
-             * - 幅度变化（走动）→ diff_mag ≠ 0
-             * - 静态反射（墙）→ diff_mag ≈ 0
-             * MTI 本身去 DC，不需要再加 BPF */
+            /* MTI: 复数帧差模值 */
             const float32_t dre = CREAL_F32(coherent_range_avg[bin])
                                 - CREAL_F32(s_presence_state.bin_prev_coherent[bin]);
             const float32_t dim = CIMAG_F32(coherent_range_avg[bin])
                                 - CIMAG_F32(s_presence_state.bin_prev_coherent[bin]);
-            const float32_t diff_mag_sq = dre * dre + dim * dim;
+            const float32_t diff_mag = sqrtf(dre * dre + dim * dim);
             s_presence_state.bin_prev_coherent[bin] = coherent_range_avg[bin];
 
-            /* 短窗功率 EMA，α=0.1，时间常数约 1 秒 */
+            /* 双 EMA 带通（替代 biquad，无数值精度问题）：
+             * fast EMA α=0.12 → τ≈0.8s → LPF 截止 ≈0.6Hz
+             * slow EMA α=0.02 → τ≈5s   → LPF 截止 ≈0.1Hz
+             * bandpass = fast - slow  → 只保留 0.1–0.6Hz 呼吸频带
+             * 风吹窗帘（>1Hz）被 fast LPF 平滑掉
+             * 缓慢温漂（<0.1Hz）被 slow 跟踪减去 */
+            s_presence_state.bin_diff_fast[bin] =
+                0.88f * s_presence_state.bin_diff_fast[bin] + 0.12f * diff_mag;
+            s_presence_state.bin_diff_slow[bin] =
+                0.98f * s_presence_state.bin_diff_slow[bin] + 0.02f * diff_mag;
+            const float32_t bp_out =
+                s_presence_state.bin_diff_fast[bin] - s_presence_state.bin_diff_slow[bin];
+
+            /* 功率 EMA，α=0.1，时间常数约 1 秒 */
             s_presence_state.bin_breath_power[bin] =
-                0.9f * s_presence_state.bin_breath_power[bin] + 0.1f * diff_mag_sq;
+                0.9f * s_presence_state.bin_breath_power[bin] + 0.1f * bp_out * bp_out;
         }
         s_presence_state.bin_bpf_warmup_frames++;
         /* 暖机刚结束：清空 tracker 历史，强制基于带通功率重新做一次全局 argmax，
@@ -2425,8 +2530,11 @@ static bool radar_analyze_frame(void *result_ptr)
                 pos_weight = 1.0f + anchor_bonus_k * expf(-(d * d) * anchor_sigma2_inv);
             }
 
-            /* 特征 4：静态占比门控（墙/家具动/静比低 → 扣分） */
-            float32_t static_ratio = P / (s_presence_state.bin_static_ema[bin] * 0.01f + 1e-9f);
+            /* 特征 4：静态占比门控（墙/家具动/静比低 → 扣分）
+             * F5 (2026-04 调整): 分母系数 0.01 → 0.001
+             * 原值对人体（强静态回波）压制过狠，statG 常态 0.005-0.03，无谓损失 30-500×。
+             * 改后整体 score 抬升 ~10×，深睡静态场景余量充足。 */
+            float32_t static_ratio = P / (s_presence_state.bin_static_ema[bin] * 0.001f + 1e-9f);
             float32_t static_gate = fminf(static_ratio, 1.0f);
 
             /* 特征 5：突发门控（当前 >> 5s 慢基线 → 瞬态扣分）
@@ -2441,6 +2549,20 @@ static bool radar_analyze_frame(void *result_ptr)
 
             /* 综合打分 */
             s_presence_state.bin_chest_score[bin] = P * narrowness * pos_weight * static_gate * burst_gate;
+
+#if RADAR_DEBUG_SCORE_LOG
+            /* 只打锚点处，且 1Hz（每 10 帧 1 次） */
+            if (anchor_active && bin == anchor && (radar_frame_counter % 10U) == 0U) {
+                ESP_LOGI(TAG,
+                         "ScoreDbg anchor=%ld age=%u P=%.3e staticEMA=%.2f "
+                         "narrow=%.2f posW=%.2f statG=%.3f burstG=%.2f score=%.3e",
+                         (long)bin, s_presence_state.anchor_age_frames,
+                         (double)P, (double)s_presence_state.bin_static_ema[bin],
+                         (double)narrowness, (double)pos_weight,
+                         (double)static_gate, (double)burst_gate,
+                         (double)s_presence_state.bin_chest_score[bin]);
+            }
+#endif
         }
     }
 
@@ -2470,6 +2592,87 @@ static bool radar_analyze_frame(void *result_ptr)
     result->distance_cm = radar_calculate_distance_cm_from_bin(result->range_bin);
     result->signal_db = radar_calculate_fft_level_db(coherent_range_avg, result->range_bin);
     result->target_detected = (result->signal_db > RADAR_DISTANCE_THRESHOLD_DB);
+
+    /* === 分数门槛：宽进严出（hysteresis）===
+     * 未锁定（acquire）：要求 score > 1e-6（空场噪声 ~1e-12，余量 6 个量级）
+     * 已锁定（maintain）：score > 1e-7 即维持（容忍静止瞬间、屏息、轻微姿势变化）
+     * 持续 30 帧（3 秒）低于维持阈值 → 真正解锁
+     * 真正强健的 acquire 在 update_presence 层用 raw_present 或 F2 score-only(1e-3 持续 1s) */
+    {
+        const float32_t top_score = (result->range_bin >= (int32_t)RADAR_DISTANCE_FIRST_VALID_BIN &&
+                                     result->range_bin <= (int32_t)RADAR_DISTANCE_LAST_VALID_BIN)
+                                    ? s_presence_state.bin_chest_score[result->range_bin]
+                                    : 0.0f;
+
+        /* 缓存给 radar_update_presence 内的 confidence-gate 使用（F1/F2） */
+        s_presence_state.current_top_score = top_score;
+
+        if (s_presence_state.bin_bpf_warmup_frames >= 40U)
+        {
+            /* F3/F4 (2026-04 调整):
+             *   acquire_th  1e-4 → 1e-6  （空房噪底 1e-12，余量 6 个量级，安全降低）
+             *   maintain_th 1e-6 → 1e-7  （躺卧最低 ~1.8e-6，新阈值留足余量不被波谷击穿）
+             * 注：F2 score-only re-acquire 在 update_presence 层用更严的 1e-3 + 1s 持续，
+             *     score-gate 这里只是兜底"score 实在太低就不要假报有人"。 */
+            const float32_t acquire_th  = 1e-6f;
+            const float32_t maintain_th = 1e-7f;
+            const uint32_t  release_grace_frames = 30U;  /* 3 秒 @ 10Hz */
+
+            const float32_t threshold = s_presence_state.presence_latched ? maintain_th : acquire_th;
+
+#if RADAR_DEBUG_SCORE_LOG
+            if ((radar_frame_counter % 10U) == 0U) {
+                ESP_LOGI(TAG,
+                         "LockDbg top_score=%.3e threshold=%.3e latched=%s low_frames=%u "
+                         "bin=%ld anchor=%ld age=%u",
+                         (double)top_score, (double)threshold,
+                         s_presence_state.presence_latched ? "Y" : "N",
+                         s_presence_state.score_low_frames,
+                         (long)result->range_bin,
+                         (long)s_presence_state.anchor_bin,
+                         s_presence_state.anchor_age_frames);
+            }
+#endif
+
+            if (top_score < threshold)
+            {
+                s_presence_state.score_low_frames++;
+                if (!s_presence_state.presence_latched ||
+                    s_presence_state.score_low_frames >= release_grace_frames)
+                {
+                    /* 未锁定 → 直接判 no；已锁定 → 连续低于 maintain_th 超过 3 秒才解锁 */
+                    result->presence_detected = false;
+                    result->presence_confidence = 0.0f;
+                    result->presence_distance_cm = 0.0f;
+                    result->phase_excursion_mm = 0.0f;
+                    result->amplitude_cv = 0.0f;
+                    result->bin_span = 0.0f;
+                    result->breath_present = false;
+                    result->phase_present = false;
+                    result->amplitude_present = false;
+                    result->bin_present = false;
+                    result->breath_rate_bpm = 0.0f;
+                    result->heart_rate_bpm = 0.0f;
+                    result->rbm_detected = false;
+                    result->body_movement_mm = 0.0f;
+                    s_presence_state.presence_latched = false;
+                    s_presence_state.presence_misses = 0U;
+                    s_presence_state.score_low_frames = 0U;
+                    return true;
+                }
+                /* 已锁定且未到解锁宽限期：保持 detected=yes，继续走下面的 presence 分析。
+                 * 2026-04 修正：不再在此清零 BPM。
+                 *   瞬态 score 低谷（呼吸周期静默段、姿势微调）会在这里停留 1-3 秒。
+                 *   清零 BPM 会让睡眠监控 GUI 看到心率/呼吸数字闪烁归零，观感极差。
+                 *   若是人真离开，30 帧 grace 后会走上面的 release 分支，该清零照样清零。*/
+            }
+            else
+            {
+                /* 分数足够，重置低分计数 */
+                s_presence_state.score_low_frames = 0U;
+            }
+        }
+    }
 
     /* === 锚点维护：tracker 稳定位置追踪（仅暖机后启用，避免被静态能量误锚）=== */
     if (s_presence_state.bin_bpf_warmup_frames >= 40U)

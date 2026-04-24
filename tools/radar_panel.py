@@ -40,6 +40,7 @@ radar_re = re.compile(
     r"Radar: detected=(\w+) confidence=([\d.]+) distance=([\d.]+)cm "
     r"breath=([\d.]+)bpm heart=([\d.]+)bpm "
     r"rbm=(\w+) bodyMov=(\d+)%"
+    r"(?: T=([-\d.]+) RH=([\d.]+) lux=([\d.]+))?"
 )
 wave_re = re.compile(r"Wave: breath=([-\d.]+) heart=([-\d.]+)")
 aht_re = re.compile(r"温湿度 T=([-\d.]+)\S* RH=([\d.]+)")
@@ -88,6 +89,12 @@ class RadarPanel:
         self.csv_path = None
         self.csv_row_count = 0
 
+        # Wave 高频 (10Hz) 波形录制，与主 CSV 同步启停，独立文件
+        self.wave_csv_file = None
+        self.wave_csv_writer = None
+        self.wave_csv_path = None
+        self.wave_row_count = 0
+
         # ---- 布局 ----
         self._build_status_bar()
         body = ttk.Frame(root)
@@ -124,6 +131,13 @@ class RadarPanel:
         self.rec_info = ttk.Label(top, text="未录制", font=("Consolas", 9),
                                    foreground="#666")
         self.rec_info.pack(side="left")
+
+        # 睡眠分析按钮
+        self.analyze_btn = tk.Button(top, text="分析睡眠", width=10,
+                                      bg="#2196F3", fg="white", relief="flat",
+                                      activebackground="#1976D2",
+                                      command=self._analyze_sleep)
+        self.analyze_btn.pack(side="left", padx=(8, 4))
 
         self.status_var = tk.StringVar(value="等待数据...")
         ttk.Label(top, textvariable=self.status_var, font=("Arial", 10),
@@ -245,7 +259,7 @@ class RadarPanel:
         bar.pack(fill="x")
         ttk.Button(bar, text="清空", width=6,
                    command=lambda: self.log.delete("1.0", "end")).pack(side="left")
-        self.filter_rgb = tk.BooleanVar(value=True)
+        self.filter_rgb = tk.BooleanVar(value=False)
         ttk.Checkbutton(bar, text="只显示 RGB 相关", variable=self.filter_rgb
                         ).pack(side="left", padx=8)
 
@@ -309,11 +323,19 @@ class RadarPanel:
     def _connect(self):
         if self.ser and self.ser.is_open: return
         try:
-            self.ser = serial.Serial(PORT, BAUD, timeout=0.1)
+            # 打开前关掉 DTR/RTS，避免触发 ESP 板子的自动复位 / 进 bootloader
+            ser = serial.Serial()
+            ser.port = PORT
+            ser.baudrate = BAUD
+            ser.timeout = 0.1
+            ser.dtr = False
+            ser.rts = False
+            ser.open()
+            self.ser = ser
             time.sleep(0.2)
             self.ser.reset_input_buffer()
             self.conn_label.configure(text=f"● 已连接 {PORT}", foreground="#4CAF50")
-            self._log(f"Connected {PORT} @ {BAUD}", "sys")
+            self._log(f"Connected {PORT} @ {BAUD} (DTR/RTS off)", "sys")
         except Exception as e:
             self._log(f"连接失败: {e}", "sys")
             self.conn_label.configure(text=f"● 连接失败 {PORT}", foreground="#F44336")
@@ -334,8 +356,9 @@ class RadarPanel:
                         line = line.strip()
                         if not line: continue
                         self._parse_line(line)
-            except Exception:
-                pass
+            except Exception as e:
+                # 不再静默吞异常：让问题可见
+                self._log(f"串口读错误: {e}", "sys")
         self.root.after(50, self._rx_poll)
 
     # ---------- CSV 录制 ----------
@@ -373,14 +396,29 @@ class RadarPanel:
             self.csv_file.flush()
             self.csv_path = path
             self.csv_row_count = 0
+
+            # 同步打开波形 CSV（10Hz 原始相位 BPF 输出）
+            if path.lower().endswith(".csv"):
+                wave_path = path[:-4] + "_wave.csv"
+            else:
+                wave_path = path + "_wave.csv"
+            self.wave_csv_file = open(wave_path, "w", newline="", encoding="utf-8-sig")
+            self.wave_csv_writer = csv.writer(self.wave_csv_file)
+            self.wave_csv_writer.writerow(["时间", "帧号", "呼吸_相位", "心率_相位"])
+            self.wave_csv_file.flush()
+            self.wave_csv_path = wave_path
+            self.wave_row_count = 0
+
             self.rec_btn.configure(text="■ 停止录制", bg="#4CAF50",
                                     activebackground="#388E3C")
             self.rec_info.configure(text=f"录制中: {os.path.basename(path)}",
                                      foreground="#4CAF50")
             self._log(f"开始录制: {path}", "sys")
+            self._log(f"  + 波形: {os.path.basename(wave_path)}", "sys")
         except Exception as e:
             self._log(f"录制失败: {e}", "sys")
             self.csv_file = None
+            self.wave_csv_file = None
 
     def _stop_recording(self):
         if self.csv_file:
@@ -393,10 +431,95 @@ class RadarPanel:
             self.csv_file = None
             self.csv_writer = None
             self.csv_path = None
+            # 同时关闭波形文件
+            wave_rows = self.wave_row_count
+            wave_path = self.wave_csv_path
+            if self.wave_csv_file:
+                try:
+                    self.wave_csv_file.close()
+                except Exception:
+                    pass
+            self.wave_csv_file = None
+            self.wave_csv_writer = None
+            self.wave_csv_path = None
             self.rec_btn.configure(text="● 开始录制", bg="#F44336",
                                     activebackground="#D32F2F")
-            self.rec_info.configure(text=f"已保存 {rows} 行", foreground="#666")
+            self.rec_info.configure(text=f"已保存 {rows} 行 + 波形 {wave_rows} 帧",
+                                     foreground="#666")
             self._log(f"停止录制，共 {rows} 行 → {path}", "sys")
+            if wave_path:
+                self._log(f"  + 波形 {wave_rows} 帧 → {wave_path}", "sys")
+
+    # ---------- 睡眠分析 ----------
+    def _analyze_sleep(self):
+        """选一个已录制的 CSV，后台跑 sleep_analyze.py 产出分期报告。"""
+        here = os.path.dirname(os.path.abspath(__file__))
+        default_dir = os.path.join(here, "records")
+        if not os.path.isdir(default_dir):
+            default_dir = here
+
+        initial_dir = default_dir
+        initial_name = None
+        if self.csv_path and os.path.isfile(self.csv_path):
+            initial_dir = os.path.dirname(self.csv_path)
+            initial_name = os.path.basename(self.csv_path)
+
+        path = filedialog.askopenfilename(
+            initialdir=initial_dir,
+            initialfile=initial_name,
+            filetypes=[("CSV 文件", "*.csv"), ("所有文件", "*.*")],
+            title="选择要分析的睡眠录制 CSV",
+        )
+        if not path:
+            return
+
+        analyze_script = os.path.join(here, "sleep_analyze.py")
+        if not os.path.isfile(analyze_script):
+            self._log(f"找不到 sleep_analyze.py: {analyze_script}", "sys")
+            return
+
+        self.analyze_btn.configure(state="disabled", text="分析中...")
+        self._log(f"开始分析: {path}", "sys")
+
+        import threading
+        import subprocess
+
+        def worker():
+            try:
+                proc = subprocess.run(
+                    [sys.executable, analyze_script, path],
+                    capture_output=True, text=True,
+                    encoding="utf-8", errors="replace",
+                )
+                output = (proc.stdout or "") + (proc.stderr or "")
+                self.root.after(
+                    0, lambda: self._analyze_done(proc.returncode, output, path)
+                )
+            except Exception as e:
+                err = f"[EXC] {e}"
+                self.root.after(0, lambda: self._analyze_done(-1, err, path))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _analyze_done(self, rc, output, csv_path):
+        self.analyze_btn.configure(state="normal", text="分析睡眠")
+        tail = "\n".join(output.splitlines()[-30:]) if output else ""
+        if tail:
+            self._log(tail, "sys")
+        if rc != 0:
+            self._log(f"分析失败 rc={rc}", "sys")
+            return
+        stem = os.path.splitext(os.path.basename(csv_path))[0]
+        out_dir = os.path.join(os.path.dirname(csv_path), stem)
+        png_path = os.path.join(out_dir, "hypnogram.png")
+        if os.path.isfile(png_path):
+            try:
+                os.startfile(png_path)
+                self._log(f"结果: {out_dir}", "sys")
+            except Exception as e:
+                self._log(f"无法打开 PNG: {e}", "sys")
+        else:
+            self._log(f"未找到 {png_path}", "sys")
 
     def _record_row(self, frame_num):
         if not self.csv_writer:
@@ -427,13 +550,34 @@ class RadarPanel:
         except Exception as e:
             self._log(f"写入失败: {e}", "sys")
 
+    def _record_wave_row(self, breath, heart, frame_idx):
+        """10Hz 原始相位 BPF 输出写入独立 CSV。"""
+        if not self.wave_csv_writer:
+            return
+        try:
+            self.wave_csv_writer.writerow([
+                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
+                frame_idx,
+                f"{breath:.4f}",
+                f"{heart:.4f}",
+            ])
+            self.wave_row_count += 1
+            # 不每行 flush（性能考虑），每 100 行 flush 一次
+            if self.wave_row_count % 100 == 0:
+                self.wave_csv_file.flush()
+        except Exception:
+            pass
+
     def _parse_line(self, line):
         m = wave_re.search(line)
         if m:
-            self.wave_breath.append(float(m.group(1)))
-            self.wave_heart.append(float(m.group(2)))
+            b = float(m.group(1))
+            h = float(m.group(2))
+            self.wave_breath.append(b)
+            self.wave_heart.append(h)
             self.wave_x.append(self.wave_idx / 10.0)  # 10Hz → 秒
             self.wave_idx += 1
+            self._record_wave_row(b, h, self.wave_idx)
             return
 
         m = radar_re.search(line)
@@ -445,6 +589,11 @@ class RadarPanel:
             self.state["heart_bpm"]   = float(m.group(5))
             self.state["rbm"]         = m.group(6)
             self.state["body_move"]   = int(m.group(7))
+            # 可选环境字段（Radar 行尾的 T/RH/lux），无则保留旧值
+            if m.group(8) is not None:
+                self.state["temp"] = float(m.group(8))
+                self.state["rh"]   = float(m.group(9))
+                self.state["lux"]  = float(m.group(10))
             # 推入体动曲线（1Hz）
             self.body_t.append(self._now_t())
             self.body_v.append(self.state["body_move"])
@@ -503,11 +652,16 @@ class RadarPanel:
             self.ax_breath.set_xlim(*xlim)
             self.ax_heart.set_xlim(*xlim)
 
-            if bs:
-                m = max(abs(max(bs)), abs(min(bs)), 0.001) * 1.3
+            # Y 轴仅按最近 5 秒（50 帧 @ 10Hz）自动缩放
+            # 避免几分钟前的大幅体动压扁当前的弱小波形
+            recent_n = 50
+            bs_recent = bs[-recent_n:] if len(bs) > recent_n else bs
+            hs_recent = hs[-recent_n:] if len(hs) > recent_n else hs
+            if bs_recent:
+                m = max(abs(max(bs_recent)), abs(min(bs_recent)), 0.001) * 1.3
                 self.ax_breath.set_ylim(-m, m)
-            if hs:
-                m = max(abs(max(hs)), abs(min(hs)), 0.001) * 1.3
+            if hs_recent:
+                m = max(abs(max(hs_recent)), abs(min(hs_recent)), 0.001) * 1.3
                 self.ax_heart.set_ylim(-m, m)
 
             self.ax_breath.set_title(
@@ -522,8 +676,9 @@ class RadarPanel:
             bt = list(self.body_t)
             bv = list(self.body_v)
             self.line_body.set_data(bt, bv)
-            # 清除旧填充后重绘
-            self.ax_body.collections.clear()
+            # 清除旧填充后重绘（matplotlib 3.x ArtistList 无 clear，逐个 remove）
+            for coll in list(self.ax_body.collections):
+                coll.remove()
             self.ax_body.fill_between(bt, bv, 0, color="#FF9800", alpha=0.25)
             # 窗口: 最近 300 秒
             xlim_body = (max(0, bt[-1] - 300), bt[-1] + 1)
