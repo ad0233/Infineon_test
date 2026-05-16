@@ -11,7 +11,7 @@
 
 | 环节 | 关键问题 | 解决方案 |
 |---|---|---|
-| 初始化顺序 | BGT60 需严格顺序上电 | 固定：GPIO hold释放 → SPI init → LDO_EN → sensor init → 寄存器配置 |
+| 初始化顺序 | BGT60 需严格顺序上电 | 固定：GPIO hold释放 → SPI init → sensor init → 寄存器配置 |
 | SPI 时钟 | 10MHz 导致 FIFO 溢出 | 提到 25MHz（后因 XTAL 限制降到 20MHz） |
 | FIFO 容量 | 24576 样本超过 8192 上限 | 分 6 片 × 4096 读取 |
 | FIFO burst | MOSI=0x00 读不到数据 | 改为 MOSI=0xFF（存入 MemPalace） |

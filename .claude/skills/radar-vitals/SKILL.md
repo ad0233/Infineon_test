@@ -12,7 +12,7 @@ description: 分析或调优 ESP32 BGT60TR13C 雷达的生命体征检测（呼�
 ### 数据流
 ```
 SPI FIFO (6片×4096) → ADC 原始数据 → Range FFT (128点)
-→ 目标 bin 选择（跟踪式峰值, ≥bin8=30cm）
+→ 目标 bin 选择（跟踪式峰值, ≥bin10=37.5cm）
 → 相位提取 atan2 → 解缠 → 循环缓冲区 (200帧, 20s @ 10Hz)
     ├─ 实时路径 (每帧 10Hz): 因果 IIR BPF → breath_wave / heart_wave
     └─ 估算路径 (每 200帧 20s): linearize → filtfilt → FFT 1024 → BPM

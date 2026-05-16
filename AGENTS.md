@@ -61,11 +61,10 @@
 - 初始化顺序不要乱改：
   1. 释放雷达相关 GPIO hold
   2. 初始化 SPI，总线模式保持 mode 0
-  3. 拉高 `LDO_EN`
-  4. 调用 `xensiv_bgt60trxx_esp_init(...)`
-  5. 应用运行时 distance profile
-  6. 配置 IRQ 输入和 FIFO limit
-  7. 启动 frame generation
+  3. 调用 `xensiv_bgt60trxx_esp_init(...)`
+  4. 应用运行时 distance profile
+  5. 配置 IRQ 输入和 FIFO limit
+  6. 启动 frame generation
 - 不要轻易把 IRQ 轮询改回 GPIO ISR；当前轮询是为了规避 WDT 和时序问题。
 - 不要默认把未知 chip id 当成致命错误；这个板级路径可能存在兼容兜底。
 - 如果距离日志不稳定，优先检查和调这几个量，而不是先动底层 SPI：

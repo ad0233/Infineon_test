@@ -27,17 +27,33 @@ import sleep_staging as gem  # noqa: E402
 
 # ══════════════════════════════════════════════════════════════════════
 # 体动量纲校准 —— 当前固件「体动强度_%」是 0-100
-# sleep_staging 的默认阈值针对旧固件量纲，此处覆盖为 % 尺度下的保守初值。
-# 实测一整夜后应根据体动分布重新定标（见 README / 评估文档）。
+# sleep_staging 的默认阈值针对旧固件量纲，此处覆盖为 % 尺度下的实测校准值。
+#
+# 2026-04-27 第一版校准：
+# 旧值（保守初版）让 Awake 误判 75% → 阈值上调，让正常翻身/小动作不再误判清醒。
+#   AWAKE_MOVE_MEAN  15 → 30  （1分钟均值要 ≥ 30% 才判 Awake）
+#   AWAKE_MOVE_MAX   60 → 80  （单帧峰值更宽容）
+#   WAKEUP_MOVE_THRESH 12 → 25（起床判定的体动门槛）
+# DEEP_MOVE_CEIL 保持 5（深睡仍要求几乎不动）
 # ══════════════════════════════════════════════════════════════════════
-gem.AWAKE_MOVE_MEAN    = 15.0   # 清醒判定：10 分钟窗内 Move 均值阈值
-gem.AWAKE_MOVE_MAX     = 60.0   # 清醒判定：峰值阈值
+gem.AWAKE_MOVE_MEAN    = 30.0   # 清醒判定：10 分钟窗内 Move 均值阈值
+gem.AWAKE_MOVE_MAX     = 80.0   # 清醒判定：峰值阈值
 gem.DEEP_MOVE_CEIL     = 5.0    # 深睡判定：Move 上限
-gem.WAKEUP_MOVE_THRESH = 12.0   # 醒来检测：Move 阈值
+gem.WAKEUP_MOVE_THRESH = 25.0   # 醒来检测：Move 阈值
 
 # HR 量程适配固件检测范围（51-132 BPM）
 gem.HR_MIN = 45
 gem.HR_MAX = 135
+
+# 2026-04-27: 当前固件 HR 输出受 P6/P7 bug 影响普遍偏高 30-40 BPM（中位数 94）
+# 把 wake 判定的 HR 阈值拉到 130，相当于禁用 HR-based wake，仅靠 Move 判定
+# 治本方案：修固件 heart median 自适应（P7）+ 呼吸谐波误检（P6）
+gem.WAKEUP_HR_THRESH = 130.0
+
+# 2026-04-27 第二轮：HR/Resp 噪声大让 REM 误判 69% → 把 REM 触发的波动阈值抬高
+# 只有真正"波动很大"才判 REM，让大量"Move低 + HR/Resp 普通抖动"分钟落到 Light
+gem.REM_HR_STD_FLOOR    = 6.0    # 原 3.0，中间值（8 太高 REM 只有 10%）
+gem.REM_RESP_STD_FLOOR  = 3.0    # 原 1.5
 
 # ── 宽表 CSV 列名（与 radar_panel.py _start_recording 完全一致）────
 COL_TIME     = "时间"

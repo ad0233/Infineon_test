@@ -77,7 +77,10 @@
 #define RADAR_PHASE_DIFF_CLIP_HEART         (1.0f)            /* 心率高频信号需要更大裕度，避免削顶产生谐波 */
 #define RADAR_RBM_PHASE_JUMP_TH            (2.0f)            /* 帧间相位跳变 > 2.0 rad 判定为体动（呼吸约 0.3-1.5 rad） */
 #define RADAR_RBM_WINDOW_FRAMES            (200U)            /* RBM 统计窗口 = vitals 窗口 */
-#define RADAR_RBM_RATIO_TH                 (0.15f)           /* 窗口内 >15% 帧为体动 → 跳过 vitals */
+#define RADAR_RBM_RATIO_TH                 (0.40f)           /* 窗口内 >40% 帧为体动 → 跳过 vitals
+                                                              * 2026-05-01: 0.15 太严, 近场强信号让 ampCV/Doppler
+                                                              * 在正常呼吸时频繁触发, 导致 vitals 全程跳过.
+                                                              * 0.40 给正常呼吸 + 偶发小动作留余量, 真翻滚仍触发. */
 #define RADAR_BODY_MOVE_THRESHOLD          (0.38f)           /* 体动固定阈值（静坐<0.35，运动>0.40） */
 #define RADAR_PHASE_SMOOTH_LEN              (7U)
 #define RADAR_WAVELENGTH_MM                 (5.0f)            /* c / 60GHz */
@@ -90,7 +93,8 @@
  * 历史：
  *   2026-04 批次 1+2 调试期间打开过；F1/F2/F3/F4/F5/F6 全部验证通过后关闭。
  *   现场再现问题需要重新打开 → 改成 1 → 重新烧录。 */
-#define RADAR_DEBUG_SCORE_LOG               (0)
+#define RADAR_DEBUG_SCORE_LOG               (0)   /* ScoreDbg + LockDbg 详细分数日志 */
+#define RADAR_DEBUG_DOPPLER_LOG             (0)   /* DopplerDbg 体动校准日志（独立开关，校准完关闭） */
 #define RADAR_VITALS_INTERVAL_FRAMES        (20U)             /* 每 20 帧 (2s) 做一次 vitals 估算（滑窗：仍用最近 20s 数据）*/
 #define RADAR_PI_F                          (3.14159265358979323846f)
 
@@ -304,6 +308,10 @@ typedef struct
     uint32_t  score_low_frames;                             /* 锁定后 score 持续低于 maintain_th 的帧数 */
     float32_t current_top_score;                            /* 当前帧 top_score 缓存：供 confidence-gate 参考 */
     uint32_t  score_hi_streak;                              /* score 持续高于 ACQUIRE_BY_SCORE_TH 的帧数（score-only re-acquire 用） */
+    float32_t doppler_motion;                               /* 当前帧目标 bin 邻域的 Doppler 非零速度能量和（体动指标，2026-04 新增） */
+    uint32_t  heart_reject_streak;                          /* 心率 outlier 连续被拒计数（移出 static 便于离场清零，2026-04 新增） */
+    float32_t anchor_ser;                                   /* Static Energy Ratio: anchor 邻域 / 远端空背景的能量比（深睡守门用） */
+    uint32_t  ser_low_frames;                               /* SER 也低于阈值的连续帧数（STILL→ABSENT 的 grace 计数）*/
 } radar_presence_state_t;
 
 
@@ -326,6 +334,14 @@ static cfloat32_t distance_range_fft[NUM_SAMPLES_PER_CHIRP / 2U];
 static float32_t range_energy_accum[NUM_SAMPLES_PER_CHIRP / 2U];
 static cfloat32_t coherent_range_accum[NUM_SAMPLES_PER_CHIRP / 2U];
 static cfloat32_t coherent_range_avg[NUM_SAMPLES_PER_CHIRP / 2U];
+
+/* Doppler 体动检测 (2026-04 新增)
+ * slow-time 矩阵：保留每个 chirp 的 range FFT 结果，喂给 ifx_doppler_cfft_f32
+ * 行 = chirp index (0..63), 列 = range bin (0..63), row-major
+ * 大小 = 64×64×8 byte = 32KB */
+static cfloat32_t chirp_range_fft_matrix[NUM_CHIRPS_PER_FRAME * (NUM_SAMPLES_PER_CHIRP / 2U)];
+/* range-Doppler map：行 = range bin, 列 = doppler bin, row-major（ifx 内部转置）*/
+static cfloat32_t range_doppler_map[(NUM_SAMPLES_PER_CHIRP / 2U) * NUM_CHIRPS_PER_FRAME];
 
 /* 生命体征 FFT 工作缓冲区（1024 点复数 = 2048 float = 8KB，静态分配） */
 static float32_t vitals_fft_buf[RADAR_VITALS_FFT_SIZE * 2U];
@@ -823,21 +839,6 @@ static int32_t init_sensor(void)
         ESP_LOGE(TAG, "spi_bus_add_device failed");
         return -1;
     }
-
-    gpio_config_t radar_power_conf = {
-        .intr_type = GPIO_INTR_DISABLE,
-        .mode = GPIO_MODE_OUTPUT,
-        .pin_bit_mask = (1ULL << PIN_XENSIV_BGT60TRXX_LDO_EN),
-        .pull_down_en = 0,
-        .pull_up_en = 0
-    };
-    if (gpio_config(&radar_power_conf) != ESP_OK)
-    {
-        ESP_LOGE(TAG, "LDO_EN gpio_config failed");
-        return -1;
-    }
-    gpio_set_level(PIN_XENSIV_BGT60TRXX_LDO_EN, 1);
-    vTaskDelay(pdMS_TO_TICKS(100));
 
     if (xensiv_bgt60trxx_esp_init(&bgt60_obj,
                                   spi_obj,
@@ -1630,13 +1631,16 @@ static void radar_vitals_init_filters(void)
     dsps_biquad_gen_lpf_f32(s_presence_state.breath_bpf_coef[1],
                             0.6f / fs, q_butter);
 
-    /* 心率 BPF: 0.85–2.2 Hz */
+    /* 心率 BPF: 0.85–2.2 Hz
+     * P7 修正 (2026-05-01): 第 3 级 peaking filter 中心 1.525Hz (91 BPM) 会把 FFT 峰
+     * 强行推高到 90+ BPM，导致睡眠静息心率 (50-70 BPM) 被偏置。
+     * 改中心为 1.0Hz (60 BPM) + Q 降到 0.6（更宽缓 boost，避免单点尖峰偏置）*/
     dsps_biquad_gen_hpf_f32(s_presence_state.heart_bpf_coef[0],
                             0.85f / fs, q_butter);
     dsps_biquad_gen_lpf_f32(s_presence_state.heart_bpf_coef[1],
                             2.2f / fs, q_butter);
     dsps_biquad_gen_bpf0db_f32(s_presence_state.heart_bpf_coef[2],
-                               1.525f / fs, 1.13f);
+                               1.0f / fs, 0.6f);
 
     /* 清零延迟线 */
     memset(s_presence_state.breath_bpf_w, 0, sizeof(s_presence_state.breath_bpf_w));
@@ -1781,6 +1785,37 @@ static float32_t radar_estimate_rate_hz(const float32_t *signal, uint32_t len,
     }
 
     if (max_mag < 1.0e-12f) { return 0.0f; }
+
+    /* === P7 修正 (2026-05-01): harmonic-aware peak picking ===
+     * 现象：心率 FFT 倾向选 2 倍频谐波（S1/S2 心音让 2F 振幅常 > F），
+     *       结果报出 ~2× 真心率（如真 60 BPM 报 120）。
+     * 修法：找到 max_bin 后，检查 max_bin/2 是否是局部峰且振幅 ≥ 33% 主峰
+     *       (即功率 ≥ 11%) → 优先采用 (它才是真基频)。
+     * 防误改：要求 max_bin/2 严格是局部最大，避免被 BPF 漏出来的低频噪声拉偏。
+     * 注：此 fix 对 breath 也有效，但 breath 真基频常在 bin_lo 边缘，触发条件少。 */
+    if (max_bin >= 2U * bin_lo + 2U)
+    {
+        uint32_t hb = max_bin / 2U;
+        if (hb >= bin_lo + 1U && hb + 1U <= bin_hi)
+        {
+            float32_t re_l = vitals_fft_buf[(hb - 1U) * 2U];
+            float32_t im_l = vitals_fft_buf[(hb - 1U) * 2U + 1U];
+            float32_t mag_l = re_l * re_l + im_l * im_l;
+            float32_t re_c = vitals_fft_buf[hb * 2U];
+            float32_t im_c = vitals_fft_buf[hb * 2U + 1U];
+            float32_t mag_c = re_c * re_c + im_c * im_c;
+            float32_t re_r = vitals_fft_buf[(hb + 1U) * 2U];
+            float32_t im_r = vitals_fft_buf[(hb + 1U) * 2U + 1U];
+            float32_t mag_r = re_r * re_r + im_r * im_r;
+            /* mag_c 是局部峰 且 振幅 ≥ 33% 主峰 (功率 ≥ 11%) */
+            if (mag_c > mag_l && mag_c > mag_r &&
+                mag_c * 9.0f >= max_mag)
+            {
+                max_bin = hb;
+                max_mag = mag_c;
+            }
+        }
+    }
 
     /* 抛物线插值精确频率 */
     float32_t peak_bin = (float32_t)max_bin;
@@ -1941,8 +1976,12 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
     radar_filtfilt_biquad(breath_sig, len,
                           s_presence_state.breath_bpf_coef, 2U,
                           filt_temp);
+    /* P6 修正 (2026-05-01): 搜索下限 0.20→0.15 Hz (12→9 BPM)。
+     * 原因：真呼吸 0.2 Hz 时正好在 bin_lo 边缘，2 倍频谐波 (0.4 Hz) 容易被
+     * picker 选为最大峰但 harmonic check 因 hb=bin_lo 不满足 hb>=bin_lo+1 而失效。
+     * 把下限拉到 0.15 让 0.2 Hz 真基频离 bin_lo 至少 5 bin，harmonic check 才能起作用。*/
     float32_t breath_hz = radar_estimate_rate_hz(breath_sig, len,
-                                                  fs, 0.20f, 0.50f);
+                                                  fs, 0.15f, 0.50f);
 
     /* 中值平滑呼吸率（5 样本中值 ≈ 10s 平滑）*/
     if (breath_hz > 0.0f)
@@ -1977,8 +2016,8 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
     /* 心率离群值拒绝 — 前 3 次不拒绝（让初始值稳定）；±20 BPM 容忍；
      * 2026-04 修正：streak 阈值 5 → 2。
      *   原来要连续 10 秒（5 × 2s）才接受新值 → 真实心率变化时卡 0 太久。
-     *   新逻辑：连续 2 次拒绝即接受（4 秒内自适应），让 median 跟上心率漂移。*/
-    static uint32_t heart_reject_streak = 0;
+     *   新逻辑：连续 2 次拒绝即接受（4 秒内自适应），让 median 跟上心率漂移。
+     *   streak 计数移到 s_presence_state 便于人离场时清零。*/
     if (heart_hz > 0.0f && s_presence_state.heart_hz_count >= 3U)
     {
         float32_t heart_bpm_raw = heart_hz * 60.0f;
@@ -1986,16 +2025,16 @@ static void radar_estimate_vitals(radar_frame_result_t *result)
                           ? s_presence_state.heart_hz_count : 7U;
         float32_t prev_median = radar_small_median(
             s_presence_state.heart_hz_history, n_prev) * 60.0f;
-        if (fabsf(heart_bpm_raw - prev_median) > 20.0f && heart_reject_streak < 2U)
+        if (fabsf(heart_bpm_raw - prev_median) > 20.0f && s_presence_state.heart_reject_streak < 2U)
         {
             ESP_LOGW(TAG, "Heart outlier rejected (streak=%u): %.1f vs median %.1f",
-                     (unsigned)heart_reject_streak, heart_bpm_raw, prev_median);
+                     (unsigned)s_presence_state.heart_reject_streak, heart_bpm_raw, prev_median);
             heart_hz = 0.0f;
-            heart_reject_streak++;
+            s_presence_state.heart_reject_streak++;
         }
         else
         {
-            heart_reject_streak = 0;  /* 接受，重置连续拒绝计数 */
+            s_presence_state.heart_reject_streak = 0;  /* 接受，重置连续拒绝计数 */
         }
     }
 
@@ -2181,10 +2220,28 @@ static void radar_update_presence(void *result_ptr)
             rbm_bin_span = (float32_t)(b_max - b_min);
         }
 
-        /* 判定：1s_ampCV > 0.45 或 1s_binSpan ≥ 4 */
+        /* 判定：1s_ampCV > 0.45 或 1s_binSpan ≥ 4 或 Doppler 能量 > 阈值 */
         const bool rbm_by_amp = (rbm_amp_cv > 0.38f);   /* 校准值：静坐max=0.353, 运动min=0.413 */
         const bool rbm_by_bin = (rbm_bin_span >= 4.0f);
-        const uint8_t rbm_flag = (rbm_by_amp || rbm_by_bin) ? 1U : 0U;
+        /* 2026-04 新增：Doppler 直接捕捉横向滚动等"距离不变但有速度"的体动
+         * 实测校准 (2026-04):
+         *   空房 / 静卧噪声底:  6-13
+         *   呼吸 / 小幅调整:    40-500（偶发）
+         *   滚动 / 翻身 / 坐起: 1000-3000+
+         * 阈值 200 = 几何中点附近，留 15× 安全余量防误触 */
+        const float32_t DOPPLER_RBM_TH = 200.0f;
+        const bool rbm_by_doppler = (s_presence_state.doppler_motion > DOPPLER_RBM_TH);
+        const uint8_t rbm_flag = (rbm_by_amp || rbm_by_bin || rbm_by_doppler) ? 1U : 0U;
+
+#if RADAR_DEBUG_DOPPLER_LOG
+        /* 临时校准日志：每秒打一次 Doppler 能量，配合静坐/翻身实测定阈值 */
+        if ((radar_frame_counter % 10U) == 0U) {
+            ESP_LOGI(TAG, "DopplerDbg motion=%.3e ampCV=%.3f binSpan=%.0f flag=%s",
+                     (double)s_presence_state.doppler_motion,
+                     (double)rbm_amp_cv, (double)rbm_bin_span,
+                     rbm_flag ? "Y" : "N");
+        }
+#endif
 
         const uint32_t idx_rbm = (s_presence_state.history_head + RADAR_PRESENCE_HISTORY_LEN - 1U)
                                  % RADAR_PRESENCE_HISTORY_LEN;
@@ -2199,14 +2256,28 @@ static void radar_update_presence(void *result_ptr)
                             ? (float32_t)s_presence_state.rbm_sum / (float32_t)rbm_window
                             : 0.0f;
 
-        /* bodyMov 输出：0-100% 体动强度
-         * 0% = 静坐 (ampCV1s ≤ 0.38)
-         * 100% = 大摆动 (ampCV1s ≥ 0.92)
-         * 线性映射，clamp 到 0-100 */
+        /* bodyMov 输出：0-100% 体动强度，取两个来源最大值
+         * 来源 1 — ampCV (距离方向运动)：0.38→0%, 0.92→100% 线性映射
+         * 来源 2 — Doppler motion (速度，覆盖横向/滚动等 ampCV 测不到的运动)：
+         *   log10 域映射：200→0%, 20000→100% (跨 100× 量级)
+         * 2026-04 修正：原公式只看 ampCV → 横向滚动时 rbm=Y 但 bodyMov=0% */
         if (rbm_flag)
         {
-            float32_t pct = (rbm_amp_cv - 0.38f) / (0.92f - 0.38f) * 100.0f;
-            if (pct < 0.0f) { pct = 0.0f; }
+            /* 来源 1: ampCV */
+            float32_t pct_amp = (rbm_amp_cv - 0.38f) / (0.92f - 0.38f) * 100.0f;
+            if (pct_amp < 0.0f) { pct_amp = 0.0f; }
+
+            /* 来源 2: Doppler motion (log 域，仅在过阈值后参与映射) */
+            float32_t pct_dop = 0.0f;
+            const float32_t dm = s_presence_state.doppler_motion;
+            if (dm > DOPPLER_RBM_TH)
+            {
+                /* log10(200) ≈ 2.301, log10(20000) ≈ 4.301，跨度 2.0 = 100% */
+                pct_dop = (log10f(dm) - 2.301f) / 2.0f * 100.0f;
+                if (pct_dop < 0.0f) { pct_dop = 0.0f; }
+            }
+
+            float32_t pct = (pct_amp > pct_dop) ? pct_amp : pct_dop;
             if (pct > 100.0f) { pct = 100.0f; }
             result->body_movement_mm = pct;
         }
@@ -2451,11 +2522,29 @@ static bool radar_analyze_frame(void *result_ptr)
             range_energy_accum[bin] += sqrtf((re * re) + (im * im));
             coherent_range_accum[bin] += distance_range_fft[bin];
         }
+
+        /* Doppler 用：保留这个 chirp 的 range FFT 完整复数结果到 slow-time 矩阵 */
+        memcpy(&chirp_range_fft_matrix[chirp * (NUM_SAMPLES_PER_CHIRP / 2U)],
+               distance_range_fft,
+               sizeof(cfloat32_t) * (NUM_SAMPLES_PER_CHIRP / 2U));
     }
 
     for (uint32_t bin = 0U; bin < (NUM_SAMPLES_PER_CHIRP / 2U); bin++)
     {
         coherent_range_avg[bin] = coherent_range_accum[bin] / (float32_t)NUM_CHIRPS_PER_FRAME;
+    }
+
+    /* Doppler FFT：64 个 chirp × 64 个 range bin 的复矩阵
+     * 输出 range-Doppler map，每个 range bin 一行 64 个 doppler 速度 bin
+     * mean_removal=true：去 DC（静态目标），让结果只反映运动能量 */
+    if (ifx_doppler_cfft_f32(chirp_range_fft_matrix,
+                             range_doppler_map,
+                             true,
+                             NULL,
+                             NUM_SAMPLES_PER_CHIRP / 2U,
+                             NUM_CHIRPS_PER_FRAME) != IFX_SENSOR_DSP_STATUS_OK)
+    {
+        ESP_LOGW(TAG, "ifx_doppler_cfft_f32 failed");
     }
 
     /* 逐 bin 呼吸带通功率更新：只认 0.1–0.6Hz 呼吸频带，过滤静态墙/被子和随机抖动 */
@@ -2593,6 +2682,69 @@ static bool radar_analyze_frame(void *result_ptr)
     result->signal_db = radar_calculate_fft_level_db(coherent_range_avg, result->range_bin);
     result->target_detected = (result->signal_db > RADAR_DISTANCE_THRESHOLD_DB);
 
+    /* === Doppler 体动指标 (2026-04 新增) ===
+     * 在 target bin ± 5 邻域内，对所有非零 Doppler bin 求 |X|² 之和。
+     * mean_removal=true 已去掉 DC（静态目标），所以 bin 0 自然 ~0；
+     * 仍保守跳过 bin 0 防边界效应。
+     * 物理含义：本帧目标邻域内"有运动"的能量总和。
+     * 体动越大（滚动/翻身/走动）→ 速度谱越宽 → 这个值越大。 */
+    {
+        float32_t doppler_motion = 0.0f;
+        const int32_t target = result->range_bin;
+        const int32_t roi_radius = 5;
+        int32_t r_lo = target - roi_radius;
+        int32_t r_hi = target + roi_radius + 1;
+        if (r_lo < (int32_t)RADAR_DISTANCE_FIRST_VALID_BIN) {
+            r_lo = (int32_t)RADAR_DISTANCE_FIRST_VALID_BIN;
+        }
+        if (r_hi > (int32_t)(NUM_SAMPLES_PER_CHIRP / 2U)) {
+            r_hi = (int32_t)(NUM_SAMPLES_PER_CHIRP / 2U);
+        }
+        for (int32_t r = r_lo; r < r_hi; r++) {
+            const cfloat32_t *row = &range_doppler_map[r * NUM_CHIRPS_PER_FRAME];
+            for (uint32_t d = 1U; d < NUM_CHIRPS_PER_FRAME; d++) {  /* 跳过 d=0 即 DC/静态 */
+                const float32_t re = CREAL_F32(row[d]);
+                const float32_t im = CIMAG_F32(row[d]);
+                doppler_motion += re * re + im * im;
+            }
+        }
+        s_presence_state.doppler_motion = doppler_motion;
+    }
+
+    /* === SER (Static Energy Ratio) 静态守门指标 (2026-05-01 新增) ===
+     * 深睡时 score 跌到噪声底但人**还在床上**——range_energy 仍在 anchor bin 强反射。
+     * 计算 anchor 邻域 (±2 bin) 平均能量 vs 远端 (≥30cm 外) "空"区域平均能量的比值。
+     * SER ≥ 3 (≈ 10dB) → anchor bin 仍有强反射体（人没走）
+     * SER ≈ 1            → anchor 区域已和背景齐平（人走了）
+     * 用途：score-gate release 路径检查 SER；SER 高就不释放，仅清 vitals。*/
+    {
+        const int32_t a_bin = result->range_bin;
+        const int32_t bs = (int32_t)RADAR_DISTANCE_FIRST_VALID_BIN;
+        const int32_t be = (int32_t)(NUM_SAMPLES_PER_CHIRP / 2U);
+
+        float32_t anchor_E = 0.0f;
+        uint32_t  n_anchor = 0U;
+        for (int32_t b = a_bin - 2; b <= a_bin + 2; b++) {
+            if (b >= bs && b < be) {
+                anchor_E += range_energy_accum[b];
+                n_anchor++;
+            }
+        }
+        if (n_anchor > 0U) { anchor_E /= (float32_t)n_anchor; }
+
+        float32_t empty_E = 0.0f;
+        uint32_t  n_empty = 0U;
+        for (int32_t b = bs; b < be; b++) {
+            if (abs(b - a_bin) >= 8) {  /* 至少距 anchor 30cm 远 */
+                empty_E += range_energy_accum[b];
+                n_empty++;
+            }
+        }
+        if (n_empty > 0U) { empty_E /= (float32_t)n_empty; }
+
+        s_presence_state.anchor_ser = anchor_E / (empty_E + 1.0e-6f);
+    }
+
     /* === 分数门槛：宽进严出（hysteresis）===
      * 未锁定（acquire）：要求 score > 1e-6（空场噪声 ~1e-12，余量 6 个量级）
      * 已锁定（maintain）：score > 1e-7 即维持（容忍静止瞬间、屏息、轻微姿势变化）
@@ -2637,10 +2789,63 @@ static bool radar_analyze_frame(void *result_ptr)
             if (top_score < threshold)
             {
                 s_presence_state.score_low_frames++;
-                if (!s_presence_state.presence_latched ||
-                    s_presence_state.score_low_frames >= release_grace_frames)
+
+                /* === 静态守门 (2026-05-01 新增) ===
+                 * 决策三态:
+                 *   ACTIVE (score 健康) — 正常分支, 不进这里
+                 *   STILL_PRESENT — score 低但 SER 高 (人在床上深睡) → 保持 latched, vitals=0
+                 *   ABSENT — score 低 且 SER 也低 (人真走) → 走原 release 路径
+                 * SER_HOLD_TH = 3.0  (≈10dB) → anchor 邻域能量明显高于背景
+                 * 100 帧锚点门槛 → 防刚锚定不稳定锚点撑场
+                 * SER_RELEASE_GRACE = 30 帧 → STILL→ABSENT 二级 grace, 防 SER 抖动 */
+                const float32_t SER_HOLD_TH = 3.0f;
+                const uint32_t  SER_RELEASE_GRACE = 30U;
+
+                const bool grace_expired = (s_presence_state.score_low_frames >= release_grace_frames);
+                const bool ser_holds_still =
+                    s_presence_state.presence_latched &&
+                    s_presence_state.anchor_ser >= SER_HOLD_TH &&
+                    s_presence_state.anchor_age_frames >= 100U;
+
+                if (s_presence_state.presence_latched && grace_expired && ser_holds_still)
                 {
-                    /* 未锁定 → 直接判 no；已锁定 → 连续低于 maintain_th 超过 3 秒才解锁 */
+                    /* STILL_PRESENT: 保持 latched, 仅清当帧 vitals
+                     * 不清 history (同人深睡, 醒后 BPM 续) */
+                    s_presence_state.ser_low_frames = 0U;
+                    result->breath_rate_bpm = 0.0f;
+                    result->heart_rate_bpm = 0.0f;
+                    /* fall through, latched 保持 true → update_presence 映射 detected=yes */
+                }
+                else if (s_presence_state.presence_latched && grace_expired)
+                {
+                    /* score 低 + grace 到期 + SER 也不高 → 进 SER 二级 grace */
+                    s_presence_state.ser_low_frames++;
+                    if (s_presence_state.ser_low_frames < SER_RELEASE_GRACE)
+                    {
+                        /* SER 刚跌, 二级 grace 内仍 STILL */
+                        result->breath_rate_bpm = 0.0f;
+                        result->heart_rate_bpm = 0.0f;
+                        /* fall through */
+                    }
+                    else
+                    {
+                        /* 二级 grace 也到 → 真释放 */
+                        goto do_release;
+                    }
+                }
+                else if (!s_presence_state.presence_latched)
+                {
+                    /* 未锁定 + score 低 → 直接判 no, 走 release */
+                    goto do_release;
+                }
+                /* else: latched 但 grace 未到 → 仍在 grace 期, 不动 (BPM 也不清) */
+
+                /* 跳过下面的 release 块 */
+                goto skip_release;
+
+do_release:
+                {
+                    /* 真正释放 */
                     result->presence_detected = false;
                     result->presence_confidence = 0.0f;
                     result->presence_distance_cm = 0.0f;
@@ -2658,18 +2863,33 @@ static bool radar_analyze_frame(void *result_ptr)
                     s_presence_state.presence_latched = false;
                     s_presence_state.presence_misses = 0U;
                     s_presence_state.score_low_frames = 0U;
+
+                    /* 2026-04 新增：人离场时清空所有 vitals 累积状态。
+                     * 下一个进入感应范围的人不一定是同一人，旧 BPM/median/streak
+                     * 残留会污染新人的初始读数（被 outlier rejection 误拒）。*/
+                    s_presence_state.breath_rate_bpm = 0.0f;
+                    s_presence_state.heart_rate_bpm = 0.0f;
+                    s_presence_state.breath_hz_count = 0U;
+                    s_presence_state.heart_hz_count = 0U;
+                    memset(s_presence_state.breath_hz_history, 0,
+                           sizeof(s_presence_state.breath_hz_history));
+                    memset(s_presence_state.heart_hz_history, 0,
+                           sizeof(s_presence_state.heart_hz_history));
+                    s_presence_state.heart_reject_streak = 0U;
+                    /* 锚点也复位：新人位置可能不同，旧锚点会偏置新人的 score */
+                    s_presence_state.anchor_bin = -1;
+                    s_presence_state.anchor_age_frames = 0U;
+                    s_presence_state.score_hi_streak = 0U;
+
                     return true;
                 }
-                /* 已锁定且未到解锁宽限期：保持 detected=yes，继续走下面的 presence 分析。
-                 * 2026-04 修正：不再在此清零 BPM。
-                 *   瞬态 score 低谷（呼吸周期静默段、姿势微调）会在这里停留 1-3 秒。
-                 *   清零 BPM 会让睡眠监控 GUI 看到心率/呼吸数字闪烁归零，观感极差。
-                 *   若是人真离开，30 帧 grace 后会走上面的 release 分支，该清零照样清零。*/
+skip_release: ;  /* 落点：STILL_PRESENT 或 grace 期内, 继续走下面的 presence 分析 */
             }
             else
             {
-                /* 分数足够，重置低分计数 */
+                /* 分数足够，重置低分计数 + SER 二级 grace */
                 s_presence_state.score_low_frames = 0U;
+                s_presence_state.ser_low_frames = 0U;
             }
         }
     }

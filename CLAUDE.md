@@ -27,7 +27,7 @@
 | `components/my_lidar_inf/cli_task.c` | CLI 控制入口，presence 参数调节 |
 | `components/my_lidar_inf/resource_map.h` | 雷达引脚定义 |
 | `dependencies/sensor-xensiv-bgt60trxx/` | Infineon 低层驱动 |
-| `doc/netlist_BY-SA-V001.tel` | 主板原理图网表（Telia 格式，纯文本，含所有元器件和网络连接） |
+| `doc/Netlist_BY-SA-V001_2026-05-06.enet` | 主板原理图网表（纯文本，含所有元器件和网络连接） |
 
 ## 雷达硬件配置（当前已验证）
 
@@ -42,7 +42,7 @@
 | IF 增益 | 43 dB（VGA = 5） |
 | 帧率 | ~10 Hz |
 | 距离分辨率 | 3.75 cm/bin（c / 2BW） |
-| 有效检测起点 | bin 8 = 30 cm |
+| 有效检测窗口 | bin 10 ~ bin 53 = 37.5 cm ~ 198.75 cm |
 
 ## 关键约束（违反会崩溃或检测失效）
 
@@ -58,16 +58,15 @@
 ### 初始化顺序（不能调换）
 1. 释放雷达相关 GPIO hold（LP GPIO）
 2. 初始化 SPI，mode 0
-3. 拉高 `LDO_EN`
-4. 调用 `xensiv_bgt60trxx_esp_init()`
-5. 应用运行时 distance profile
-6. 配置 IRQ 输入和 FIFO limit（`FIFO_SLICE_SAMPLES`）
-7. 启动 frame generation
+3. 调用 `xensiv_bgt60trxx_esp_init()`
+4. 应用运行时 distance profile
+5. 配置 IRQ 输入和 FIFO limit（`FIFO_SLICE_SAMPLES`）
+6. 启动 frame generation
 
 ## 检测参数（调优入口）
 
 - `RADAR_DISTANCE_THRESHOLD_DB`（当前 `-5.0f`）：距离检测 FFT 幅度阈值
-- `RADAR_DISTANCE_FIRST_VALID_BIN`（当前 `8`，即 30 cm）：过滤近场杂波
+- `RADAR_DISTANCE_FIRST_VALID_BIN`（当前 `10`，即 37.5 cm）：过滤近场杂波
 - `RADAR_PRESENCE_MAX_RANGE_M`：presence 最大检测距离
 - `macro_threshold` / `micro_threshold`：宏/微动检测门限
 

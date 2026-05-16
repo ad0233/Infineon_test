@@ -18,7 +18,6 @@ This implementation currently provides:
 
 - ESP32-P4 board bring-up for the Infineon wingboard.
 - SPI mode 0 communication with LP GPIO hold release before bus init.
-- Radar power enable through `LDO_EN`.
 - TR13C register bring-up through `sensor-xensiv-bgt60trxx`.
 - A distance-measure style loop that rearms each measurement instead of relying on free-running IRQ forever.
 - FIFO slice reads (`4096` samples per slice) to stay within the hardware FIFO limit.
@@ -54,16 +53,17 @@ The live configuration is defined in `components/my_lidar_inf/my_lidar_inf.c`, n
 - `adc_div = 80`
 - `vga_gain_rx1 = 5`
 - `distance_threshold_db = -5.0`
-- `distance_first_valid_bin = 8`
+- `distance_first_valid_bin = 10`
 - `main_rx_idx = 1`
 - `fifo_slice_samples = 4096`
 - `measurement_rearm_delay_ms = 100`
 
 Expected range-bin length is about `3.75 cm`, so:
 
-- `bin 8 ~= 30.0 cm`
+- `bin 10 ~= 37.5 cm`
 - `bin 13 ~= 48.7 cm`
 - `bin 15 ~= 56.2 cm`
+- `bin 53 ~= 198.75 cm`（当前窗口上限）
 
 ## Live Export API
 
