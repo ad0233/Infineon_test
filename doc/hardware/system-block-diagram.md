@@ -28,7 +28,7 @@ flowchart LR
     Spk["喇叭 L/R<br/>CN4 / CN18"]
 
     %% 通信
-    Wifi["U6 协处理器模组<br/>Cross Air OA-W01<br/>(ESP32-C6 + 天线)<br/>Wi-Fi 2.4G + BT 5.0"]
+    Wifi["U6 协处理器模组<br/>Cross Air OA-W01<br/>(ESP32-C6 + 天线)<br/>Wi-Fi 6 (2.4G) + BLE 5<br/>+ 802.15.4 (Thread)"]
     USBC["USB-C<br/>OTA + 数据"]
 
     %% 存储（板外，M3 模组内已含 16MB Flash + 8MB PSRAM）

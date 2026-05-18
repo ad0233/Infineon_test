@@ -1,6 +1,6 @@
 # Networking 模块
 
-> Status: 🟡 needs-review · Last reviewed: 2026-05-18 · C6 / C5 待核实
+> Status: 🟢 current · Last reviewed: 2026-05-18
 
 Wi-Fi + 蓝牙双通道。ESP32-P4 主控**自身没有 Wi-Fi / BT 射频**，无线能力全部来自 **ESP32-C6 协处理器模组**（板上 U6 = Cross Air OA-W01），通过 `esp_hosted` SDIO/SPI 透传协议挂在 P4 侧。
 
@@ -24,15 +24,26 @@ Wi-Fi + 蓝牙双通道。ESP32-P4 主控**自身没有 Wi-Fi / BT 射频**，�
 
 | 项 | 规格 |
 |---|---|
-| 主控模组 | **JC-ESP32P4-M3**（嘉立创 ESP32-P4 模组，含 16 MB Flash + 8 MB PSRAM 版本） |
+| 主控模组 | **JC-ESP32P4-M3**（嘉立创 ESP32-P4 模组，含 16 MB Flash + 8 MB PSRAM） |
 | 协处理器模组 | **Cross Air OA-W01**（含 ESP32-C6 + 板载天线） |
-| Wi-Fi 频段 | 2.4 GHz（C6 原生）。网表 description 标 "2.4G/5G" —— **待核实**：是 C6 实际单频，还是模组内嵌额外 5G 通路 / 替换为 C5（双频） |
-| 蓝牙 | BLE 5.0（C6 提供）。P4 自身无 BT 射频 |
-| 主控接口 | `esp_hosted` 透传（Wi-Fi + BLE 共用一条命令链路） |
+| Wi-Fi | **2.4 GHz Wi-Fi 6（802.11ax）** —— C6 仅原生 2.4 G 单频。网表 description 标 "2.4G/5G" 是把代际名 "Wi-Fi 6" 误写成了频段 "5G"，实际 **不支持 5 GHz 频段** |
+| 蓝牙 | **Bluetooth 5（LE）** —— C6 提供。P4 自身无 BT 射频 |
+| 802.15.4 | **支持** —— C6 原生 Thread / Zigbee / Matter。**对 Luna Matter Controller 有直接价值**，未来若做 Thread 邻边路由不用外加芯片 |
+| 主控接口 | `esp_hosted` 透传（Wi-Fi + BLE 共用一条命令链路，SDIO 或 SPI） |
 | 软件栈 | `esp_hosted` + `esp_wifi_remote`（managed_components） |
 | 天线 | OA-W01 模组板载天线，无外置天线接口 |
 
-> **校核 TODO**：在 OA-W01 数据手册 / Cross Air 选型表里确认实际芯片是 C6 / C5 / 其他。当前 codebase 配合 `esp_hosted` 默认按 C6 设定走。
+### C6 内部规格（来自乐鑫数据手册）
+
+| 项 | 规格 |
+|---|---|
+| 高性能 CPU | RISC-V 32-bit，最高 160 MHz |
+| 低功耗 CPU | RISC-V 32-bit，最高 20 MHz |
+| 内存 | 512 KB SRAM + 320 KB ROM；支持外接 flash |
+| GPIO | 30 (QFN40) / 22 (QFN32) 可编程 |
+| 接口 | SPI、UART、I²C、I²S、RMT、TWAI、PWM、MCPWM、SDIO |
+| ADC | 12-bit + 温度传感器 |
+| 协议 | Wi-Fi 6、BLE 5、802.15.4（Thread / Zigbee） |
 
 ---
 
@@ -58,6 +69,7 @@ Wi-Fi + 蓝牙双通道。ESP32-P4 主控**自身没有 Wi-Fi / BT 射频**，�
 | 数据 | Wi-Fi / WebSocket | `/ws` | 8080 | ESP 服务端，App 客户端 |
 | 发现 | mDNS | `_lunawake._tcp.local` | — | App 解析 IP；失败兜底手动输 |
 | OTA | Wi-Fi / HTTP | 待定 | 待定 | 固件升级（未实现） |
+| Matter / Thread | 802.15.4（C6 原生） | — | — | 未启用，但硬件能力具备，详见 [luna-panel-bridge.md §5](luna-panel-bridge.md) A 域 Matter |
 
 详细消息字典与时序见 [app-protocol.md](app-protocol.md)。
 

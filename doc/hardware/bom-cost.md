@@ -115,7 +115,7 @@
 | U3 | 1 | AHT20 | AHT20 | C2757850 | 温湿度 |
 | U4 | 1 | BMP580 | BMP580 | C22391138 | 气压（DVT 待决去留） |
 | **U5** | 1 | **JC-ESP32P4-M3** | JC-ESP32P4-M3 | — | **主控模组**：ESP32-P4 + 16 MB Flash + 8 MB PSRAM（嘉立创自封） |
-| **U6** | 1 | **Cross Air OA-W01** | OA-W01 | — | **协处理器模组**：ESP32-C6（Wi-Fi 2.4 G + BT）+ 板载天线；网表 desc 写 "2.4G/5G" 待核实是否实际带 5G |
+| **U6** | 1 | **Cross Air OA-W01** | OA-W01 | — | **协处理器模组**：ESP32-C6（Wi-Fi 6 / 2.4 G + BLE 5 + 802.15.4 Thread/Zigbee）+ 板载天线。网表 desc 写 "2.4G/5G" 是把 "Wi-Fi 6 代际" 误标为 "5G 频段"，**不支持 5 GHz**。Thread 能力对 Matter Controller 有直接价值 |
 | U7, U8, U10, U11 | 4 | RCLAMP0521T-ES | RCLAMP0521T-ES | C5180263 | ESD 保护 |
 | U9 | 1 | 60 µH 共模电感 | PSTFAQ3416-600T020 | C3011570 | — |
 | U12 | 1 | SY8368QNC | SY8368QNC | C125897 | DC-DC |
@@ -178,7 +178,7 @@ V1.1 决策见 [microphone.md](microphone.md) + [decisions.md](../progress/decis
 | 类别 | 当前选型 | 国产 / 替代选项 | 备注 |
 |---|---|---|---|
 | 主控模组 | JC-ESP32P4-M3（嘉立创自封） | 裸 ESP32-P4 + 外置 Flash/PSRAM；其他 P4 模组（乐鑫 ESP32-P4-Function-EV-Board / 安信可 P4 模组） | 含 16 MB Flash + 8 MB PSRAM |
-| 协处理器模组 | Cross Air OA-W01（ESP32-C6） | 安信可 ESP32-C6 模组、矽昌 SF32LB52J 5G 模组、ESP32-C5（双频但 pin 不兼容需改板） | 替换需重测 SRRC / FCC 认证 |
+| 协处理器模组 | Cross Air OA-W01（ESP32-C6） | 安信可 ESP32-C6 模组、其他 C6 模组；若需双频可考虑 ESP32-C5（pin 不兼容需改板） | 替换需重测 SRRC / FCC 认证 |
 | 雷达 | BGT60TR13C | 无国产同类 60 GHz FMCW | 单点风险件 |
 | 光传感 | VEML7700 / BH1750 | OPT3001、SI1133 | 双源备份充足 |
 | 温湿度 | AHT20 | SHT41、HDC2080 | 双源备份充足 |

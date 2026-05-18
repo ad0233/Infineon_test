@@ -18,6 +18,18 @@
 
 ---
 
+## 2026-05-18 — 主控方案确认：P4 + C6 双芯（含 Thread 能力）
+
+**做了**：明确硬件主控方案是 **JC-ESP32P4-M3（主控）+ OA-W01（ESP32-C6 协处理器）** 双芯架构，通过 `esp_hosted` 透传。C6 模组提供 **Wi-Fi 6 (2.4 G) + BLE 5 + 802.15.4 (Thread/Zigbee)**。
+
+**备选**：① 单 ESP32-S3（自带 Wi-Fi/BT，省一颗模组，但算力不够跑 vitals + Wi-Fi + 多任务）；② ESP32-P4 + ESP32-C5（双频 Wi-Fi，但 C5 pin 与 C6 不兼容需改板，且 EVT 已选 C6）。
+
+**为什么**：① P4 算力 + 内存适合 vitals + 音频混合工作；② C6 双频不需要（床头联网 2.4 G 够用），但 **802.15.4 = Matter Thread 邻边路由能力 unlocks Luna A 域 Matter Controller**，省得后续加专用 Thread 芯片；③ M3 模组带 8 MB PSRAM —— 之前文档说"无大 PSRAM"是错的，应该敢用 PSRAM 放大数组（音频缓冲、sleep staging 模型、FFT 暂存）。
+
+**影响**：[networking.md](../hardware/networking.md)（重写 §1）、[lunawake-hardware.md §1.1](../hardware/lunawake-hardware.md)（修正 PSRAM 状态）、[bom-cost.md](../hardware/bom-cost.md)（U5/U6/U17 厂商 P/N 填实）、[system-block-diagram.md](../hardware/system-block-diagram.md)、[power.md](../hardware/power.md)、CLAUDE.md。**网表 OA-W01 desc 写 "2.4G/5G" 是 Wi-Fi 6 代际名被误标为 5G 频段，应改正。**
+
+---
+
 ## 2026-05-18 — doc/ 按 Luna 风格 kebab-case 重构
 
 **做了**：`doc/` 拆 `hardware/` + `progress/` + `standards/`，每硬件模块一份独立 md（7 模块），命名 kebab-case 参照 Luna `lunawake-device.md` 风格。
