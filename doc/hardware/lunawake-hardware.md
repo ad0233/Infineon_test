@@ -182,6 +182,8 @@ typedef struct {
 | [../progress/evt-radar-bringup.md](../progress/evt-radar-bringup.md) | 从硬件点亮到产品化的实验记录 + 问题↔解决方案对照表 |
 | [../progress/evt-vitals-baseline.md](../progress/evt-vitals-baseline.md) | 雷达 vitals 算法基线快照 + 校准记录 |
 | [assets/netlist-BY-SA-V001-2026-05-06.enet](assets/netlist-BY-SA-V001-2026-05-06.enet) | 主板网表（完整 BOM + 网络连接） |
+| [../../reference/hardware/infineon-bgt60tr13c-datasheet-cn.pdf](../../reference/hardware/infineon-bgt60tr13c-datasheet-cn.pdf) | BGT60TR13C 雷达数据手册（中文） |
+| [../../reference/hardware/espressif-esp32c6-datasheet-cn.pdf](../../reference/hardware/espressif-esp32c6-datasheet-cn.pdf) | ESP32-C6 数据手册（中文） |
 | `components/my_lidar_inf/my_lidar_inf.h` | 对外数据结构与 API（权威） |
 | `components/my_lidar_inf/resource_map.h` | 雷达 / LED 引脚定义（权威） |
 | `CLAUDE.md` | 项目硬约束与禁忌（FIFO 分片 / SPI 时钟 / 初始化顺序 / 嵌入式约束） |

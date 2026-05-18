@@ -3,3 +3,7 @@ rooms:
   - name: bgt60tr13c-datasheet
     description: BGT60TR13C radar chip datasheet and hardware reference
     keywords: [datasheet, bgt60, register, timing, spi, fifo, adc, chirp, 寄存器, 数据手册, page]
+
+  - name: esp32c6-datasheet
+    description: ESP32-C6 SoC datasheet (Espressif, Chinese version)
+    keywords: [datasheet, esp32-c6, c6, espressif, wifi6, 802.11ax, bluetooth, ble, 802.15.4, thread, zigbee, risc-v, gpio, 数据手册, 乐鑫]

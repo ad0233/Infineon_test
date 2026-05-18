@@ -99,3 +99,4 @@ C6 协处理器**理论支持**蓝牙音频（A2DP），P4 通过 `esp_hosted` �
 - [app-protocol.md](app-protocol.md) — 完整 App 通信协议（BluFi + WS + 消息字典）
 - [luna-panel-bridge.md](luna-panel-bridge.md) — 与 Luna 软件契约（含 ConfigCard 摄取链路待定）
 - [lunawake-hardware.md §5](lunawake-hardware.md) — 待澄清问题（蓝牙音频、ConfigCard 通信协议）
+- [../../../reference/hardware/espressif-esp32c6-datasheet-cn.pdf](../../../reference/hardware/espressif-esp32c6-datasheet-cn.pdf) — **ESP32-C6 完整数据手册（中文）** — 引脚 / 内部框图 / Wi-Fi 6 + BLE 5 + 802.15.4 详细规格
