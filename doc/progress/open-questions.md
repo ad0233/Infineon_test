@@ -34,6 +34,8 @@
 | Q12 | WS 鉴权（protocol_version=2 起启用 token） | future |
 | Q13 | 调试口 CN2 / U13 量产是否拆除 | DVT 期决 |
 | Q14 | 17 个 firmware 兜底常量的最终值（Luna `firmware.md §2`） | 调试后回填 |
+| Q15 | **Matter 角色定位**：Device-only / + Controller / + Thread Border Router？这影响 Luna A 域分工。详见 [../hardware/matter.md §5](../hardware/matter.md) | not-started 等 Phase 2 |
+| Q16 | ESP-IDF v5.5 → v5.5.4 升级评估（esp-matter SDK 推荐版本，会不会破坏 vitals / esp_hosted） | not-started |
 
 ---
 

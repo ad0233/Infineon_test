@@ -176,7 +176,8 @@ typedef struct {
 | [environment.md](environment.md) | 环境传感模块（温湿/光/气压） |
 | [indicator.md](indicator.md) | LED 状态指示 + 按键 + 滑条 |
 | [power.md](power.md) | 电源管理模块 |
-| [networking.md](networking.md) | WiFi / BT / 天线 |
+| [networking.md](networking.md) | Wi-Fi 6 / BLE 5 / 802.15.4 |
+| [matter.md](matter.md) | Matter 协议（前瞻，Thread 能力来自 C6） |
 | [app-protocol.md](app-protocol.md) | ESP ↔ App 通信契约（BluFi + WS） |
 | [luna-panel-bridge.md](luna-panel-bridge.md) | 对 Luna 软件团队的硬件实施契约 |
 | [../progress/evt-radar-bringup.md](../progress/evt-radar-bringup.md) | 从硬件点亮到产品化的实验记录 + 问题↔解决方案对照表 |

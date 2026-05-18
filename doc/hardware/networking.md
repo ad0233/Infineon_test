@@ -69,7 +69,7 @@ Wi-Fi + 蓝牙双通道。ESP32-P4 主控**自身没有 Wi-Fi / BT 射频**，�
 | 数据 | Wi-Fi / WebSocket | `/ws` | 8080 | ESP 服务端，App 客户端 |
 | 发现 | mDNS | `_lunawake._tcp.local` | — | App 解析 IP；失败兜底手动输 |
 | OTA | Wi-Fi / HTTP | 待定 | 待定 | 固件升级（未实现） |
-| Matter / Thread | 802.15.4（C6 原生） | — | — | 未启用，但硬件能力具备，详见 [luna-panel-bridge.md §5](luna-panel-bridge.md) A 域 Matter |
+| Matter / Thread | 802.15.4（C6 原生） | — | — | 未启用，硬件能力已就绪。详见 [matter.md](matter.md) 前瞻文档 + [luna-panel-bridge.md §5](luna-panel-bridge.md) A 域 Matter |
 
 详细消息字典与时序见 [app-protocol.md](app-protocol.md)。
 

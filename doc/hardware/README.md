@@ -22,7 +22,8 @@ BY001 整机硬件说明集。每个模块一份 md；总览 + 整机规格在�
 | 环境传感（温湿 / 光 / 气压） | [environment.md](environment.md) |
 | 状态指示 + 用户输入（LED / 按键 / 滑条 / 隐私闸） | [indicator.md](indicator.md) |
 | 电源管理 | [power.md](power.md) |
-| 通信（Wi-Fi / BT / 天线） | [networking.md](networking.md) |
+| 通信（Wi-Fi 6 / BLE 5 / 802.15.4） | [networking.md](networking.md) |
+| Matter 协议（前瞻） | [matter.md](matter.md) 🔴 planning |
 
 ## 软硬契约（对外接口）
 

@@ -84,6 +84,10 @@
 - 3 RX 角度估计 → 启用侧向 / 多目标检测
 - HRV 心率变异性（需帧率 ≥ 50 Hz，当前硬件不可行 → 需替换雷达或 ESP 配置）
 - 睡眠分期（依赖 HRV + 体动聚合，需大数据训练 / 外采模型 / PSG 同步采集计划）
+- **Matter 协议接入**（C6 + 802.15.4 已就绪，等产品策略与 Luna 软件团队定 A 域分工，详见 [../hardware/matter.md](../hardware/matter.md)）：
+  - Phase 2a：Matter Device 模式（自暴露为 Apple/Google Home 设备，1-2 周）
+  - Phase 2b：Matter Controller（替代 App 端 Controller，需软件团队改架构，4-6 周）
+  - Phase 2c：Thread Border Router（战略加分，视市场定位，4-8 周）
 
 ---
 
