@@ -49,24 +49,14 @@
 
 ## 3. 弧形滑条 / 旋钮（DVT 待选型）
 
-**软件契约**：[luna-panel-bridge.md §7](luna-panel-bridge.md) 定义 Auto / Manual 双语义，需要"一个连续位置输入"。
+详细模块规格见 **[touch-slider.md](touch-slider.md)**（候选 IC、电极几何、SNR、固件接口、验收红线）。
 
-**候选方案对比**（详见 `assets/` 内选型对比文档）：
+**速览**：
 
-| 方案 | 适用 | 参考 |
-|---|---|---|
-| 金属背贴电容触摸条 + LED 灯柱 + 线性马达（推荐方向） | 滑条音量 / 亮度 | [assets/触摸开关选型对比.md](assets/触摸开关选型对比.md) |
-| 霍尔开关 / 磁编码器 | 雷达俯仰铰链限位、角度反馈 | [assets/霍尔开关_磁编码器_选型对比.md](assets/霍尔开关_磁编码器_选型对比.md) |
-
-### 通用要求
-
-- 连续位置输入：电容滑条 / 旋钮编码器 / 触摸环
-- 单手可完成，无需视觉确认
-- 手指离开 1.5 s 后位置锁定不漂移
-
-### 电气接口
-
-留 I²C / GPIO 各 2 路给滑条模块（具体器件由结构-ID 定后选型）。
+- 软件契约 [luna-panel-bridge.md §7](luna-panel-bridge.md) Auto / Manual 双语义
+- 推荐方向：**金属背贴电容触摸 + LED 灯柱 + LRA 振动反馈**（IC 倾向 Azoteq IQS572）
+- 通用要求：连续位置输入、单手可完成、手指离开 1.5 s 不漂移
+- 电气接口：I²C + 中断 GPIO（PCB V1.1 改版补）
 
 ## 4. 隐私闸（CRITICAL）
 
@@ -100,8 +90,7 @@
 
 ## 7. 配套资料
 
+- [touch-slider.md](touch-slider.md) — 弧形滑条模块完整规格（IC / 电极 / 算法 / 验收）
 - [industrial-design.md §2 + §3](industrial-design.md) — 物理交互与视觉反馈需求
 - [luna-panel-bridge.md §7](luna-panel-bridge.md) — Auto / Manual 双语义
-- [assets/触摸开关选型对比.md](assets/触摸开关选型对比.md) — 触摸滑条选型
-- [assets/霍尔开关_磁编码器_选型对比.md](assets/霍尔开关_磁编码器_选型对比.md) — 霍尔 vs 磁编码器
 - `components/my_lidar_inf/resource_map.h` — 雷达 / LED 引脚（权威）

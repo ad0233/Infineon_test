@@ -171,10 +171,12 @@ typedef struct {
 | [industrial-design.md](industrial-design.md) | 操作与体验需求（结构组用，含摆放几何） |
 | [product-spec.md](product-spec.md) | 整机规格书（含雷达透波硬约束） |
 | [radar.md](radar.md) | 60 GHz 雷达模块（输出契约 + 算法参数） |
+| [radar-mount.md](radar-mount.md) | 雷达机械支架 / 俯仰铰链 / 未来电动化位置反馈 |
 | [microphone.md](microphone.md) | 麦克风阵列模块 |
 | [audio.md](audio.md) | 音频输出模块 |
 | [environment.md](environment.md) | 环境传感模块（温湿/光/气压） |
-| [indicator.md](indicator.md) | LED 状态指示 + 按键 + 滑条 |
+| [indicator.md](indicator.md) | LED 状态指示 + 按键 + 隐私闸 |
+| [touch-slider.md](touch-slider.md) | 弧形触摸滑条（用户输入） |
 | [power.md](power.md) | 电源管理模块 |
 | [networking.md](networking.md) | Wi-Fi 6 / BLE 5 / 802.15.4 |
 | [matter.md](matter.md) | Matter 协议（前瞻，Thread 能力来自 C6） |

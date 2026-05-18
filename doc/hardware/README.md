@@ -17,10 +17,12 @@ BY001 整机硬件说明集。每个模块一份 md；总览 + 整机规格在�
 | 模块 | 文档 |
 |---|---|
 | 60 GHz 雷达（BGT60TR13C） | [radar.md](radar.md) |
+| 雷达机械支架 / 俯仰铰链 | [radar-mount.md](radar-mount.md) 🟡 needs-decision |
 | 麦克风阵列（4 麦 / 双麦） | [microphone.md](microphone.md) |
 | 音频输出（codec + 功放 + 喇叭） | [audio.md](audio.md) |
 | 环境传感（温湿 / 光 / 气压） | [environment.md](environment.md) |
-| 状态指示 + 用户输入（LED / 按键 / 滑条 / 隐私闸） | [indicator.md](indicator.md) |
+| 状态指示（LED / 按键 / 隐私闸总览） | [indicator.md](indicator.md) |
+| 弧形触摸滑条（用户输入子模块） | [touch-slider.md](touch-slider.md) 🔴 planning |
 | 电源管理 | [power.md](power.md) |
 | 通信（Wi-Fi 6 / BLE 5 / 802.15.4） | [networking.md](networking.md) |
 | Matter 协议（前瞻） | [matter.md](matter.md) 🔴 planning |
