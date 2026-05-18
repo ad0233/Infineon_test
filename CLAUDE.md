@@ -13,6 +13,7 @@
 ## 项目定位
 
 - 基于 ESP-IDF / ESP-ADF 的嵌入式项目，根工程名为 `Lunawake`，目标芯片 `esp32p4`。
+- **主控方案**：P4 + C6 双芯架构。U5 = JC-ESP32P4-M3 主控模组（P4 + 16 MB Flash + 8 MB PSRAM）；U6 = OA-W01 协处理器模组（ESP32-C6 + 天线，提供 Wi-Fi/BT，走 `esp_hosted` 透传）。详见 [doc/hardware/networking.md](doc/hardware/networking.md)。
 - `app_main()` 位于 `main/main.cpp`，主路径启动 `my_lidar_inf_init()`。
 - 当前活跃雷达链路：`components/my_lidar_inf/`（Infineon BGT60TR13C SPI 雷达）。
 - 旧串口雷达链路：`components/my_lidar/`，两条链路不要混改。

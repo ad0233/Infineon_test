@@ -12,8 +12,9 @@
 
 | 类别 | 数量 | 估算单台成本 | 备注 |
 |---|---|---|---|
-| 主控（ESP32-P4 + Flash） | 2 | TBD | U5 + U60 |
-| Wi-Fi/BT 模组（OA-W01） | 1 | TBD | U6，三方模组单点风险 |
+| 主控模组（JC-ESP32P4-M3，含 Flash/PSRAM） | 1 | TBD | U5（嘉立创自封） |
+| 协处理器模组（OA-W01，ESP32-C6 + 天线） | 1 | TBD | U6，三方模组单点风险，更换需重测认证 |
+| 板外 SLC NAND（4 Gb） | 1 | TBD | U60 |
 | 雷达（BGT60TR13C） | 1 | TBD | 单点风险件，无国产替代 |
 | 音频（双 codec + 功放） | 3 | TBD | U14 + U16 + U17 |
 | 传感器 | 4 | TBD | AHT20 + VEML7700 + BH1750 + BMP580 |
@@ -32,12 +33,12 @@
 
 | 位号 | 器件 | 供应商 | 替代方案 | 备注 |
 |---|---|---|---|---|
-| U5 | ESP32-P4 | Espressif | 无（IDF 锁定 P4） | 主控冻结，见 [decisions.md](../progress/decisions.md) |
+| U5 | **JC-ESP32P4-M3**（ESP32-P4 + 16 MB Flash + 8 MB PSRAM） | 嘉立创自封模组（芯片：Espressif） | 可换裸 ESP32-P4 + 外置 Flash/PSRAM 自封；或换其他 P4 模组（需重测） | 主控冻结，见 [decisions.md](../progress/decisions.md) |
+| U6 | **Cross Air OA-W01**（ESP32-C6 协处理器 + 板载天线） | Cross Air（芯片：Espressif C6） | 安信可 ESP32-C6 模组、矽昌 / 其他 C6 模组；ESP32-C5 双频替换（pin 不兼容需改板） | 含天线，更换需重测 SRRC / FCC 认证 |
 | 雷达 IC | BGT60TR13C | Infineon | 无国产同类 60 GHz FMCW | 量产前需双源备货 |
-| U6 | OA-W01 Wi-Fi 5G 模组 | Cross Air | 单点风险高，需备替代模组型号 | 含天线，更换需重测认证 |
 | U60 | MKDV4GCL-ABB（4 Gb SLC NAND） | 美光 / 美光代理 | 可换其他 SLC NAND（需 IDF NAND 驱动适配） | |
 | U14 / U16 | ES8311 codec | 周立功 / 国产替代多 | ES7148 等 | 量产替代灵活 |
-| U17 | 2×10 W AB/D 类功放 | 待型号确认 | NS4225B / TPA3110 等 | EVT 网表无明确部件号 |
+| U17 | **HTA8998**（2×10 W AB/D 类功放） | 海陆通 HTA | NS4225B / TPA3110 等 | 国产 D 类，已点亮验证 |
 
 ---
 
@@ -113,21 +114,23 @@
 | U2 | 1 | VEML7700 | VEML7700-TR | C504893 | 光传感（主） |
 | U3 | 1 | AHT20 | AHT20 | C2757850 | 温湿度 |
 | U4 | 1 | BMP580 | BMP580 | C22391138 | 气压（DVT 待决去留） |
-| **U5** | 1 | **ESP32-P4** | （网表未填）| — | **主控** |
-| **U6** | 1 | **Cross Air OA-W01** | （网表部分填）| — | **Wi-Fi 5G + BT 模组** |
+| **U5** | 1 | **JC-ESP32P4-M3** | JC-ESP32P4-M3 | — | **主控模组**：ESP32-P4 + 16 MB Flash + 8 MB PSRAM（嘉立创自封） |
+| **U6** | 1 | **Cross Air OA-W01** | OA-W01 | — | **协处理器模组**：ESP32-C6（Wi-Fi 2.4 G + BT）+ 板载天线；网表 desc 写 "2.4G/5G" 待核实是否实际带 5G |
 | U7, U8, U10, U11 | 4 | RCLAMP0521T-ES | RCLAMP0521T-ES | C5180263 | ESD 保护 |
 | U9 | 1 | 60 µH 共模电感 | PSTFAQ3416-600T020 | C3011570 | — |
 | U12 | 1 | SY8368QNC | SY8368QNC | C125897 | DC-DC |
 | U13 | 1 | PZ2.54-2×4 排针 | PZ2.54-2*4 | C5156676 | 调试口 |
 | U14, U16 | 2 | ES8311 codec | ES8311 | C962342 | 立体声 codec |
 | U15 | 1 | XC6219B332MR | XC6219B332MR | C347386 | LDO |
-| **U17** | 1 | **2×10 W AB/D 类功放** | （网表未填）| — | **功放，待选型** |
+| U17 | 1 | HTA8998 | HTA8998 | — | **2×10 W AB/D 类功放** |
 | U20 | 1 | AiP8563 RTC | AiP8563 | C116087 | RTC |
 | U39 | 1 | CR1220 座 | XDCR-1220-006 | C7498147 | RTC 备份电池座 |
-| **U54** | 1 | （网表未填）| — | — | **未明，可能是电平转换 TXS0108E** |
+| ~~U54~~ | 1 | 嘉立创二维码 6×6 | — | — | **非 IC**：PCB 工艺二维码贴片，应从 IC 表剔除 |
 | U60 | 1 | MKDV4GCL-ABB | MKDV4GCL-ABB | C7500178 | 4 Gb SLC NAND |
 
-> **U5 / U6 / U17 / U54** 网表条目缺型号 → 抽 BOM 前需在 EDA 工具里补完厂商 P/N。
+> 模组类（U5 JC-ESP32P4-M3 / U6 OA-W01）和国产 IC（U17 HTA8998）在 LCSC 通常需要直接按厂商 P/N 询价，不一定能查到 C-编号。
+>
+> U54 = 嘉立创二维码贴片标识，不是元器件，**下次抽 BOM 时应被脚本过滤**（或在 EDA 里把它移出 BOM 类）。
 
 ### MIC — 麦克风（V1.0 4 颗 / V1.1 → 2 颗）
 
@@ -174,17 +177,17 @@ V1.1 决策见 [microphone.md](microphone.md) + [decisions.md](../progress/decis
 
 | 类别 | 当前选型 | 国产 / 替代选项 | 备注 |
 |---|---|---|---|
-| 主控 | ESP32-P4 | 无（IDF 锁定） | 不可替代 |
+| 主控模组 | JC-ESP32P4-M3（嘉立创自封） | 裸 ESP32-P4 + 外置 Flash/PSRAM；其他 P4 模组（乐鑫 ESP32-P4-Function-EV-Board / 安信可 P4 模组） | 含 16 MB Flash + 8 MB PSRAM |
+| 协处理器模组 | Cross Air OA-W01（ESP32-C6） | 安信可 ESP32-C6 模组、矽昌 SF32LB52J 5G 模组、ESP32-C5（双频但 pin 不兼容需改板） | 替换需重测 SRRC / FCC 认证 |
 | 雷达 | BGT60TR13C | 无国产同类 60 GHz FMCW | 单点风险件 |
-| Wi-Fi 模组 | OA-W01 | 安信可 ESP32-C6 模组、矽昌 5G 模组 | 替换需重测认证 |
 | 光传感 | VEML7700 / BH1750 | OPT3001、SI1133 | 双源备份充足 |
 | 温湿度 | AHT20 | SHT41、HDC2080 | 双源备份充足 |
 | 气压 | BMP580 | BMP390、ICP-10125 | 若 DVT 删则不需要 |
 | codec | ES8311 | TLV320AIC3104、WM8978 | 量产替代灵活 |
-| 功放 | 2×10 W AB/D | TPA3110D2、NS4225B | EVT 网表未填，DVT 选型 |
+| 功放 | HTA8998（2×10 W AB/D） | TPA3110D2、NS4225B | 国产 D 类，量产换型简单 |
 | DC-DC | SY8368QNC | TPS54302、MP2143 | 兼容封装直接换 |
 | LDO | XC6219B332MR | AMS1117、LDL1117 | 国产替代多 |
-| MCU 闪存 | MKDV4GCL-ABB | 兆易 GD5F4GQ4UC、长江存储 SLC NAND | 需 NAND 驱动适配 |
+| 板外 SLC NAND | MKDV4GCL-ABB（4 Gb） | 兆易 GD5F4GQ4UC、长江存储 SLC NAND | 需 IDF NAND 驱动适配；注意 M3 模组内已有 16 MB Flash，此颗为额外存储 |
 
 ---
 

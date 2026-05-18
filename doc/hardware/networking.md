@@ -1,20 +1,42 @@
 # Networking 模块
 
-Wi-Fi + 蓝牙双通道。Wi-Fi 走 App 数据链路，BLE 走配网（BluFi）+ 蓝牙音频（可选）。
+> Status: 🟡 needs-review · Last reviewed: 2026-05-18 · C6 / C5 待核实
+
+Wi-Fi + 蓝牙双通道。ESP32-P4 主控**自身没有 Wi-Fi / BT 射频**，无线能力全部来自 **ESP32-C6 协处理器模组**（板上 U6 = Cross Air OA-W01），通过 `esp_hosted` SDIO/SPI 透传协议挂在 P4 侧。
 
 主板：BY-SA-V001 / 项目：Lunawake (BY001)。
 
 ---
 
-## 1. 硬件
+## 1. 主控方案：P4 + C6 双芯架构
+
+```
+┌─────────────────┐                ┌──────────────────────┐
+│ U5 主控          │  esp_hosted    │ U6 协处理器模组       │
+│ JC-ESP32P4-M3   │ ──透传 SDIO/── │ Cross Air OA-W01     │
+│ (双核 RISC-V    │   SPI          │ (ESP32-C6 + 天线)    │
+│  IDF v5.5)      │ ←───────────── │  Wi-Fi + BT          │
+└─────────────────┘                └──────────────────────┘
+       │                                       │
+   雷达 SPI / I²C / I²S /                  Wi-Fi 数据链路（WS）
+   PDM 麦 / GPIO / Flash                   BLE 配网（BluFi）
+```
 
 | 项 | 规格 |
 |---|---|
-| 模组 | Cross Air OA-W01 |
-| Wi-Fi | 2.4 GHz / 5 GHz |
-| 蓝牙 | ESP32-P4 内置 + 协处理器（esp_hosted） |
-| 天线 | 模组板载天线 |
-| 主控接口 | esp_hosted 透传（Wi-Fi + BLE 共用） |
+| 主控模组 | **JC-ESP32P4-M3**（嘉立创 ESP32-P4 模组，含 16 MB Flash + 8 MB PSRAM 版本） |
+| 协处理器模组 | **Cross Air OA-W01**（含 ESP32-C6 + 板载天线） |
+| Wi-Fi 频段 | 2.4 GHz（C6 原生）。网表 description 标 "2.4G/5G" —— **待核实**：是 C6 实际单频，还是模组内嵌额外 5G 通路 / 替换为 C5（双频） |
+| 蓝牙 | BLE 5.0（C6 提供）。P4 自身无 BT 射频 |
+| 主控接口 | `esp_hosted` 透传（Wi-Fi + BLE 共用一条命令链路） |
+| 软件栈 | `esp_hosted` + `esp_wifi_remote`（managed_components） |
+| 天线 | OA-W01 模组板载天线，无外置天线接口 |
+
+> **校核 TODO**：在 OA-W01 数据手册 / Cross Air 选型表里确认实际芯片是 C6 / C5 / 其他。当前 codebase 配合 `esp_hosted` 默认按 C6 设定走。
+
+---
+
+## 2. 软件栈
 
 ## 2. 软件栈
 
@@ -41,7 +63,7 @@ Wi-Fi + 蓝牙双通道。Wi-Fi 走 App 数据链路，BLE 走配网（BluFi）+
 
 ## 4. 蓝牙音频
 
-ESP32-P4 + 协处理器**理论支持**蓝牙音频，但能否与 Wi-Fi + 雷达 SPI 25 MHz + 4 麦 PDM + 双 codec **同时运行**需要固件资源预算确认。
+C6 协处理器**理论支持**蓝牙音频（A2DP），P4 通过 `esp_hosted` 拿到 PCM 流再走 ES8311 codec 输出。但能否与 Wi-Fi + 雷达 SPI 25 MHz + 4 麦 PDM + 双 codec **同时运行**需要固件资源预算确认（瓶颈在 `esp_hosted` 透传带宽和 C6 内部并发能力）。
 
 - 见 [lunawake-hardware.md §5](lunawake-hardware.md) 待澄清问题 8
 

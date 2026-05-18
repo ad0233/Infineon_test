@@ -11,11 +11,15 @@
 
 ## 1. 硬件是什么（最底层事实）
 
-### 1.1 主控与计算
-- MCU：ESP32-P4（双核 RISC-V，FreeRTOS，ESP-IDF v5.5）
+### 1.1 主控与计算（P4 + C6 双芯架构）
+
+- **主控模组**：**JC-ESP32P4-M3**（U5，嘉立创自封）—— ESP32-P4 双核 RISC-V + **16 MB Flash + 8 MB PSRAM**，FreeRTOS / ESP-IDF v5.5
+- **协处理器模组**：**Cross Air OA-W01**（U6）—— ESP32-C6 + 板载天线，提供 Wi-Fi 2.4 G + BT 5.0；P4 自身无 Wi-Fi/BT 射频，通过 `esp_hosted` 透传协议（SDIO/SPI）挂载
+- **板外存储**：MKDV4GCL-ABB 4 Gb（512 MB）SLC NAND（U60）—— 模组内 16 MB Flash 之外的额外存储，目前用于音频素材 / 模型 / 日志缓冲
 - 无独立 NPU；TF-Lite Micro 级别的端侧推理可行，大模型不可行
-- Flash：板载 4 Gb（512 MB）SLC NAND（MKDV4GCL-ABB）
-- 无 PSRAM 大容量外扩（按当前网表）；大数组必须 static 或堆，函数内 >512 B 局部数组禁止
+- 8 MB PSRAM 已可放大数组，但仍建议大数组 static 或堆分配；函数内 >512 B 局部数组禁止（FreeRTOS 任务栈有限）
+
+> **C6 / C5 待核实**：网表 description 将 OA-W01 标为 "2.4G/5G Wi-Fi"，但 C6 仅原生 2.4 G。可能：(a) 标签错；(b) 实际是 ESP32-C5（双频，pin 不同需改板）；(c) 模组内嵌额外 5 G 射频。详见 [networking.md §1](networking.md)。
 
 ### 1.2 雷达
 - 器件：Infineon **BGT60TR13C**，60 GHz FMCW，1 Tx / 3 Rx（**当前固件只用 RX1**）

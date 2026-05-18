@@ -18,8 +18,8 @@ flowchart LR
     BMP["BMP580<br/>气压 (待定)"]
     BTN["3× 轻触按键<br/>SW1/SW2/SW3"]
 
-    %% 主控
-    ESP["ESP32-P4 (U5)<br/>双核 RISC-V<br/>IDF v5.5"]
+    %% 主控（P4 + C6 双芯）
+    ESP["U5 主控模组<br/>JC-ESP32P4-M3<br/>(ESP32-P4 双核 RISC-V<br/>+16MB Flash+8MB PSRAM<br/>IDF v5.5)"]
 
     %% 输出侧
     LED["RGB LED<br/>GPIO15/16/17"]
@@ -28,11 +28,11 @@ flowchart LR
     Spk["喇叭 L/R<br/>CN4 / CN18"]
 
     %% 通信
-    Wifi["OA-W01<br/>Wi-Fi 2.4G/5G<br/>+ BT"]
+    Wifi["U6 协处理器模组<br/>Cross Air OA-W01<br/>(ESP32-C6 + 天线)<br/>Wi-Fi 2.4G + BT 5.0"]
     USBC["USB-C<br/>OTA + 数据"]
 
-    %% 存储
-    Flash["MKDV4GCL-ABB<br/>4 Gb SLC NAND (U60)"]
+    %% 存储（板外，M3 模组内已含 16MB Flash + 8MB PSRAM）
+    Flash["U60 板外存储<br/>MKDV4GCL-ABB<br/>4 Gb (512 MB) SLC NAND<br/>(音频素材 / 日志)"]
 
     Radar -- "SPI 25 MHz<br/>GPIO0/1/3/5+IRQ" --> ESP
     MIC -- "PDM<br/>GPIO10/11 + GPIO54(V1.0)" --> ESP
@@ -46,7 +46,7 @@ flowchart LR
     Codec -- "模拟" --> Amp
     Amp --> Spk
 
-    ESP <-- "esp_hosted 透传" --> Wifi
+    ESP <-- "esp_hosted 透传<br/>SDIO/SPI" --> Wifi
     ESP <-- "USB" --> USBC
 
     ESP <--> Flash
