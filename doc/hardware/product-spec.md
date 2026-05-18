@@ -1,11 +1,13 @@
-# 04 — 整机规格书（结构组优先版）
+# 整机规格书
+
+> Status: 🟢 current · Last reviewed: 2026-05-18 · 结构组优先版
 
 **项目**：Lunawake 床头硬件
 **机型代号**：BY001
 **主板版本**：BY-SA-V001（2026-05-06 网表）
 **版本**：EVT → DVT 交接
 **日期**：2026-05-10
-**配套**：`03_operation_experience.md`
+**配套**：[industrial-design.md](industrial-design.md)
 
 > 本规格书**结构组优先**：电气/软件细节只列结构相关的部分，详细电气表请向硬件工程师索取。
 
@@ -208,7 +210,7 @@ DVT 第一版结构件回来后，按下面步骤验证（可用现有 panel GUI
 
 ## 8. 软件层指标（仅列结构相关的）
 
-详见 `doc/SYSTEM_OVERVIEW.md` 与 `doc/luna-home-panel-logic.md`。结构组只看：
+详见 [radar.md](radar.md) 与 [luna-panel-bridge.md](luna-panel-bridge.md)。结构组只看：
 
 | 指标 | 数值 | 结构含义 |
 |------|------|---------|
@@ -271,10 +273,10 @@ DVT 第一版结构件回来后，按下面步骤验证（可用现有 panel GUI
 
 ## 12. 文档引用
 
-- `03_operation_experience.md` — 操作与体验需求
-- `doc/SYSTEM_OVERVIEW.md` — 系统能力总览
-- `doc/luna-home-panel-logic.md` — 软件状态机与 phase 定义
-- `doc/RADAR_EXPERIMENT_SUMMARY.md` — 雷达调参实验记录
-- `doc/Netlist_BY-SA-V001_2026-05-06.enet` — 主板网表（含完整 BOM）
+- [industrial-design.md](industrial-design.md) — 操作与体验需求
+- [radar.md](radar.md) — 雷达系统能力总览
+- [luna-panel-bridge.md](luna-panel-bridge.md) — 软件状态机与 phase 定义
+- [../progress/evt-radar-bringup.md](../progress/evt-radar-bringup.md) — 雷达调参实验记录
+- [assets/netlist-BY-SA-V001-2026-05-06.enet](assets/netlist-BY-SA-V001-2026-05-06.enet) — 主板网表（含完整 BOM）
 - `CLAUDE.md` — 项目硬约束与禁忌
 - `components/my_lidar_inf/resource_map.h` — 雷达引脚定义（权威）

@@ -8,7 +8,7 @@
 - 回复简洁直接，少解释，多落地。
 - 默认直接执行任务，不先输出大段方案。
 - 除非用户明确要求，否则不要主动新增 Markdown 文档。
-- 编码风格优先遵循 `doc/standards/coding_standard.md`。
+- 编码风格优先遵循 `doc/standards/coding-standard.md`。
 
 ## 项目定位
 
@@ -27,7 +27,9 @@
 | `components/my_lidar_inf/cli_task.c` | CLI 控制入口，presence 参数调节 |
 | `components/my_lidar_inf/resource_map.h` | 雷达引脚定义 |
 | `dependencies/sensor-xensiv-bgt60trxx/` | Infineon 低层驱动 |
-| `doc/Netlist_BY-SA-V001_2026-05-06.enet` | 主板原理图网表（纯文本，含所有元器件和网络连接） |
+| `doc/hardware/assets/netlist-BY-SA-V001-2026-05-06.enet` | 主板原理图网表（纯文本，含所有元器件和网络连接） |
+| `doc/hardware/` | 各硬件模块说明（radar / microphone / audio / environment / indicator / power / networking） + 整机规格 |
+| `doc/progress/` | 项目里程碑、调参实验记录、测试计划 |
 
 ## 雷达硬件配置（当前已验证）
 

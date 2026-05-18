@@ -9,7 +9,7 @@
 - 回复尽量简洁直接，少解释，多落地。
 - 默认直接执行任务，不先输出大段方案。
 - 除非用户明确要求，否则不要主动新增 Markdown 文档。
-- 编码风格优先遵循 `doc/coding_standard.md`。
+- 编码风格优先遵循 `doc/standards/coding-standard.md`。
 - 额外的表达偏好可参考 `.cursorrules`。
 
 ## 项目定位
@@ -33,7 +33,7 @@
   雷达相关引脚定义。
 - `dependencies/sensor-xensiv-bgt60trxx/`
   Infineon 低层驱动。
-- `doc/coding_standard.md`
+- `doc/standards/coding-standard.md`
   代码规范。
 
 ## 重要约束

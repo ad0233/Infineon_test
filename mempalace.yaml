@@ -24,8 +24,8 @@ rooms:
     keywords: [main, app_main, lunawake, init, task]
 
   - name: documentation
-    description: Project documentation under doc/
-    keywords: [coding, standard, flash, cert, design, fsm, vitals_status, doc]
+    description: Project documentation under doc/ (hardware modules, progress milestones, standards)
+    keywords: [hardware, module, radar, microphone, audio, environment, indicator, power, networking, app-protocol, luna-panel, product-spec, industrial-design, lunawake-hardware, progress, evt, dvt, baseline, bringup, changelog, coding-standard, references]
 
   - name: config
     description: Build configuration and CMake files

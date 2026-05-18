@@ -1,16 +1,18 @@
 # Luna Home Panel 硬件实施逻辑图
 
-面向硬件工程师。把 [luna-home-config-card.md](../luna-home-config-card.md) 的需求重排为接口契约、信号链与状态机，并对齐当前前端实现（[web/components/home/lunawake-paired-view.tsx](../../../web/components/home/lunawake-paired-view.tsx)）。看完此文应能直接动手。
+> Status: 🟡 needs-review · Last reviewed: 2026-05-05 · Luna 源文档命名已对齐 2026-05-18
 
-源文档：
-- 需求总纲：[luna-home-config-card.md](../luna-home-config-card.md)
-- Lunawake 床头硬件：[lunawake.md](./lunawake.md)
-- 入睡段闭环：[lunawake-sleep-onset.md](./lunawake-sleep-onset.md)
-- 环境 Spec 与 schema：[../../context/sleep-env-spec.md](../../context/sleep-env-spec.md)
+面向硬件 / 固件工程师。把 Luna 软件团队的 Panel 需求重排为接口契约、信号链与状态机，看完此文应能直接动手。
 
-前端实现：
-- 已配对态六卡入口：[lunawake-paired-view.tsx](../../../web/components/home/lunawake-paired-view.tsx)
-- Sheet 共享原语：[lunawake-sheet-parts.tsx](../../../web/components/home/lunawake-sheet-parts.tsx)
+**Luna 仓上游源文档**（`LunawakeGo/luna-product`）：
+
+| 文档 | 用途 |
+|---|---|
+| `lunawake-device.md` | 整机交互 master：产品定义、状态机、操控/感知/输出、Pairing、能力矩阵、降级、服务方案 |
+| `hardware-blueprint.md` | App Home Panel 模块功能需求：按卡组织（Hero / Wind Down / Wake / Home / Sensors / Network / Controls） |
+| `firmware.md` | firmware 工程师契约册：兜底常量、ConfigCard 摄取契约、stage 事件协议、时钟同步、自检失效、持久化、OTA、物理控件标定 |
+
+> 本文内的章节引用（`§3.x`、`§6` 等）以 Luna 仓 `lunawake-device.md` 为准。本仓不维护 Luna 软件代码路径与 `lunawake-sleep-onset.md` / `sleep-env-spec.md`，需要时去 Luna 仓查。
 
 ---
 
@@ -70,7 +72,7 @@ asleep 态（phase=B）规则：仅显示 Wind Down（read-only）/ Sensors / Ne
 | Network | — | Wi-Fi 配置 + 蓝牙重连 + 固件更新策略 | Lunawake 通信子系统 |
 | Controls | B | Lunawake 自身灯/音 Auto/Manual 双语义 + 重新校准 | Lunawake firmware |
 
-CRITICAL：Home 卡只管 Matter 第三方；Lunawake 自身光声归 Controls。两者互斥，不能交叉操控（[lunawake.md §3.9](./lunawake.md)）。
+CRITICAL：Home 卡只管 Matter 第三方；Lunawake 自身光声归 Controls。两者互斥，不能交叉操控（`lunawake-device.md §3.9`）。
 
 ---
 
@@ -94,7 +96,7 @@ CRITICAL：Home 卡只管 Matter 第三方；Lunawake 自身光声归 Controls�
 
 ## 4. ConfigCard 接口契约
 
-机器可消费 schema 详见 [sleep-env-spec.md Part B](../../context/sleep-env-spec.md)。硬件侧只需关心两个出口：
+机器可消费 schema 详见 Luna 仓 `sleep-env-spec.md` Part B。硬件侧只需关心两个出口：
 
 ### 4.1 A 域出口（每个 stage 一次性下发）
 
@@ -133,7 +135,7 @@ wake:
   intensity             : enum {gentle, bright}
 ```
 
-B 域 firmware 收到后：缓存素材偏好 + prompt + cap；实时控制由本地 sensing 决策，不读 stages 时序。cap 仅作为序列内参数天花板，不打断序列（[lunawake.md §3.2](./lunawake.md)）。
+B 域 firmware 收到后：缓存素材偏好 + prompt + cap；实时控制由本地 sensing 决策，不读 stages 时序。cap 仅作为序列内参数天花板，不打断序列（`lunawake-device.md §3.2`）。
 
 ---
 
@@ -164,7 +166,7 @@ Matter Controller（Cluster 映射适配器）
 
 ## 6. B 域 Lunawake 本地闭环（Wind Down + Wake + Controls）
 
-完整规范见 [lunawake-sleep-onset.md](./lunawake-sleep-onset.md)。硬件工程师只看这张图：
+完整规范见 Luna 仓 `lunawake-sleep-onset.md`。硬件工程师只看这张图：
 
 ```
 ┌─ 60GHz 雷达 ──► 在床检测 ─┐
@@ -190,7 +192,7 @@ CRITICAL 约束：
 
 ## 7. Auto / Manual 双语义（Controls 卡）
 
-弧形滑条与 APP Controls 卡承载同一控件、两种语义（[lunawake.md §3.2 / §3.9](./lunawake.md)）。前端 [lunawake-sheet-controls.tsx](../../../web/components/home/lunawake-sheet-controls.tsx) 用单一字段切换：
+弧形滑条与 APP Controls 卡承载同一控件、两种语义（`lunawake-device.md §3.2 / §3.9`）。前端用单一字段切换：
 
 ```
 mode = auto:
@@ -209,7 +211,7 @@ firmware 必须区分这两组字段，不能合并。手动介入不切换设�
 
 ## 8. 设备状态机 ↔ Phase 命名对齐
 
-[lunawake.md §3.4](./lunawake.md) 设备状态机与前端 phase / SceneSegment 对应：
+`lunawake-device.md §3.4` 设备状态机与前端 phase / SceneSegment 对应：
 
 | firmware 状态 | 前端 phase | SceneSegment | 触发 |
 |---|---|---|---|
@@ -275,7 +277,7 @@ DeviceCapability {
 
 ## 11. Sensors 卡 telemetry 接口
 
-前端 [lunawake-sheet-sensors.tsx](../../../web/components/home/lunawake-sheet-sensors.tsx) 已落型，firmware 提供以下 live readings：
+前端 Sensors sheet 已落型，firmware 提供以下 live readings：
 
 ```
 LiveReadings {
@@ -286,14 +288,14 @@ LiveReadings {
 }
 ```
 
-闸控规则（[lunawake.md §3.9](./lunawake.md)）：
+闸控规则（`lunawake-device.md §3.9`）：
 - 隐私闸关：radar / microphone 字段为 null（前端显示 paused）
 - ambient 始终有读数
 - breathRateHistory 用于 sparkline，长度由 firmware 决定，paused 期间用 null 占位
 - 仅作即时透明度，不做趋势/告警/持久化
 - 云同步开关：只控制事件标签上云，呼吸数据始终留端
 
-APP 不能远程开启隐私闸；关闭可远端发起但需机身二次确认（[lunawake.md §3.9](./lunawake.md)）。
+APP 不能远程开启隐私闸；关闭可远端发起但需机身二次确认（`lunawake-device.md §3.9`）。
 
 ---
 
@@ -341,12 +343,12 @@ B域│ 光柱+声景 entrainment │ 入睡后渐灭，整夜仅采集    │ �
 | 婴幼儿场景声压 | dB SPL ≤ 50 | 需求 §Persona |
 | 婴幼儿整夜白噪 | 禁用 | 需求 §Persona |
 | 老人 climate 下限 | target_temp ≥ 18°C | 需求 §Persona |
-| 光柱光谱 | 低 melanopic，峰值压在褪黑素抑制阈下 | [lunawake.md §3.5a](./lunawake.md) |
-| 声景节奏跟随 | only decrease | [lunawake-sleep-onset.md](./lunawake-sleep-onset.md) |
-| 隐私闸 | 物理切断雷达供电；APP 无法远程开启 | [lunawake.md §3.1](./lunawake.md) |
-| Auto 契约音量/亮度 | 不超过 masterVolumeCap / brightnessCap | [lunawake.md §3.2](./lunawake.md) |
+| 光柱光谱 | 低 melanopic，峰值压在褪黑素抑制阈下 | `lunawake-device.md §3.5a` |
+| 声景节奏跟随 | only decrease | Luna 仓 `lunawake-sleep-onset.md` |
+| 隐私闸 | 物理切断雷达供电；APP 无法远程开启 | `lunawake-device.md §3.1` |
+| Auto 契约音量/亮度 | 不超过 masterVolumeCap / brightnessCap | `lunawake-device.md §3.2` |
 | B 域断网行为 | wind-down 闭环独立可跑 | 需求 §验收 |
-| 呼吸数据 | 始终留端，不上云 | [lunawake.md §3.9](./lunawake.md) |
+| 呼吸数据 | 始终留端，不上云 | `lunawake-device.md §3.9` |
 
 ---
 
@@ -356,7 +358,7 @@ B域│ 光柱+声景 entrainment │ 入睡后渐灭，整夜仅采集    │ �
 |---|---|---|
 | LLM 推理生成 ConfigCard | APP / 云 | 不在硬件侧 |
 | ConfigCard schema 校验与持久化 | APP | web/ |
-| 六模块卡 UI + sheet morph | APP | web/components/home/ |
+| 六模块卡 UI + sheet morph | APP | Luna 仓 web/ |
 | Matter Controller / Cluster 适配 | A 域硬件阶段 | 端侧或网关 |
 | Matter 设备状态回读 + lastTrigger | A 域硬件阶段 | Matter |
 | 雷达 / 麦克风 / 环境 sensing | B 域 firmware | Lunawake 本机 |

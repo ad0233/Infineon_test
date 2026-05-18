@@ -1,7 +1,8 @@
-# 雷达系统参数总表
+# EVT — 雷达 vitals 算法基线
 
+> Status: 🟡 needs-review · Last reviewed: 2026-04-11 · 2026-05-10 算法翻新（谐波 HR + Doppler RBM）后参数表需重核
+>
 > 项目：BY001-ESP32-P4 + BGT60TR13C 雷达
-> 更新日期：2026-04-11
 > 分支：feat_lidar_inf
 
 ---

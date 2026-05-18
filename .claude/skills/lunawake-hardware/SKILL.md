@@ -96,7 +96,7 @@ description: Lunawake 床头硬件（BY001 / 主板 BY-SA-V001）的硬件能力
 - `docs/hardware/-device.md` —— 整机交互（隐私闸/AUTO键/弧形滑条×2/光柱/声/状态屏；5 场景状态机；事件优先级 手动>自动；降级树）
 - `docs/hardware/firmlunawakeware.md` —— firmware 契约（**5 场景状态机 + 6 类 stage 事件 + 17 个兜底常量 + ConfigCard 摄取 + 跨域时钟对齐 ≤ 50 ms + OTA 仅 Manual默认/Auto空闲**）
 - `docs/hardware/hardware-blueprint.md` —— App Home 六卡需求（Hero/WindDown/Wake/Home/Sensors/Network/Controls）
-- `docs/references/by001-radar-system.md` —— 他们复制的我们 SYSTEM_OVERVIEW
+- `docs/references/by001-radar-system.md` —— 他们复制的我们 `doc/hardware/radar.md`
 - `docs/appendix/sensor-modules-spec.md` —— 感知模组 checklist（他们等我们回答的项）
 - `docs/glossary.md` —— 术语表（Manual/Auto · A域/B域 · Phase/Stage/SceneSegment · degradeMode · ConfigCard · 隐私闸）
 
@@ -137,19 +137,27 @@ description: Lunawake 床头硬件（BY001 / 主板 BY-SA-V001）的硬件能力
 
 | 文件 | 内容 |
 |---|---|
-| `doc/handover/03_operation_experience.md` | 操作与体验需求（结构组用，摆放几何/按键/RGB/光柱/音频/端口/装配/验收触点） |
-| `doc/handover/04_product_spec.md` | 整机规格书（功能清单/物理规格/引脚/雷达罩硬约束 §5/电源热/认证/DVT 遗留 §10/已冻结 §11） |
-| `doc/handover/05_hardware_capability_brief.md` | 给软件团队的硬件能力蒸馏（本 skill 的长版） |
-| `doc/SYSTEM_OVERVIEW.md` | 雷达系统能力总览（= 软件侧 by001-radar-system.md 的源） |
-| `doc/vitals_status.md` | 雷达全参数表 + 校准记录 |
-| `doc/RADAR_EXPERIMENT_SUMMARY.md` | 硬件点亮 → 产品化实验记录 + 问题↔解决方案对照表 |
+| `doc/hardware/lunawake-hardware.md` | 给软件团队的硬件能力蒸馏（本 skill 的长版，整机硬件 master） |
+| `doc/hardware/product-spec.md` | 整机规格书（功能清单/物理规格/引脚/雷达罩硬约束/电源热/认证/DVT 遗留/已冻结） |
+| `doc/hardware/industrial-design.md` | 操作与体验需求（结构组用，摆放几何/按键/RGB/光柱/音频/端口/装配/验收触点） |
+| `doc/hardware/radar.md` | 60 GHz 雷达模块（输出契约 + 算法参数） |
+| `doc/hardware/microphone.md` | 麦克风阵列模块 |
+| `doc/hardware/audio.md` | 音频输出模块 |
+| `doc/hardware/environment.md` | 环境传感模块 |
+| `doc/hardware/indicator.md` | 状态指示 + 用户输入模块 |
+| `doc/hardware/power.md` | 电源管理模块 |
+| `doc/hardware/networking.md` | 通信模块 |
+| `doc/hardware/app-protocol.md` | ESP ↔ App 通信契约 |
+| `doc/hardware/luna-panel-bridge.md` | 对 Luna 软件团队的实施契约 |
+| `doc/progress/evt-vitals-baseline.md` | 雷达 vitals 算法基线 + 校准记录 |
+| `doc/progress/evt-radar-bringup.md` | 硬件点亮 → 产品化实验记录 + 问题↔解决方案对照表 |
+| `doc/hardware/assets/netlist-BY-SA-V001-2026-05-06.enet` | 主板网表（完整 BOM + 网络连接） |
 | `components/my_lidar_inf/my_lidar_inf.h` | 对外数据结构与 API（权威） |
 | `components/my_lidar_inf/resource_map.h` | 雷达/LED 引脚（权威） |
 | `CLAUDE.md` | 项目硬约束与禁忌 |
 | `.claude/skills/radar-vitals/SKILL.md` | vitals 调参方法论 |
 | `.claude/skills/embedded-stack-workflow/SKILL.md` | 四层工作流方法论 |
 | `.codex/skills/infineon-bgt60tr13c-radar/SKILL.md` | BGT60TR13C 驱动与配置 |
-| `doc/Netlist_BY-SA-V001_2026-05-06.enet` | 主板网表（完整 BOM + 网络连接） |
 
 ---
 

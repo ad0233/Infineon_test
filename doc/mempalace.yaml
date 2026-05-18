@@ -1,9 +1,5 @@
 wing: by001_esp32_feat_lidar_inf
 rooms:
-  - name: radar-vitals
-    description: Vital signs detection feature status and algorithm details
-    keywords: [vitals, breath, heart, bpm, fft, threshold, presence, sqi, detection, radar, status, feature, implement, phase, chirp, iir]
-
   - name: documentation
-    description: Project documentation including coding standards and tools
-    keywords: [coding, standard, naming, function, convention, flash, cert, certificate, style, error, init, deinit]
+    description: Project docs under doc/ — hardware/ (module specs) + progress/ (milestones) + standards/ (coding + references)
+    keywords: [hardware, module, radar, microphone, audio, environment, indicator, power, networking, app-protocol, luna-panel-bridge, product-spec, industrial-design, lunawake-hardware, progress, evt, dvt, baseline, bringup, changelog, coding-standard, scientific-references, netlist]

@@ -1,8 +1,10 @@
-# BY-SA-V001 双麦克风方案（鼾声检测）
+# 麦克风阵列模块
 
+> Status: 🟢 current · Last reviewed: 2026-05-13
+>
 > 板号：BY-SA-V001 / 项目：BY001-ESP32（Lunawake 床头硬件）
 > 用途：鼾声检测 + 双人床鼾声来源区分 + 环境噪声抑制
-> 状态：V1.0 通过 BOM DNP 可直接验证；V1.1 建议改板落地
+> 阶段：V1.0 通过 BOM DNP 可直接验证；V1.1 建议改板落地
 
 ---
 
@@ -312,6 +314,6 @@ stereo_buf[3] = MIC4 sample 1  (Right)
 ## 10. 参考资料
 
 - LinkMems LCD3526B261-OFA03 数据手册（Rev 1.1，2026-01-17）
-- 当前网表：`doc/Netlist_BY-SA-V001_2026-05-06.enet`
+- 当前网表：[assets/netlist-BY-SA-V001-2026-05-06.enet](assets/netlist-BY-SA-V001-2026-05-06.enet)
 - 资源映射：`components/my_lidar_inf/resource_map.h`
 - ESP-IDF PDM RX 文档：`esp-idf/components/driver/i2s/include/driver/i2s_pdm.h`

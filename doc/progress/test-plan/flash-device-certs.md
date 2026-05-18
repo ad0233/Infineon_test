@@ -1,5 +1,7 @@
 # flash_device_certs.py 使用文档
 
+> Status: 🟢 current · Last reviewed: 2026-03-30
+
 ## 功能说明
 
 用于烧录设备证书和 IoT 配置到 ESP32 设备。

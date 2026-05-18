@@ -19,13 +19,13 @@ description: BY001 项目沉淀的"AI 辅助嵌入式产品"四层工作流方�
 │   .codex/skills/* / mempalace.yaml（分布式上下文索引）          │
 ├────────────────────────────────────────────────────────────────┤
 │ L3 ── 功能需求层（PM/上层开发可动）                             │
-│   doc/SYSTEM_OVERVIEW.md（接口契约 + 数据结构 + 使用边界）      │
-│   doc/<feature>-logic.md（信号链 + 状态机 + 验收红线）          │
-│   doc/RADAR_EXPERIMENT_SUMMARY.md（调参实验日志）              │
+│   doc/hardware/<module>.md（每模块输出契约 + 数据结构 + 边界）  │
+│   doc/hardware/luna-panel-bridge.md（信号链 + 状态机 + 验收）   │
+│   doc/progress/evt-radar-bringup.md（调参实验日志）            │
 ├────────────────────────────────────────────────────────────────┤
 │ L2 ── 驱动/组件层（工程师维护，PM 只读）                        │
 │   components/my_<area>_<func>/（snake_case + my_ 前缀）        │
-│   doc/coding_standard.md（C 句柄式不透明指针规范）              │
+│   doc/standards/coding-standard.md（C 句柄式不透明指针规范）    │
 ├────────────────────────────────────────────────────────────────┤
 │ L1 ── 硬件契约层（一次性产出，几乎不变）                        │
 │   reference/hardware/（datasheet PDF）                         │
@@ -196,13 +196,13 @@ CLAUDE.md / AGENTS.md 内强制声明：
 - 嵌套 ≤ 3 层
 - 错误码统一 `int` 返回（参考 `esp_err_t`）
 - 内存申请失败必须返回错误
-- 详见 [doc/coding_standard.md](../../../doc/coding_standard.md)
+- 详见 [doc/standards/coding-standard.md](../../../doc/standards/coding-standard.md)
 
 ---
 
 ## 六、L3 功能需求层：PM/APP 视角的契约
 
-### 6.1 SYSTEM_OVERVIEW.md 写法（核心入口）
+### 6.1 模块输出契约写法（核心入口）
 
 四块必备：
 1. **检测能力表**：指标 / 范围 / 更新频率 / 延迟
@@ -210,7 +210,7 @@ CLAUDE.md / AGENTS.md 内强制声明：
 3. **数据有效性矩阵**（什么场景显示 "--" / "测量中" / "信号弱"）
 4. **能做 / 不能做**（边界声明，避免过度承诺）
 
-### 6.2 实施逻辑文档（如 luna-home-panel-logic.md）
+### 6.2 实施逻辑文档（PM 需求 → 硬件落地版）
 
 把上层 PM/UI 需求**重排为接口契约 + 信号链 + 状态机**，让硬件工程师"看完能动手"。
 
@@ -224,9 +224,8 @@ CLAUDE.md / AGENTS.md 内强制声明：
 
 ### 6.3 实验日志习惯
 
-每次调参留三件套：
-- `RADAR_EXPERIMENT_SUMMARY.md` — 实验结论
-- `radar_score_debug_log.md` — 中间过程
+每次调参留两件套：
+- `doc/progress/evt-<topic>-bringup.md` — 实验结论（按 EVT/DVT 里程碑命名）
 - `tools/records/<date>/` — 真实采集数据 + hypnogram + summary.json
 
 校准值都写日期：`(2026-04-12)`。
@@ -253,12 +252,12 @@ CLAUDE.md / AGENTS.md 内强制声明：
 - [ ] 3. 写 `CLAUDE.md`：项目定位 + 主工作路径表 + 硬件参数表 + 关键约束 + 期望日志
 - [ ] 4. 复制 `CLAUDE.md` 为 `AGENTS.md`，开头改成"Codex 适配版本"
 - [ ] 5. 写 `.cursorrules`：只放 5-7 行风格偏好
-- [ ] 6. 写 `doc/coding_standard.md`（可直接复用本项目的 C 句柄式规范）
+- [ ] 6. 写 `doc/standards/coding-standard.md`（可直接复用本项目的 C 句柄式规范）
 - [ ] 7. 根目录写 `mempalace.yaml`（声明所有 rooms + exclude）
 - [ ] 8. 各语义子目录补 `mempalace.yaml`（声明该目录的局部 rooms）
 - [ ] 9. 第一个组件按 `components/my_<func>/` 结构搭起来
 - [ ] 10. 每个核心领域补一份 `.claude/skills/<domain>/SKILL.md`
-- [ ] 11. 写 `doc/SYSTEM_OVERVIEW.md`（哪怕只有占位接口）
+- [ ] 11. 写 `doc/hardware/lunawake-hardware.md` + 每模块 md（哪怕只有占位接口）
 - [ ] 12. 设置 `.claude/settings.json` 沉淀常用授权命令
 
 ---
@@ -282,4 +281,4 @@ CLAUDE.md / AGENTS.md 内强制声明：
 4. **mempalace 分布式上下文** 解决"AI 进哪个目录就该懂哪个目录"的局部相关性问题。
 5. **多 AI 兼容**（Claude/Codex/Cursor）让团队不被单一工具锁定，三套规范同源同步。
 
-—— 这套方法论在 BY001 项目上的实测：8 天独立完成 3-4 个中级雷达工程师 1 个月的工作量（详见 [doc/DEVELOPMENT_EFFICIENCY_REPORT.md](../../../doc/DEVELOPMENT_EFFICIENCY_REPORT.md)）。
+—— 这套方法论在 BY001 项目上的实测：8 天独立完成 3-4 个中级雷达工程师 1 个月的工作量。

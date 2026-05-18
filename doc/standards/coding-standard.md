@@ -1,5 +1,7 @@
 # C/C++ 编码规范
 
+> Status: 🟢 current · Last reviewed: 2026-03-30
+
 ## 语言使用原则
 
 - 保持 C 的写法，可以使用少部分 C++ 的功能

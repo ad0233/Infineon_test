@@ -1,5 +1,7 @@
-# BY001-ESP32 雷达系统实验总结
+# EVT — 雷达点亮 + 算法基线实验记录
 
+> Status: 🟢 archived · Last reviewed: 2026-04-13 · EVT 阶段归档
+>
 > 项目：ESP32-P4 + BGT60TR13C 60GHz 雷达 + AHT20 + VEML7700 + WS2812
 > 周期：2026-04-06 ~ 2026-04-13
 
@@ -217,4 +219,4 @@ rgb_ctrl_task (5Hz):
 3. **信噪比优先**：频谱差分 SNR 差，不如直接用已有的 ampCV/binSpan（信噪比高 3-5 倍）
 4. **场景化校准**：空场/静坐/轻微/中等/大动作分档采集，阈值取中点
 5. **硬件认知补全**：USB-JTAG / USB-UART / UART0 的区别导致多次调试偏离，查网表确认才定位
-6. **记录不是选项**：vitals_status.md + SKILL.md + MemPalace 的实时更新是持续迭代的基础
+6. **记录不是选项**：evt-vitals-baseline.md + SKILL.md + MemPalace 的实时更新是持续迭代的基础

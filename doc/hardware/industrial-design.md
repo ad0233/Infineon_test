@@ -1,10 +1,12 @@
-# 03 — 操作与体验需求（结构组用）
+# 操作与体验需求
+
+> Status: 🟢 current · Last reviewed: 2026-05-18 · 结构 / ID 组用
 
 **项目**：Lunawake 床头硬件（BY001 / 主板 BY-SA-V001）
 **版本**：EVT → DVT 交接
 **日期**：2026-05-10
 **适用读者**：结构 / ID / 模具 / 装配工艺
-**配套文档**：`04_product_spec.md`（整机规格书）
+**配套文档**：[product-spec.md](product-spec.md)（整机规格书）
 
 ---
 
@@ -57,7 +59,7 @@
 
 ### 2.1 弧形滑条 / 旋钮（结构与 ID 决定）
 
-`luna-home-panel-logic.md §7` 定义了 Auto / Manual 双语义。结构组需提供：
+[luna-panel-bridge.md §7](luna-panel-bridge.md) 定义了 Auto / Manual 双语义。结构组需提供：
 - **一个连续位置输入**（电容滑条 / 旋钮编码器 / 触摸环）— 软件按当前模式映射
 - 操作过程**可单手完成**，无需视觉确认
 - 手指离开 1.5 s 后**位置锁定不漂移**
@@ -95,7 +97,7 @@
 
 ### 3.2 暖光光柱（待结构 + ID 定型）
 
-软件契约见 `luna-home-panel-logic.md §6`，结构需支持：
+软件契约见 [luna-panel-bridge.md §6](luna-panel-bridge.md)，结构需支持：
 - 光柱**与声景共相位**（蜡烛熄灭曲线），所以亮度 PWM 必须**稳定可调到 0.1% 以下**
 - 光谱要求：**低 melanopic**（峰值压在褪黑素抑制阈下）— 用 1800 K – 2200 K 暖光 LED
 - 朝向：**不直射用户眼睛**，建议向上/向床面 wash light，或漫射柱体
@@ -178,7 +180,7 @@
 
 ## 9. 不在本文档范围
 
-- 电气详细参数 → `04_product_spec.md`
-- 雷达罩硬约束清单 → `04_product_spec.md §雷达罩`
-- 软件状态机细节 → `doc/luna-home-panel-logic.md`
-- 上层 ConfigCard / APP 契约 → `doc/luna-home-panel-logic.md`
+- 电气详细参数 → [product-spec.md](product-spec.md)
+- 雷达罩硬约束清单 → [product-spec.md §5 雷达罩](product-spec.md)
+- 软件状态机细节 → [luna-panel-bridge.md](luna-panel-bridge.md)
+- 上层 ConfigCard / APP 契约 → [luna-panel-bridge.md](luna-panel-bridge.md)

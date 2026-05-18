@@ -1,4 +1,6 @@
-# 05 — BY001 硬件能力说明书（给 Luna 软件团队）
+# BY001 硬件能力说明书
+
+> Status: 🟢 current · Last reviewed: 2026-05-18
 
 受众：Luna 软件团队（first），硬件 / 固件团队（second）。
 目的：让软件侧准确知道硬件「能做什么 / 不能做什么 / 哪些还在调试」，避免基于错误假设设计上层。
@@ -162,14 +164,22 @@ typedef struct {
 
 | 文件 | 内容 |
 |---|---|
-| `doc/handover/03_operation_experience.md` | 操作与体验需求（结构组用，含摆放几何） |
-| `doc/handover/04_product_spec.md` | 整机规格书（含雷达透波硬约束） |
-| `doc/SYSTEM_OVERVIEW.md` | 雷达系统能力总览（= 软件侧 `by001-radar-system.md` 的源） |
-| `doc/vitals_status.md` | 雷达全参数表（呼吸/心率/presence/RBM 算法细节 + 校准记录） |
-| `doc/RADAR_EXPERIMENT_SUMMARY.md` | 从硬件点亮到产品化的实验记录 + 问题↔解决方案对照表 |
+| [industrial-design.md](industrial-design.md) | 操作与体验需求（结构组用，含摆放几何） |
+| [product-spec.md](product-spec.md) | 整机规格书（含雷达透波硬约束） |
+| [radar.md](radar.md) | 60 GHz 雷达模块（输出契约 + 算法参数） |
+| [microphone.md](microphone.md) | 麦克风阵列模块 |
+| [audio.md](audio.md) | 音频输出模块 |
+| [environment.md](environment.md) | 环境传感模块（温湿/光/气压） |
+| [indicator.md](indicator.md) | LED 状态指示 + 按键 + 滑条 |
+| [power.md](power.md) | 电源管理模块 |
+| [networking.md](networking.md) | WiFi / BT / 天线 |
+| [app-protocol.md](app-protocol.md) | ESP ↔ App 通信契约（BluFi + WS） |
+| [luna-panel-bridge.md](luna-panel-bridge.md) | 对 Luna 软件团队的硬件实施契约 |
+| [../progress/evt-radar-bringup.md](../progress/evt-radar-bringup.md) | 从硬件点亮到产品化的实验记录 + 问题↔解决方案对照表 |
+| [../progress/evt-vitals-baseline.md](../progress/evt-vitals-baseline.md) | 雷达 vitals 算法基线快照 + 校准记录 |
+| [assets/netlist-BY-SA-V001-2026-05-06.enet](assets/netlist-BY-SA-V001-2026-05-06.enet) | 主板网表（完整 BOM + 网络连接） |
 | `components/my_lidar_inf/my_lidar_inf.h` | 对外数据结构与 API（权威） |
 | `components/my_lidar_inf/resource_map.h` | 雷达 / LED 引脚定义（权威） |
 | `CLAUDE.md` | 项目硬约束与禁忌（FIFO 分片 / SPI 时钟 / 初始化顺序 / 嵌入式约束） |
 | `.claude/skills/radar-vitals/SKILL.md` | vitals 调参方法论与参数索引 |
 | `.codex/skills/infineon-bgt60tr13c-radar/SKILL.md` | BGT60TR13C 雷达驱动与配置 |
-| `doc/Netlist_BY-SA-V001_2026-05-06.enet` | 主板网表（完整 BOM + 网络连接） |

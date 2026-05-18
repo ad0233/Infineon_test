@@ -1,5 +1,7 @@
 # Lunawake App 通信协议 v1
 
+> Status: 🟢 current · Last reviewed: 2026-04-20
+
 本文档定义 **ESP32-P4 设备 ↔ 手机 App** 之间的配网与数据通信契约。交付给 App 开发方作为对接规范。
 
 - **配网通道**：BluFi over BLE（Espressif 标准协议）
